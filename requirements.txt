@@ -1,0 +1,6 @@
+# Para instalar os pacotes necessários, execute:
+# pip install -r requirements.txt
+
+flask==2.3.3
+python-dotenv==1.0.1
+pytest==7.4.4
