@@ -33,6 +33,7 @@ The project demonstrates how to build a **simple CRUD web app** (name, phone num
 ---
 
 ## 📂 Repository Structure
+```
 VibeCForms/
 │
 ├── src/ # Main source code
@@ -53,7 +54,7 @@ VibeCForms/
 ├── requirements.txt
 ├── .gitignore
 └── LICENSE
-
+```
 
 ---
 
