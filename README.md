@@ -19,7 +19,8 @@ The project demonstrates how to build a **simple CRUD web app** (name, phone num
 - **pytest** (unit testing)  
 - **dotenv** (environment management)  
 - **VSCode**  
-- **GitHub Copilot (free version)**  
+- **GitHub Copilot (free version)**
+- **ChatGPT (Support and Consulting)** 
 
 ---
 
