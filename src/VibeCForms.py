@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATA_FILE = os.path.join(os.path.dirname(__file__), "registros.txt")
+DATA_FILE = os.path.join(os.path.dirname(__file__), "data/registros.txt")
 
 app = Flask(__name__)
 
