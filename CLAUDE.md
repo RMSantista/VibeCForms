@@ -34,15 +34,21 @@ All operations use the index position in the forms list (not a unique ID) to ide
 uv sync
 ```
 
-### Run the application
+### Run the application (development mode)
 ```bash
-uv run python src/VibeCForms.py
+uv run hatch run dev
 ```
-The server starts on `http://0.0.0.0:5000`
+The server starts on `http://0.0.0.0:5000` with debug mode enabled
+
+### Run the application (production mode with Gunicorn)
+```bash
+uv run hatch run serve
+```
+Runs with 4 workers on `http://0.0.0.0:5000`
 
 ### Run all tests
 ```bash
-uv run pytest
+uv run hatch run test
 ```
 
 ### Run a specific test
@@ -53,6 +59,21 @@ uv run pytest tests/test_form.py::test_write_and_read_forms
 ### Run tests with verbose output
 ```bash
 uv run pytest -v
+```
+
+### Format code
+```bash
+uv run hatch run format
+```
+
+### Check code formatting
+```bash
+uv run hatch run lint
+```
+
+### Run pre-commit hooks
+```bash
+uv run hatch run check
 ```
 
 ## Testing Approach

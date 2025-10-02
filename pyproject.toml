@@ -12,6 +12,7 @@ authors = [
 dependencies = [
     "flask==2.3.3",
     "python-dotenv==1.0.1",
+    "gunicorn>=21.0.0",
 ]
 
 [project.optional-dependencies]
@@ -31,4 +32,13 @@ dev-dependencies = [
     "pytest==7.4.4",
     "black>=24.0.0",
     "pre-commit>=3.0.0",
+    "hatch>=1.9.0",
 ]
+
+[tool.hatch.envs.default.scripts]
+dev = "python src/VibeCForms.py"
+serve = "gunicorn -w 4 -b 0.0.0.0:5000 wsgi:app"
+test = "pytest"
+format = "black src/ tests/"
+lint = "black --check src/ tests/"
+check = "pre-commit run --all-files"

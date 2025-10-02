@@ -83,19 +83,39 @@ git clone https://github.com/<your-username>/VibeCForms.git
 cd VibeCForms
 uv sync
 ```
-Run the application:
 
+### Run the application (development mode)
 ```bash
-uv run python src/VibeCForms.py
+uv run hatch run dev
 ```
+
+### Run the application (production mode with Gunicorn)
+```bash
+uv run hatch run serve
+```
+
 Access in your browser:
 - http://localhost:5000/contatos (contacts form)
 - http://localhost:5000/produtos (products form - example)
 
-Run tests with:
-
+### Run tests
 ```bash
-uv run pytest
+uv run hatch run test
+```
+
+### Format code
+```bash
+uv run hatch run format
+```
+
+### Check code formatting
+```bash
+uv run hatch run lint
+```
+
+### Run pre-commit hooks
+```bash
+uv run hatch run check
 ```
 
 ### Creating Your Own Form
