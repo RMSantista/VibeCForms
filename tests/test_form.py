@@ -2,6 +2,7 @@ import os
 import json
 from src.VibeCForms import read_forms, write_forms, load_spec, validate_form_data
 
+
 def test_write_and_read_forms(tmp_path):
     """Test writing and reading forms with spec."""
     test_file = tmp_path / "test.txt"
@@ -12,18 +13,24 @@ def test_write_and_read_forms(tmp_path):
         "fields": [
             {"name": "nome", "label": "Nome", "type": "text", "required": True},
             {"name": "telefone", "label": "Telefone", "type": "tel", "required": True},
-            {"name": "whatsapp", "label": "WhatsApp", "type": "checkbox", "required": False}
-        ]
+            {
+                "name": "whatsapp",
+                "label": "WhatsApp",
+                "type": "checkbox",
+                "required": False,
+            },
+        ],
     }
 
     forms = [
         {"nome": "Ana", "telefone": "123", "whatsapp": True},
-        {"nome": "Bob", "telefone": "456", "whatsapp": False}
+        {"nome": "Bob", "telefone": "456", "whatsapp": False},
     ]
 
     write_forms(forms, spec, str(test_file))
     result = read_forms(spec, str(test_file))
     assert result == forms
+
 
 def test_update_form(tmp_path):
     """Test updating a form entry."""
@@ -34,13 +41,18 @@ def test_update_form(tmp_path):
         "fields": [
             {"name": "nome", "label": "Nome", "type": "text", "required": True},
             {"name": "telefone", "label": "Telefone", "type": "tel", "required": True},
-            {"name": "whatsapp", "label": "WhatsApp", "type": "checkbox", "required": False}
-        ]
+            {
+                "name": "whatsapp",
+                "label": "WhatsApp",
+                "type": "checkbox",
+                "required": False,
+            },
+        ],
     }
 
     forms = [
         {"nome": "Ana", "telefone": "123", "whatsapp": True},
-        {"nome": "Bob", "telefone": "456", "whatsapp": False}
+        {"nome": "Bob", "telefone": "456", "whatsapp": False},
     ]
 
     write_forms(forms, spec, str(test_file))
@@ -52,6 +64,7 @@ def test_update_form(tmp_path):
     result = read_forms(spec, str(test_file))
     assert result[0]["telefone"] == "999"
 
+
 def test_delete_form(tmp_path):
     """Test deleting a form entry."""
     test_file = tmp_path / "test.txt"
@@ -61,13 +74,18 @@ def test_delete_form(tmp_path):
         "fields": [
             {"name": "nome", "label": "Nome", "type": "text", "required": True},
             {"name": "telefone", "label": "Telefone", "type": "tel", "required": True},
-            {"name": "whatsapp", "label": "WhatsApp", "type": "checkbox", "required": False}
-        ]
+            {
+                "name": "whatsapp",
+                "label": "WhatsApp",
+                "type": "checkbox",
+                "required": False,
+            },
+        ],
     }
 
     forms = [
         {"nome": "Ana", "telefone": "123", "whatsapp": True},
-        {"nome": "Bob", "telefone": "456", "whatsapp": False}
+        {"nome": "Bob", "telefone": "456", "whatsapp": False},
     ]
 
     write_forms(forms, spec, str(test_file))
@@ -80,19 +98,20 @@ def test_delete_form(tmp_path):
     assert len(result) == 1
     assert result[0]["nome"] == "Ana"
 
+
 def test_validation():
     """Test form validation logic."""
     spec = {
         "title": "Test Form",
         "fields": [
             {"name": "nome", "label": "Nome", "type": "text", "required": True},
-            {"name": "telefone", "label": "Telefone", "type": "tel", "required": True}
+            {"name": "telefone", "label": "Telefone", "type": "tel", "required": True},
         ],
         "validation_messages": {
             "all_empty": "Campos obrigatórios vazios",
             "nome": "Nome é obrigatório",
-            "telefone": "Telefone é obrigatório"
-        }
+            "telefone": "Telefone é obrigatório",
+        },
     }
 
     # Test all empty
@@ -114,6 +133,7 @@ def test_validation():
     form_data = {"nome": "Test", "telefone": "123"}
     error = validate_form_data(spec, form_data)
     assert error == ""
+
 
 def test_load_spec():
     """Test loading a spec file."""

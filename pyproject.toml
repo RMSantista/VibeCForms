@@ -29,4 +29,6 @@ packages = ["src"]
 [tool.uv]
 dev-dependencies = [
     "pytest==7.4.4",
+    "black>=24.0.0",
+    "pre-commit>=3.0.0",
 ]
