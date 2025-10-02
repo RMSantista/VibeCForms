@@ -1,5 +1,5 @@
 import os
-from VibeCForms import read_forms, write_forms, DATA_FILE
+from src.VibeCForms import read_forms, write_forms, DATA_FILE
 
 def test_write_and_read_forms(tmp_path):
     test_file = tmp_path / "registros.txt"
