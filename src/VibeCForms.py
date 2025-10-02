@@ -10,6 +10,7 @@ SPECS_DIR = os.path.join(os.path.dirname(__file__), "specs")
 
 app = Flask(__name__)
 
+
 def load_spec(form_name):
     """Load and validate a form specification file."""
     spec_path = os.path.join(SPECS_DIR, f"{form_name}.json")
@@ -25,9 +26,11 @@ def load_spec(form_name):
 
     return spec
 
+
 def get_data_file(form_name):
     """Get the data file path for a given form."""
     return os.path.join(os.path.dirname(__file__), f"{form_name}.txt")
+
 
 def read_forms(spec, data_file):
     """Read forms from data file based on spec definition."""
@@ -68,6 +71,7 @@ def read_forms(spec, data_file):
 
     return forms
 
+
 def write_forms(forms, spec, data_file):
     """Write forms to data file based on spec definition."""
     with open(data_file, "w", encoding="utf-8") as f:
@@ -85,6 +89,7 @@ def write_forms(forms, spec, data_file):
 
             f.write(";".join(values) + "\n")
 
+
 def generate_form_field(field, form_data=None):
     """Generate HTML for a single form field based on spec."""
     field_name = field["name"]
@@ -98,26 +103,29 @@ def generate_form_field(field, form_data=None):
 
     if field_type == "checkbox":
         checked = "checked" if (form_data and form_data.get(field_name)) else ""
-        return f'''
+        return f"""
         <div class="form-row">
             <label for="{field_name}">{field_label}:</label>
             <input type="checkbox" name="{field_name}" id="{field_name}" {checked}>
-        </div>'''
+        </div>"""
     elif field_type == "textarea":
         required_attr = "required" if required else ""
-        return f'''
+        return f"""
         <div class="form-row">
             <label for="{field_name}">{field_label}:</label>
             <textarea name="{field_name}" id="{field_name}" {required_attr}>{value}</textarea>
-        </div>'''
+        </div>"""
     else:
         required_attr = "required" if required else ""
-        input_type = field_type if field_type in ["text", "tel", "email", "number"] else "text"
-        return f'''
+        input_type = (
+            field_type if field_type in ["text", "tel", "email", "number"] else "text"
+        )
+        return f"""
         <div class="form-row">
             <label for="{field_name}">{field_label}:</label>
             <input type="{input_type}" name="{field_name}" id="{field_name}" {required_attr} value="{value}">
-        </div>'''
+        </div>"""
+
 
 def generate_table_headers(spec):
     """Generate table headers from spec."""
@@ -130,6 +138,7 @@ def generate_table_headers(spec):
 
     headers += '<th style="width: 25%;">Ações</th>'
     return headers
+
 
 def generate_table_row(form_data, spec, idx, form_name):
     """Generate a table row from form data."""
@@ -147,16 +156,17 @@ def generate_table_row(form_data, spec, idx, form_name):
 
         cells += f"<td>{display_value}</td>\n"
 
-    cells += f'''<td>
+    cells += f"""<td>
         <form action="/{form_name}/edit/{idx}" method="get" style="display:inline;">
             <button class="icon-btn edit" title="Editar"><i class="fa fa-pencil-alt"></i></button>
         </form>
         <form action="/{form_name}/delete/{idx}" method="get" style="display:inline;" onsubmit="return confirm('Confirma exclusão?');">
             <button class="icon-btn delete" title="Excluir"><i class="fa fa-trash"></i></button>
         </form>
-    </td>'''
+    </td>"""
 
     return f"<tr>{cells}</tr>"
+
 
 def validate_form_data(spec, form_data):
     """Validate form data based on spec. Returns error message or empty string."""
@@ -164,7 +174,11 @@ def validate_form_data(spec, form_data):
     required_fields = [f for f in spec["fields"] if f.get("required", False)]
 
     # Check if all required fields are empty
-    all_empty = all(not form_data.get(f["name"], "").strip() for f in required_fields if f["type"] != "checkbox")
+    all_empty = all(
+        not form_data.get(f["name"], "").strip()
+        for f in required_fields
+        if f["type"] != "checkbox"
+    )
 
     if all_empty and required_fields:
         return validation_messages.get("all_empty", "Preencha os campos obrigatórios.")
@@ -177,10 +191,13 @@ def validate_form_data(spec, form_data):
         if field_type != "checkbox":
             value = form_data.get(field_name, "").strip()
             if not value:
-                field_msg = validation_messages.get(field_name, f"O campo {field['label']} é obrigatório.")
+                field_msg = validation_messages.get(
+                    field_name, f"O campo {field['label']} é obrigatório."
+                )
                 return field_msg
 
     return ""
+
 
 def get_main_template():
     """Return the main page template with dynamic form generation."""
@@ -249,6 +266,7 @@ def get_main_template():
     </html>
     """
 
+
 def get_edit_template():
     """Return the edit page template with dynamic form generation."""
     return """
@@ -292,6 +310,7 @@ def get_edit_template():
     </html>
     """
 
+
 @app.route("/<form_name>", methods=["GET", "POST"])
 def index(form_name):
     spec = load_spec(form_name)
@@ -316,9 +335,16 @@ def index(form_name):
         if error:
             # Re-render with error and preserve form data
             forms = read_forms(spec, data_file)
-            form_fields = "".join([generate_form_field(f, form_data) for f in spec["fields"]])
+            form_fields = "".join(
+                [generate_form_field(f, form_data) for f in spec["fields"]]
+            )
             table_headers = generate_table_headers(spec)
-            table_rows = "".join([generate_table_row(forms[i], spec, i, form_name) for i in range(len(forms))])
+            table_rows = "".join(
+                [
+                    generate_table_row(forms[i], spec, i, form_name)
+                    for i in range(len(forms))
+                ]
+            )
 
             return render_template_string(
                 get_main_template(),
@@ -326,7 +352,7 @@ def index(form_name):
                 error=error,
                 form_fields=form_fields,
                 table_headers=table_headers,
-                table_rows=table_rows
+                table_rows=table_rows,
             )
 
         # Save the form
@@ -339,7 +365,9 @@ def index(form_name):
     forms = read_forms(spec, data_file)
     form_fields = "".join([generate_form_field(f) for f in spec["fields"]])
     table_headers = generate_table_headers(spec)
-    table_rows = "".join([generate_table_row(forms[i], spec, i, form_name) for i in range(len(forms))])
+    table_rows = "".join(
+        [generate_table_row(forms[i], spec, i, form_name) for i in range(len(forms))]
+    )
 
     return render_template_string(
         get_main_template(),
@@ -347,13 +375,15 @@ def index(form_name):
         error="",
         form_fields=form_fields,
         table_headers=table_headers,
-        table_rows=table_rows
+        table_rows=table_rows,
     )
+
 
 # Redirect root to default form (contatos)
 @app.route("/", methods=["GET"])
 def root():
     return redirect("/contatos")
+
 
 @app.route("/<form_name>/edit/<int:idx>", methods=["GET", "POST"])
 def edit(form_name, idx):
@@ -382,13 +412,15 @@ def edit(form_name, idx):
 
         if error:
             # Re-render with error
-            form_fields = "".join([generate_form_field(f, form_data) for f in spec["fields"]])
+            form_fields = "".join(
+                [generate_form_field(f, form_data) for f in spec["fields"]]
+            )
             return render_template_string(
                 get_edit_template(),
                 title=spec["title"],
                 form_name=form_name,
                 error=error,
-                form_fields=form_fields
+                form_fields=form_fields,
             )
 
         # Update the form
@@ -404,8 +436,9 @@ def edit(form_name, idx):
         title=spec["title"],
         form_name=form_name,
         error="",
-        form_fields=form_fields
+        form_fields=form_fields,
     )
+
 
 @app.route("/<form_name>/delete/<int:idx>")
 def delete(form_name, idx):
@@ -420,14 +453,17 @@ def delete(form_name, idx):
     write_forms(forms, spec, data_file)
     return redirect(f"/{form_name}")
 
+
 # Keep old routes for backward compatibility
 @app.route("/edit/<int:idx>", methods=["GET", "POST"])
 def old_edit(idx):
     return redirect(f"/contatos/edit/{idx}")
 
+
 @app.route("/delete/<int:idx>")
 def old_delete(idx):
     return redirect(f"/contatos/delete/{idx}")
+
 
 if __name__ == "__main__":
     print("Iniciando servidor Flask em http://0.0.0.0:5000 ...")
