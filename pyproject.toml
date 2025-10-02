@@ -1,0 +1,44 @@
+[project]
+name = "vibecforms"
+version = "1.0.0"
+description = "Flask-based contact management web application built as an exploration of Vibe Coding - AI-assisted development"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [
+    { name = "VibeCForms Contributors" }
+]
+
+dependencies = [
+    "flask==2.3.3",
+    "python-dotenv==1.0.1",
+    "gunicorn>=21.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==7.4.4",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[dependency-groups]
+dev = [
+    "pytest==7.4.4",
+    "black>=24.0.0",
+    "pre-commit>=3.0.0",
+    "hatch>=1.9.0",
+]
+
+[tool.hatch.envs.default.scripts]
+dev = "python src/VibeCForms.py"
+serve = "gunicorn -w 4 -b 0.0.0.0:5000 wsgi:app"
+test = "pytest"
+format = "black src/ tests/"
+lint = "black --check src/ tests/"
+check = "pre-commit run --all-files"

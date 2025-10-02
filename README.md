@@ -19,49 +19,59 @@ The project demonstrates how to build a **simple CRUD web app** (name, phone num
 - **pytest** (unit testing)  
 - **dotenv** (environment management)  
 - **VSCode**  
-- **GitHub Copilot (free version)**  
+- **GitHub Copilot (free version)**
+- **ChatGPT (Support and Consulting)** 
 
 ---
 
 ## 🚧 Current Status
-- ✅ First version completed: **simple contact form with CRUD** (create, read, update, delete).  
-- ✅ Unit tests implemented with `pytest`.  
-- ✅ Validations included (no empty records, required name/phone).  
-- 🎨 Styled with CSS + icons (FontAwesome).  
-- 🔜 Next step: evolve into **dynamic form generation**.  
+- ✅ First version completed: **simple contact form with CRUD** (create, read, update, delete).
+- ✅ Unit tests implemented with `pytest`.
+- ✅ Validations included (no empty records, required name/phone).
+- 🎨 Styled with CSS + icons (FontAwesome).
+- ✅ **Dynamic form generation** now implemented!
+  - Forms are generated from JSON spec files
+  - URL-based routing (e.g., `/contatos`, `/produtos`)
+  - Support for multiple field types (text, email, number, checkbox, textarea)
+  - Automatic validation based on specs  
 
 ---
 
 ## 📂 Repository Structure
+```
 VibeCForms/
 │
-├── src/ # Main source code
-│ └── VibeCForms.py
+├── src/                      # Main source code
+│   ├── VibeCForms.py        # Main application
+│   ├── specs/               # Form specification files (JSON)
+│   │   ├── contatos.json    # Contacts form spec
+│   │   └── produtos.json    # Products form spec (example)
+│   ├── contatos.txt         # Contact data storage
+│   └── produtos.txt         # Product data storage
 │
-├── tests/ # Unit tests
-│ └── test_form.py
+├── tests/                    # Unit tests
+│   └── test_form.py
 │
-├── docs/ # Documentation
-│ ├── prompts.md # Prompts (kept in Portuguese for originality)
-│ ├── learning_notes.md # Notes and reflections from the author
-│ └── roadmap.md # Future evolution plan
-│
-├── data/ # Example data (if used)
-│ └── registros.txt
+├── docs/                     # Documentation
+│   ├── prompts.md           # Prompts (kept in Portuguese)
+│   ├── learning_notes.md    # Learning notes and reflections
+│   ├── roadmap.md           # Future evolution plan
+│   └── dynamic_forms.md     # Dynamic forms guide (NEW!)
 │
 ├── README.md
 ├── requirements.txt
 ├── .gitignore
 └── LICENSE
-
+```
 
 ---
 
 ## 📚 Documentation
-- [docs/prompts.md](docs/prompts.md) → contains the exact prompts used and AI responses.  
-  > ⚠️ All prompts are **kept in Portuguese** to preserve the originality of the author’s interaction with the AI.  
-- [docs/learning_notes.md](docs/learning_notes.md) → author’s notes and reflections while learning.  
-- [docs/roadmap.md](docs/roadmap.md) → planned next steps and evolution of the project.  
+- [docs/prompts.md](docs/prompts.md) → contains the exact prompts used and AI responses.
+  > ⚠️ All prompts are **kept in Portuguese** to preserve the originality of the author's interaction with the AI.
+- [docs/learning_notes.md](docs/learning_notes.md) → author's notes and reflections while learning.
+- [docs/roadmap.md](docs/roadmap.md) → planned next steps and evolution of the project.
+- **[docs/dynamic_forms.md](docs/dynamic_forms.md)** → complete guide on creating dynamic forms (NEW!)  
 
 ---
 
@@ -71,20 +81,48 @@ Clone the repository and install dependencies:
 ```bash
 git clone https://github.com/<your-username>/VibeCForms.git
 cd VibeCForms
-pip install -r requirements.txt
+uv sync
 ```
-Run the application:
 
+### Run the application (development mode)
 ```bash
-python src/VibeCForms.py
+uv run hatch run dev
 ```
-Access in your browser: http://localhost:5000
 
-Run tests with:
-
+### Run the application (production mode with Gunicorn)
 ```bash
-pytest
+uv run hatch run serve
 ```
+
+Access in your browser:
+- http://localhost:5000/contatos (contacts form)
+- http://localhost:5000/produtos (products form - example)
+
+### Run tests
+```bash
+uv run hatch run test
+```
+
+### Format code
+```bash
+uv run hatch run format
+```
+
+### Check code formatting
+```bash
+uv run hatch run lint
+```
+
+### Run pre-commit hooks
+```bash
+uv run hatch run check
+```
+
+### Creating Your Own Form
+
+1. Create a JSON spec file in `src/specs/<form_name>.json`
+2. Access `http://localhost:5000/<form_name>`
+3. See [docs/dynamic_forms.md](docs/dynamic_forms.md) for detailed instructions
 
 ---
 
