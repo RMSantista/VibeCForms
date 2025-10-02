@@ -7,6 +7,9 @@ load_dotenv()
 
 DATA_FILE = os.path.join(os.path.dirname(__file__), "../data/registros.txt")
 
+# Directory containing form specification JSON files
+SPECS_DIR = os.path.join(os.path.dirname(__file__), "../specs")
+
 app = Flask(__name__)
 
 
