@@ -1,6 +1,15 @@
 import os
 import json
-from src.VibeCForms import read_forms, write_forms, load_spec, validate_form_data
+from src.VibeCForms import (
+    read_forms,
+    write_forms,
+    load_spec,
+    validate_form_data,
+    get_folder_icon,
+    scan_specs_directory,
+    get_all_forms_flat,
+    generate_menu_html,
+)
 
 
 def test_write_and_read_forms(tmp_path):
@@ -144,3 +153,136 @@ def test_load_spec():
     assert spec["fields"][0]["name"] == "nome"
     assert spec["fields"][1]["name"] == "telefone"
     assert spec["fields"][2]["name"] == "whatsapp"
+
+
+def test_get_folder_icon():
+    """Test folder icon assignment."""
+    assert get_folder_icon("financeiro") == "fa-dollar-sign"
+    assert get_folder_icon("rh") == "fa-users"
+    assert get_folder_icon("departamentos") == "fa-sitemap"
+    # produtos is not in the icon mapping, so it returns the default
+    assert get_folder_icon("desconhecido") == "fa-folder"
+
+
+def test_scan_specs_directory():
+    """Test scanning specs directory for menu structure."""
+    menu_items = scan_specs_directory()
+
+    # Should find multiple items
+    assert len(menu_items) > 0
+
+    # Check if we have both forms and folders
+    has_forms = any(item["type"] == "form" for item in menu_items)
+    has_folders = any(item["type"] == "folder" for item in menu_items)
+
+    assert has_forms or has_folders
+
+    # Check structure of a form item
+    form_items = [item for item in menu_items if item["type"] == "form"]
+    if form_items:
+        form = form_items[0]
+        assert "name" in form
+        assert "path" in form
+        assert "title" in form
+        assert "icon" in form
+
+    # Check structure of a folder item
+    folder_items = [item for item in menu_items if item["type"] == "folder"]
+    if folder_items:
+        folder = folder_items[0]
+        assert "name" in folder
+        assert "path" in folder
+        assert "icon" in folder
+        assert "children" in folder
+        assert isinstance(folder["children"], list)
+
+
+def test_get_all_forms_flat():
+    """Test flattening menu structure to get all forms."""
+    menu_items = scan_specs_directory()
+    forms = get_all_forms_flat(menu_items)
+
+    # Should find multiple forms
+    assert len(forms) > 0
+
+    # Check structure of each form
+    for form in forms:
+        assert "title" in form
+        assert "path" in form
+        assert "icon" in form
+        assert "category" in form
+
+    # Check if nested forms have correct category
+    nested_forms = [f for f in forms if "/" in f["path"]]
+    if nested_forms:
+        # Categories should be capitalized folder names
+        for form in nested_forms:
+            assert form["category"] != ""
+
+
+def test_generate_menu_html():
+    """Test menu HTML generation."""
+    # Create sample menu structure
+    menu_items = [
+        {
+            "type": "form",
+            "name": "contatos",
+            "path": "contatos",
+            "title": "Agenda Pessoal",
+            "icon": "fa-address-book",
+        },
+        {
+            "type": "folder",
+            "name": "financeiro",
+            "path": "financeiro",
+            "icon": "fa-dollar-sign",
+            "children": [
+                {
+                    "type": "form",
+                    "name": "contas",
+                    "path": "financeiro/contas",
+                    "title": "Contas",
+                    "icon": "fa-dollar-sign",
+                }
+            ],
+        },
+    ]
+
+    html = generate_menu_html(menu_items)
+
+    # Check if HTML contains expected elements (note: outer <ul> is added in template)
+    assert "fa-address-book" in html
+    assert "Agenda Pessoal" in html
+    assert "fa-dollar-sign" in html
+    assert "financeiro" in html
+    assert "has-submenu" in html
+    assert "submenu" in html
+    assert "Contas" in html
+
+
+def test_load_spec_nested():
+    """Test loading nested spec files."""
+    spec = load_spec("financeiro/contas")
+
+    assert spec["title"] == "Contas"
+    assert len(spec["fields"]) == 4
+    assert spec["fields"][0]["name"] == "descricao"
+    assert spec["fields"][1]["name"] == "valor"
+
+
+def test_generate_menu_html_with_active():
+    """Test menu HTML generation with active item."""
+    menu_items = [
+        {
+            "type": "form",
+            "name": "contatos",
+            "path": "contatos",
+            "title": "Agenda Pessoal",
+            "icon": "fa-address-book",
+        }
+    ]
+
+    html = generate_menu_html(menu_items, current_form_path="contatos")
+
+    # Check if active class is present
+    assert "active" in html

@@ -1,0 +1,34 @@
+{
+  "title": "Áreas",
+  "fields": [
+    {
+      "name": "nome_area",
+      "label": "Nome da Área",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "responsavel",
+      "label": "Responsável",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "num_funcionarios",
+      "label": "Número de Funcionários",
+      "type": "number",
+      "required": false
+    },
+    {
+      "name": "descricao",
+      "label": "Descrição",
+      "type": "textarea",
+      "required": false
+    }
+  ],
+  "validation_messages": {
+    "all_empty": "Informe ao menos o nome da área e o responsável.",
+    "nome_area": "É obrigatório informar o nome da área.",
+    "responsavel": "É obrigatório informar o responsável."
+  }
+}
