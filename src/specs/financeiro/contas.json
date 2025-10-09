@@ -1,0 +1,34 @@
+{
+  "title": "Contas",
+  "fields": [
+    {
+      "name": "descricao",
+      "label": "Descrição",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "valor",
+      "label": "Valor",
+      "type": "number",
+      "required": true
+    },
+    {
+      "name": "vencimento",
+      "label": "Vencimento",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "pago",
+      "label": "Pago",
+      "type": "checkbox",
+      "required": false
+    }
+  ],
+  "validation_messages": {
+    "all_empty": "Informe ao menos a descrição e o valor da conta.",
+    "descricao": "É obrigatório informar a descrição da conta.",
+    "valor": "É obrigatório informar o valor da conta."
+  }
+}

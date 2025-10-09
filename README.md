@@ -1,7 +1,7 @@
 # VibeCForms
 
-**VibeCForms** is an open-source project in Python that explores the concept of **Vibe Coding** — programming conducted with Artificial Intelligence.  
-The project demonstrates how to build a **simple CRUD web app** (name, phone number, WhatsApp flag) using **only free tools**, with code and tests generated primarily by AI.
+**VibeCForms** is an open-source project in Python that explores the concept of **Vibe Coding** — programming conducted with Artificial Intelligence.
+The project demonstrates how to build a **dynamic form management system** using **only free tools**, with code and tests generated primarily by AI. It features JSON-based form specifications, hierarchical navigation, and a modern web interface.
 
 ---
 
@@ -26,14 +26,21 @@ The project demonstrates how to build a **simple CRUD web app** (name, phone num
 
 ## 🚧 Current Status
 - ✅ First version completed: **simple contact form with CRUD** (create, read, update, delete).
-- ✅ Unit tests implemented with `pytest`.
+- ✅ Unit tests implemented with `pytest` (11 tests passing).
 - ✅ Validations included (no empty records, required name/phone).
 - 🎨 Styled with CSS + icons (FontAwesome).
 - ✅ **Dynamic form generation** now implemented!
   - Forms are generated from JSON spec files
-  - URL-based routing (e.g., `/contatos`, `/produtos`)
+  - URL-based routing with support for nested paths (e.g., `/contatos`, `/financeiro/contas`)
   - Support for multiple field types (text, email, number, checkbox, textarea)
-  - Automatic validation based on specs  
+  - Automatic validation based on specs
+- ✅ **Modern Navigation System** implemented!
+  - 🏠 Main landing page with dynamic form cards
+  - 📋 Persistent sidebar menu with hierarchical navigation
+  - 📁 Multi-level submenu support (folders as categories)
+  - 🎯 Active item highlighting
+  - 🔄 Automatic directory scanning for form discovery
+  - 🎨 Intuitive icon assignment based on category names  
 
 ---
 
@@ -41,25 +48,34 @@ The project demonstrates how to build a **simple CRUD web app** (name, phone num
 ```
 VibeCForms/
 │
-├── src/                      # Main source code
-│   ├── VibeCForms.py        # Main application
-│   ├── specs/               # Form specification files (JSON)
-│   │   ├── contatos.json    # Contacts form spec
-│   │   └── produtos.json    # Products form spec (example)
-│   ├── contatos.txt         # Contact data storage
-│   └── produtos.txt         # Product data storage
+├── src/                           # Main source code
+│   ├── VibeCForms.py             # Main application
+│   ├── specs/                    # Form specification files (JSON)
+│   │   ├── contatos.json         # Contacts form spec (root level)
+│   │   ├── produtos.json         # Products form spec (root level)
+│   │   ├── financeiro/           # Financial forms category
+│   │   │   ├── contas.json       # Accounts form
+│   │   │   └── pagamentos.json   # Payments form
+│   │   └── rh/                   # HR forms category
+│   │       ├── funcionarios.json # Employees form
+│   │       └── departamentos/    # Departments subcategory
+│   │           └── areas.json    # Areas form
+│   ├── contatos.txt              # Contact data storage
+│   ├── produtos.txt              # Product data storage
+│   ├── financeiro_contas.txt     # Financial accounts data
+│   └── rh_funcionarios.txt       # HR employees data
 │
-├── tests/                    # Unit tests
+├── tests/                         # Unit tests (11 tests)
 │   └── test_form.py
 │
-├── docs/                     # Documentation
-│   ├── prompts.md           # Prompts (kept in Portuguese)
-│   ├── learning_notes.md    # Learning notes and reflections
-│   ├── roadmap.md           # Future evolution plan
-│   └── dynamic_forms.md     # Dynamic forms guide (NEW!)
+├── docs/                          # Documentation
+│   ├── prompts.md                # All prompts with detailed results
+│   ├── learning_notes.md         # Learning notes and reflections
+│   ├── roadmap.md                # Future evolution plan
+│   └── dynamic_forms.md          # Dynamic forms guide
 │
 ├── README.md
-├── requirements.txt
+├── pyproject.toml                 # Project configuration
 ├── .gitignore
 └── LICENSE
 ```
@@ -95,8 +111,15 @@ uv run hatch run serve
 ```
 
 Access in your browser:
+- http://localhost:5000/ (main page with all forms displayed as cards)
 - http://localhost:5000/contatos (contacts form)
-- http://localhost:5000/produtos (products form - example)
+- http://localhost:5000/produtos (products form)
+- http://localhost:5000/financeiro/contas (nested form example)
+
+The application features:
+- **Main Page**: Landing page with all available forms as interactive cards
+- **Sidebar Menu**: Persistent left menu with hierarchical navigation (hover over folders to reveal submenus)
+- **Dynamic Discovery**: All forms in `src/specs/` are automatically detected and displayed
 
 ### Run tests
 ```bash
@@ -120,9 +143,29 @@ uv run hatch run check
 
 ### Creating Your Own Form
 
+**Simple Form (Root Level):**
 1. Create a JSON spec file in `src/specs/<form_name>.json`
 2. Access `http://localhost:5000/<form_name>`
-3. See [docs/dynamic_forms.md](docs/dynamic_forms.md) for detailed instructions
+3. It will appear on the main page and in the sidebar menu
+
+**Organized Form (In Category):**
+1. Create a folder in `src/specs/<category>/`
+2. Create a JSON spec file in `src/specs/<category>/<form_name>.json`
+3. Access `http://localhost:5000/<category>/<form_name>`
+4. It will appear under the category folder in the sidebar (hover to reveal)
+
+**Multi-level Organization:**
+- You can nest folders indefinitely: `src/specs/rh/departamentos/areas.json`
+- Access via: `http://localhost:5000/rh/departamentos/areas`
+- Submenus will appear when hovering over parent folders
+
+**Automatic Features:**
+- Forms are automatically discovered when you add new spec files
+- Icons are assigned based on folder names (financeiro → 💲, rh → 👥)
+- Categories are displayed on the main page cards
+- Active menu items are highlighted
+
+See [docs/dynamic_forms.md](docs/dynamic_forms.md) for detailed JSON spec format and examples.
 
 ---
 
@@ -151,9 +194,20 @@ I am learning as I build, and my goal is to share both the code and the journey 
 ## 🌍 Português (Resumo)
 
 VibeCForms é um projeto open source em Python que explora o Vibe Coding, ou seja, programação conduzida por IA.
-A primeira versão entrega um CRUD simples (nome, telefone e WhatsApp) com validações, testes unitários e layout básico.
 
-📌 Toda a documentação de prompts será mantida em português para preservar a originalidade do que foi solicitado à IA.
+**Funcionalidades Implementadas:**
+- ✅ Sistema de formulários dinâmicos baseados em especificações JSON
+- ✅ Página inicial com cards interativos de todos os formulários
+- ✅ Menu lateral persistente com navegação hierárquica
+- ✅ Suporte a múltiplos níveis de submenus (pastas como categorias)
+- ✅ Descoberta automática de formulários via varredura de diretórios
+- ✅ Atribuição inteligente de ícones baseada em nomes de categorias
+- ✅ CRUD completo (criar, ler, atualizar, deletar) para cada formulário
+- ✅ Validações dinâmicas baseadas nas especificações
+- ✅ 11 testes unitários (todos passando)
+
+📌 Toda a documentação de prompts está mantida em português para preservar a originalidade do que foi solicitado à IA.
 📌 Este é o meu primeiro projeto publicado, criado totalmente com ferramentas gratuitas.
-A ideia é evoluir futuramente para cadastros dinâmicos e servir como guia para iniciantes que também queiram aprender Vibe Coding.
+📌 O projeto evoluiu de um CRUD simples para um sistema completo de gerenciamento de formulários com navegação hierárquica.
+📌 Serve como guia prático para iniciantes que queiram aprender Vibe Coding — programação com IA.
 
