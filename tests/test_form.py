@@ -286,3 +286,40 @@ def test_generate_menu_html_with_active():
 
     # Check if active class is present
     assert "active" in html
+
+
+def test_icon_from_spec():
+    """Test that icons are loaded from spec files."""
+    # Test root level form with icon
+    spec = load_spec("contatos")
+    assert "icon" in spec
+    assert spec["icon"] == "fa-address-book"
+
+    # Test another root level form
+    spec = load_spec("produtos")
+    assert "icon" in spec
+    assert spec["icon"] == "fa-box"
+
+    # Test nested form
+    spec = load_spec("financeiro/contas")
+    assert "icon" in spec
+    assert spec["icon"] == "fa-file-invoice-dollar"
+
+
+def test_icon_in_menu_items():
+    """Test that icons appear correctly in menu items."""
+    menu_items = scan_specs_directory()
+
+    # Find contatos form
+    contatos_forms = [
+        item for item in menu_items if item["type"] == "form" and item["name"] == "contatos"
+    ]
+    assert len(contatos_forms) == 1
+    assert contatos_forms[0]["icon"] == "fa-address-book"
+
+    # Find produtos form
+    produtos_forms = [
+        item for item in menu_items if item["type"] == "form" and item["name"] == "produtos"
+    ]
+    assert len(produtos_forms) == 1
+    assert produtos_forms[0]["icon"] == "fa-box"

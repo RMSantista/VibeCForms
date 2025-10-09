@@ -1,5 +1,6 @@
 {
   "title": "Contas",
+  "icon": "fa-file-invoice-dollar",
   "fields": [
     {
       "name": "descricao",

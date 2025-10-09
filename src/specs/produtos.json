@@ -1,5 +1,6 @@
 {
   "title": "Catálogo de Produtos",
+  "icon": "fa-box",
   "fields": [
     {
       "name": "nome",

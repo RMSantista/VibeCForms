@@ -1,5 +1,6 @@
 {
   "title": "Pagamentos",
+  "icon": "fa-credit-card",
   "fields": [
     {
       "name": "fornecedor",

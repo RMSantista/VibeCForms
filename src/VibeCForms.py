@@ -95,15 +95,12 @@ def scan_specs_directory(base_path=SPECS_DIR, relative_path=""):
 
             try:
                 spec = load_spec(form_path)
-                # Root level forms get icons, nested forms don't
-                icon = ""
-                if not relative_path:  # Root level
-                    if form_name == "contatos":
-                        icon = "fa-address-book"
-                    elif form_name == "produtos":
-                        icon = "fa-box"
-                    else:
-                        icon = "fa-file-alt"
+                # Read icon from spec (optional field)
+                icon = spec.get("icon", "")
+
+                # Fallback: root level forms without icon get default
+                if not icon and not relative_path:
+                    icon = "fa-file-alt"
 
                 items.append({
                     "type": "form",
@@ -134,16 +131,8 @@ def get_all_forms_flat(menu_items=None, prefix=""):
         if item["type"] == "form":
             category = prefix if prefix else "Geral"
 
-            # Try to get a better icon for nested forms
-            icon = item.get("icon", "")
-            if not icon:
-                # Assign default icon based on category
-                if "financeiro" in item["path"].lower():
-                    icon = "fa-dollar-sign"
-                elif "rh" in item["path"].lower():
-                    icon = "fa-users"
-                else:
-                    icon = "fa-file-alt"
+            # Get icon from item (already resolved in scan_specs_directory)
+            icon = item.get("icon", "fa-file-alt")
 
             forms.append({
                 "title": item["title"],

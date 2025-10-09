@@ -1,5 +1,6 @@
 {
   "title": "Agenda Pessoal",
+  "icon": "fa-address-book",
   "fields": [
     {
       "name": "nome",
