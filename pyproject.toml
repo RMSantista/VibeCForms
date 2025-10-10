@@ -1,6 +1,6 @@
 [project]
 name = "vibecforms"
-version = "2.1.0"
+version = "2.2.0"
 description = "Flask-based contact management web application built as an exploration of Vibe Coding - AI-assisted development"
 readme = "README.md"
 requires-python = ">=3.8"
