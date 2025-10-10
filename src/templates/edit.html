@@ -1,0 +1,100 @@
+<html>
+<head>
+    <title>Editar - {{ title }}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #f7f7f7; margin: 0; padding: 0; }
+        .layout { display: flex; min-height: 100vh; }
+        .sidebar { width: 250px; background: #2c3e50; color: #fff; padding: 20px 0; position: fixed; height: 100vh; z-index: 1000; display: flex; flex-direction: column; }
+        .sidebar-header { padding: 0 20px 20px; border-bottom: 1px solid #34495e; margin-bottom: 20px; flex-shrink: 0; }
+        .sidebar-header h1 { font-size: 24px; font-style: italic; margin: 0; color: #3498db; }
+        .sidebar-header p { font-size: 12px; margin: 5px 0 0; color: #95a5a6; }
+        .menu-container { flex: 1; overflow-y: auto; position: relative; }
+        .menu { list-style: none; padding: 0; margin: 0; }
+        .menu li { margin: 0; position: static; }
+        .menu a { display: flex; align-items: center; gap: 12px; padding: 15px 20px; color: #ecf0f1; text-decoration: none; transition: all 0.2s; white-space: nowrap; }
+        .menu a:hover { background: #34495e; color: #3498db; }
+        .menu a.active { background: #3498db; color: #fff; }
+        .menu a.active-path { background: #34495e; }
+        .menu a i { font-size: 18px; width: 20px; text-align: center; }
+        .submenu-arrow { font-size: 12px !important; margin-left: auto; }
+        .has-submenu { position: relative; }
+        .submenu { list-style: none; padding: 0; margin: 0; position: fixed; left: 250px; background: #34495e; min-width: 220px; width: auto; box-shadow: 4px 4px 12px rgba(0,0,0,0.4); display: none; z-index: 2000; border-radius: 4px; }
+        .has-submenu:hover > .submenu { display: block; }
+        .submenu li { position: static; }
+        .submenu li a { padding: 12px 20px; font-size: 14px; white-space: nowrap; }
+        .level-2 { background: #2c3e50; }
+        .level-3 { background: #1a252f; }
+        .home-link { display: flex; align-items: center; gap: 12px; padding: 15px 20px; color: #ecf0f1; text-decoration: none; transition: all 0.2s; border-top: 1px solid #34495e; margin-top: 10px; }
+        .home-link:hover { background: #34495e; color: #3498db; }
+        .home-link i { font-size: 18px; width: 20px; text-align: center; }
+        .main-content { margin-left: 250px; flex: 1; padding: 40px; position: relative; z-index: 1; }
+        .container { max-width: 800px; margin: 0 auto; background: #fff; padding: 30px 60px; border-radius: 10px; box-shadow: 0 2px 8px #ccc; position: relative; z-index: 1; }
+        h2 { text-align: center; margin-bottom: 25px; color: #2c3e50; }
+        form { display: flex; flex-direction: column; gap: 12px; }
+        label { font-weight: bold; color: #2c3e50; }
+        input[type="text"], input[type="tel"], input[type="email"], input[type="number"], textarea { padding: 7px; border-radius: 5px; border: 1px solid #bbb; width: 100%; }
+        textarea { min-height: 80px; resize: vertical; }
+        .form-row { display: flex; align-items: center; gap: 10px; }
+        .form-actions { display: flex; justify-content: flex-end; gap: 10px; }
+        button, .icon-btn { background: #3498db; color: #fff; border: none; border-radius: 5px; padding: 7px 14px; cursor: pointer; font-size: 15px; transition: background 0.2s; }
+        button:hover, .icon-btn:hover { background: #2980b9; }
+        .cancel { background: #95a5a6; color: #fff; }
+        .cancel:hover { background: #7f8c8d; }
+    </style>
+    <script>
+        window.onload = function() {
+            // Position submenus dynamically
+            var menuItems = document.querySelectorAll('.has-submenu');
+            menuItems.forEach(function(item) {
+                item.addEventListener('mouseenter', function() {
+                    var submenu = this.querySelector(':scope > .submenu');
+                    if (submenu) {
+                        var rect = this.getBoundingClientRect();
+                        submenu.style.top = rect.top + 'px';
+
+                        // For nested submenus, calculate left position
+                        if (this.closest('.submenu')) {
+                            submenu.style.left = (rect.right) + 'px';
+                        }
+                    }
+                });
+            });
+        };
+    </script>
+</head>
+<body>
+<div class="layout">
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h1>VibeCForms</h1>
+            <p>Formulários Dinâmicos</p>
+        </div>
+        <div class="menu-container">
+            <ul class="menu">
+                {{ menu_html|safe }}
+            </ul>
+            <a href="/" class="home-link"><i class="fa fa-home"></i> Página Inicial</a>
+        </div>
+    </nav>
+    <div class="main-content">
+        <div class="container">
+            <h2>Editar - {{ title }}</h2>
+            {% if error %}
+            <div style="color:#e74c3c; background:#ffeaea; border:1px solid #e74c3c; padding:10px; margin-bottom:15px; border-radius:5px;">
+                <i class="fa fa-exclamation-triangle"></i> {{error}}
+            </div>
+            {% endif %}
+            <form method="post">
+                {{ form_fields|safe }}
+                <div class="form-actions">
+                    <button type="submit"><i class="fa fa-save"></i> Salvar</button>
+                    <a href="/{{ form_name }}" class="icon-btn cancel" style="text-decoration:none;"><i class="fa fa-times"></i> Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+</body>
+</html>

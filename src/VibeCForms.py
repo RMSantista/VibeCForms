@@ -1,14 +1,15 @@
 import os
 import json
-from flask import Flask, render_template_string, request, redirect, abort
+from flask import Flask, render_template, request, redirect, abort
 from dotenv import load_dotenv
 
 load_dotenv()
 
 DATA_FILE = os.path.join(os.path.dirname(__file__), "registros.txt")
 SPECS_DIR = os.path.join(os.path.dirname(__file__), "specs")
+TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder=TEMPLATE_DIR)
 
 
 def load_spec(form_path):
@@ -405,350 +406,11 @@ def generate_menu_html(menu_items, current_form_path="", level=0):
     return html
 
 
-def get_main_template():
-    """Return the main page template with dynamic form generation."""
-    return """
-    <html>
-    <head>
-        <title>{{ title }}</title>
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-        <style>
-            * { box-sizing: border-box; }
-            body { font-family: Arial, sans-serif; background: #f7f7f7; margin: 0; padding: 0; }
-            .layout { display: flex; min-height: 100vh; }
-            .sidebar { width: 250px; background: #2c3e50; color: #fff; padding: 20px 0; position: fixed; height: 100vh; z-index: 1000; display: flex; flex-direction: column; }
-            .sidebar-header { padding: 0 20px 20px; border-bottom: 1px solid #34495e; margin-bottom: 20px; flex-shrink: 0; }
-            .sidebar-header h1 { font-size: 24px; font-style: italic; margin: 0; color: #3498db; }
-            .sidebar-header p { font-size: 12px; margin: 5px 0 0; color: #95a5a6; }
-            .menu-container { flex: 1; overflow-y: auto; position: relative; }
-            .menu { list-style: none; padding: 0; margin: 0; }
-            .menu li { margin: 0; position: static; }
-            .menu a { display: flex; align-items: center; gap: 12px; padding: 15px 20px; color: #ecf0f1; text-decoration: none; transition: all 0.2s; white-space: nowrap; }
-            .menu a:hover { background: #34495e; color: #3498db; }
-            .menu a.active { background: #3498db; color: #fff; }
-            .menu a.active-path { background: #34495e; }
-            .menu a i { font-size: 18px; width: 20px; text-align: center; }
-            .submenu-arrow { font-size: 12px !important; margin-left: auto; }
-            .has-submenu { position: relative; }
-            .submenu { list-style: none; padding: 0; margin: 0; position: fixed; left: 250px; background: #34495e; min-width: 220px; width: auto; box-shadow: 4px 4px 12px rgba(0,0,0,0.4); display: none; z-index: 2000; border-radius: 4px; }
-            .has-submenu:hover > .submenu { display: block; }
-            .submenu li { position: static; }
-            .submenu li a { padding: 12px 20px; font-size: 14px; white-space: nowrap; }
-            .level-2 { background: #2c3e50; }
-            .level-3 { background: #1a252f; }
-            .main-content { margin-left: 250px; flex: 1; padding: 40px; position: relative; z-index: 1; }
-            .container { max-width: 1200px; margin: 0 auto; background: #fff; padding: 30px 60px; border-radius: 10px; box-shadow: 0 2px 8px #ccc; position: relative; z-index: 1; }
-            h2 { text-align: center; margin-bottom: 25px; color: #2c3e50; }
-            form { display: flex; flex-direction: column; gap: 12px; margin-bottom: 30px; }
-            label { font-weight: bold; color: #2c3e50; }
-            input[type="text"], input[type="tel"], input[type="email"], input[type="number"], textarea { padding: 7px; border-radius: 5px; border: 1px solid #bbb; width: 100%; }
-            textarea { min-height: 80px; resize: vertical; }
-            .form-row { display: flex; align-items: center; gap: 10px; }
-            .form-actions { display: flex; justify-content: flex-start; gap: 10px; margin-left: 0; }
-            button, .icon-btn { background: #3498db; color: #fff; border: none; border-radius: 5px; padding: 7px 14px; cursor: pointer; font-size: 15px; transition: background 0.2s; }
-            button:hover, .icon-btn:hover { background: #2980b9; }
-            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-            th, td { padding: 10px; border-bottom: 1px solid #eee; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-            th { background: #3498db; color: #fff; }
-            tr:last-child td { border-bottom: none; }
-            .icon-btn { padding: 6px 10px; font-size: 16px; margin: 0 2px; }
-            .edit { background: #f39c12; }
-            .edit:hover { background: #e67e22; }
-            .delete { background: #e74c3c; }
-            .delete:hover { background: #c0392b; }
-            .home-link { display: flex; align-items: center; gap: 12px; padding: 15px 20px; color: #ecf0f1; text-decoration: none; transition: all 0.2s; border-top: 1px solid #34495e; margin-top: 10px; }
-            .home-link:hover { background: #34495e; color: #3498db; }
-            .home-link i { font-size: 18px; width: 20px; text-align: center; }
-        </style>
-        <script>
-            window.onload = function() {
-                var form = document.getElementById('cadastroForm');
-                if (form) {
-                    form.onkeydown = function(e) {
-                        if (e.key === "Enter") {
-                            e.preventDefault();
-                            return false;
-                        }
-                    };
-                }
-
-                // Position submenus dynamically
-                var menuItems = document.querySelectorAll('.has-submenu');
-                menuItems.forEach(function(item) {
-                    item.addEventListener('mouseenter', function() {
-                        var submenu = this.querySelector(':scope > .submenu');
-                        if (submenu) {
-                            var rect = this.getBoundingClientRect();
-                            submenu.style.top = rect.top + 'px';
-
-                            // For nested submenus, calculate left position
-                            if (this.closest('.submenu')) {
-                                submenu.style.left = (rect.right) + 'px';
-                            }
-                        }
-                    });
-                });
-            };
-        </script>
-    </head>
-    <body>
-    <div class="layout">
-        <nav class="sidebar">
-            <div class="sidebar-header">
-                <h1>VibeCForms</h1>
-                <p>Formulários Dinâmicos</p>
-            </div>
-            <div class="menu-container">
-                <ul class="menu">
-                    {{ menu_html|safe }}
-                </ul>
-                <a href="/" class="home-link"><i class="fa fa-home"></i> Página Inicial</a>
-            </div>
-        </nav>
-        <div class="main-content">
-            <div class="container">
-                <h2>{{ title }}</h2>
-                {% if error %}
-                <div style="color:#e74c3c; background:#ffeaea; border:1px solid #e74c3c; padding:10px; margin-bottom:15px; border-radius:5px;">
-                    <i class="fa fa-exclamation-triangle"></i> {{error}}
-                </div>
-                {% endif %}
-                <form method="post" id="cadastroForm">
-                    {{ form_fields|safe }}
-                    <div class="form-actions">
-                        <button type="submit"><i class="fa fa-plus"></i> Cadastrar</button>
-                    </div>
-                </form>
-                <h3 style="margin-top:0;">Registros cadastrados:</h3>
-                <table>
-                    <tr>
-                        {{ table_headers|safe }}
-                    </tr>
-                    {{ table_rows|safe }}
-                </table>
-            </div>
-        </div>
-    </div>
-    </body>
-    </html>
-    """
-
-
-def get_edit_template():
-    """Return the edit page template with dynamic form generation."""
-    return """
-    <html>
-    <head>
-        <title>Editar - {{ title }}</title>
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-        <style>
-            * { box-sizing: border-box; }
-            body { font-family: Arial, sans-serif; background: #f7f7f7; margin: 0; padding: 0; }
-            .layout { display: flex; min-height: 100vh; }
-            .sidebar { width: 250px; background: #2c3e50; color: #fff; padding: 20px 0; position: fixed; height: 100vh; z-index: 1000; display: flex; flex-direction: column; }
-            .sidebar-header { padding: 0 20px 20px; border-bottom: 1px solid #34495e; margin-bottom: 20px; flex-shrink: 0; }
-            .sidebar-header h1 { font-size: 24px; font-style: italic; margin: 0; color: #3498db; }
-            .sidebar-header p { font-size: 12px; margin: 5px 0 0; color: #95a5a6; }
-            .menu-container { flex: 1; overflow-y: auto; position: relative; }
-            .menu { list-style: none; padding: 0; margin: 0; }
-            .menu li { margin: 0; position: static; }
-            .menu a { display: flex; align-items: center; gap: 12px; padding: 15px 20px; color: #ecf0f1; text-decoration: none; transition: all 0.2s; white-space: nowrap; }
-            .menu a:hover { background: #34495e; color: #3498db; }
-            .menu a.active { background: #3498db; color: #fff; }
-            .menu a.active-path { background: #34495e; }
-            .menu a i { font-size: 18px; width: 20px; text-align: center; }
-            .submenu-arrow { font-size: 12px !important; margin-left: auto; }
-            .has-submenu { position: relative; }
-            .submenu { list-style: none; padding: 0; margin: 0; position: fixed; left: 250px; background: #34495e; min-width: 220px; width: auto; box-shadow: 4px 4px 12px rgba(0,0,0,0.4); display: none; z-index: 2000; border-radius: 4px; }
-            .has-submenu:hover > .submenu { display: block; }
-            .submenu li { position: static; }
-            .submenu li a { padding: 12px 20px; font-size: 14px; white-space: nowrap; }
-            .level-2 { background: #2c3e50; }
-            .level-3 { background: #1a252f; }
-            .home-link { display: flex; align-items: center; gap: 12px; padding: 15px 20px; color: #ecf0f1; text-decoration: none; transition: all 0.2s; border-top: 1px solid #34495e; margin-top: 10px; }
-            .home-link:hover { background: #34495e; color: #3498db; }
-            .home-link i { font-size: 18px; width: 20px; text-align: center; }
-            .main-content { margin-left: 250px; flex: 1; padding: 40px; position: relative; z-index: 1; }
-            .container { max-width: 800px; margin: 0 auto; background: #fff; padding: 30px 60px; border-radius: 10px; box-shadow: 0 2px 8px #ccc; position: relative; z-index: 1; }
-            h2 { text-align: center; margin-bottom: 25px; color: #2c3e50; }
-            form { display: flex; flex-direction: column; gap: 12px; }
-            label { font-weight: bold; color: #2c3e50; }
-            input[type="text"], input[type="tel"], input[type="email"], input[type="number"], textarea { padding: 7px; border-radius: 5px; border: 1px solid #bbb; width: 100%; }
-            textarea { min-height: 80px; resize: vertical; }
-            .form-row { display: flex; align-items: center; gap: 10px; }
-            .form-actions { display: flex; justify-content: flex-end; gap: 10px; }
-            button, .icon-btn { background: #3498db; color: #fff; border: none; border-radius: 5px; padding: 7px 14px; cursor: pointer; font-size: 15px; transition: background 0.2s; }
-            button:hover, .icon-btn:hover { background: #2980b9; }
-            .cancel { background: #95a5a6; color: #fff; }
-            .cancel:hover { background: #7f8c8d; }
-        </style>
-        <script>
-            window.onload = function() {
-                // Position submenus dynamically
-                var menuItems = document.querySelectorAll('.has-submenu');
-                menuItems.forEach(function(item) {
-                    item.addEventListener('mouseenter', function() {
-                        var submenu = this.querySelector(':scope > .submenu');
-                        if (submenu) {
-                            var rect = this.getBoundingClientRect();
-                            submenu.style.top = rect.top + 'px';
-
-                            // For nested submenus, calculate left position
-                            if (this.closest('.submenu')) {
-                                submenu.style.left = (rect.right) + 'px';
-                            }
-                        }
-                    });
-                });
-            };
-        </script>
-    </head>
-    <body>
-    <div class="layout">
-        <nav class="sidebar">
-            <div class="sidebar-header">
-                <h1>VibeCForms</h1>
-                <p>Formulários Dinâmicos</p>
-            </div>
-            <div class="menu-container">
-                <ul class="menu">
-                    {{ menu_html|safe }}
-                </ul>
-                <a href="/" class="home-link"><i class="fa fa-home"></i> Página Inicial</a>
-            </div>
-        </nav>
-        <div class="main-content">
-            <div class="container">
-                <h2>Editar - {{ title }}</h2>
-                {% if error %}
-                <div style="color:#e74c3c; background:#ffeaea; border:1px solid #e74c3c; padding:10px; margin-bottom:15px; border-radius:5px;">
-                    <i class="fa fa-exclamation-triangle"></i> {{error}}
-                </div>
-                {% endif %}
-                <form method="post">
-                    {{ form_fields|safe }}
-                    <div class="form-actions">
-                        <button type="submit"><i class="fa fa-save"></i> Salvar</button>
-                        <a href="/{{ form_name }}" class="icon-btn cancel" style="text-decoration:none;"><i class="fa fa-times"></i> Cancelar</a>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-    </body>
-    </html>
-    """
-
-
-def get_main_page_template():
-    """Return the main landing page template."""
-    return """
-    <html>
-    <head>
-        <title>VibeCForms</title>
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                background: #2c3e50;
-                margin: 0;
-                padding: 0;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                min-height: 100vh;
-            }
-            .container {
-                max-width: 1200px;
-                width: 90%;
-                background: #2c3e50;
-                padding: 60px 80px;
-                border-radius: 15px;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                text-align: center;
-            }
-            h1 {
-                font-size: 72px;
-                font-style: italic;
-                color: #3498db;
-                margin: 0 0 20px 0;
-            }
-            p {
-                font-size: 18px;
-                color: #ecf0f1;
-                margin: 20px 0 40px 0;
-                line-height: 1.6;
-            }
-            .forms-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-                gap: 20px;
-                margin-top: 40px;
-            }
-            .form-card {
-                background: #3498db;
-                color: #fff;
-                text-decoration: none;
-                padding: 30px 20px;
-                border-radius: 12px;
-                font-size: 18px;
-                transition: all 0.3s ease;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                gap: 15px;
-                text-align: center;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            }
-            .form-card:hover {
-                background: #2980b9;
-                transform: translateY(-5px);
-                box-shadow: 0 8px 20px rgba(52, 152, 219, 0.5);
-            }
-            .form-card i {
-                font-size: 48px;
-                opacity: 0.9;
-            }
-            .form-title {
-                font-weight: bold;
-                font-size: 20px;
-            }
-            .form-category {
-                font-size: 14px;
-                opacity: 0.8;
-                background: rgba(255,255,255,0.2);
-                padding: 4px 12px;
-                border-radius: 12px;
-            }
-        </style>
-    </head>
-    <body>
-    <div class="container">
-        <h1>VibeCForms</h1>
-        <p>
-            Bem-vindo ao VibeCForms - Uma aplicação web de gerenciamento de formulários dinâmicos<br>
-            construída com o conceito de <strong>Vibe Coding</strong>, programação assistida por IA.
-        </p>
-        <div class="forms-grid">
-            {% for form in forms %}
-            <a href="/{{ form.path }}" class="form-card">
-                <i class="fa {{ form.icon }}"></i>
-                <div class="form-title">{{ form.title }}</div>
-                <div class="form-category">{{ form.category }}</div>
-            </a>
-            {% endfor %}
-        </div>
-    </div>
-    </body>
-    </html>
-    """
-
-
 @app.route("/")
 def main_page():
     """Display the main landing page."""
     forms = get_all_forms_flat()
-    return render_template_string(get_main_page_template(), forms=forms)
+    return render_template('index.html', forms=forms)
 
 
 @app.route("/<path:form_name>", methods=["GET", "POST"])
@@ -790,8 +452,8 @@ def index(form_name):
                 ]
             )
 
-            return render_template_string(
-                get_main_template(),
+            return render_template(
+                'form.html',
                 title=spec["title"],
                 form_name=form_name,
                 menu_html=menu_html,
@@ -815,8 +477,8 @@ def index(form_name):
         [generate_table_row(forms[i], spec, i, form_name) for i in range(len(forms))]
     )
 
-    return render_template_string(
-        get_main_template(),
+    return render_template(
+        'form.html',
         title=spec["title"],
         form_name=form_name,
         menu_html=menu_html,
@@ -863,8 +525,8 @@ def edit(form_name, idx):
             form_fields = "".join(
                 [generate_form_field(f, form_data) for f in spec["fields"]]
             )
-            return render_template_string(
-                get_edit_template(),
+            return render_template(
+                'edit.html',
                 title=spec["title"],
                 form_name=form_name,
                 menu_html=menu_html,
@@ -880,8 +542,8 @@ def edit(form_name, idx):
     # GET request - show edit form
     form_fields = "".join([generate_form_field(f, forms[idx]) for f in spec["fields"]])
 
-    return render_template_string(
-        get_edit_template(),
+    return render_template(
+        'edit.html',
         title=spec["title"],
         form_name=form_name,
         menu_html=menu_html,
