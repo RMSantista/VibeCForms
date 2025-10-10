@@ -1,6 +1,6 @@
 # Changelog
 
-## Version 2.1 - Code Quality Improvements (PR #5)
+## Version 2.2.0 - Code Quality Improvements (PR #6)
 
 ### Overview
 This version implements three major improvements suggested in PR #5 code review, focusing on better configuration, maintainability, and following Flask best practices. All changes are architectural with no functional modifications.
