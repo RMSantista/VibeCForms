@@ -57,12 +57,31 @@ def get_folder_icon(folder_name):
     return icons.get(folder_name.lower(), "fa-folder")
 
 
+def load_folder_config(folder_path):
+    """Load folder configuration from _folder.json if it exists.
+
+    Args:
+        folder_path: Full path to the folder
+
+    Returns:
+        Dictionary with config or None if file doesn't exist
+    """
+    config_path = os.path.join(folder_path, "_folder.json")
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return None
+    return None
+
+
 def scan_specs_directory(base_path=SPECS_DIR, relative_path=""):
     """Recursively scan the specs directory and build menu structure.
 
     Returns a list of menu items, where each item is either:
     - {"type": "form", "name": str, "path": str, "title": str, "icon": str}
-    - {"type": "folder", "name": str, "path": str, "icon": str, "children": list}
+    - {"type": "folder", "name": str, "path": str, "icon": str, "children": list, "description": str (optional)}
     """
     items = []
     full_path = os.path.join(base_path, relative_path) if relative_path else base_path
@@ -74,6 +93,10 @@ def scan_specs_directory(base_path=SPECS_DIR, relative_path=""):
     entries = sorted(os.listdir(full_path))
 
     for entry in entries:
+        # Skip folder config files
+        if entry == "_folder.json":
+            continue
+
         entry_path = os.path.join(full_path, entry)
         relative_entry_path = os.path.join(relative_path, entry) if relative_path else entry
 
@@ -81,13 +104,36 @@ def scan_specs_directory(base_path=SPECS_DIR, relative_path=""):
             # It's a folder - recursively scan it
             children = scan_specs_directory(base_path, relative_entry_path)
             if children:  # Only add folder if it has content
-                items.append({
-                    "type": "folder",
-                    "name": entry.capitalize(),
-                    "path": relative_entry_path,
-                    "icon": get_folder_icon(entry),
-                    "children": children
-                })
+                # Try to load folder configuration
+                folder_config = load_folder_config(entry_path)
+
+                if folder_config:
+                    # Use config values
+                    folder_item = {
+                        "type": "folder",
+                        "name": folder_config.get("name", entry.capitalize()),
+                        "path": relative_entry_path,
+                        "icon": folder_config.get("icon", get_folder_icon(entry)),
+                        "children": children
+                    }
+                    # Add description if present
+                    if "description" in folder_config:
+                        folder_item["description"] = folder_config["description"]
+                    # Add order if present
+                    if "order" in folder_config:
+                        folder_item["order"] = folder_config["order"]
+                else:
+                    # Fallback to default behavior
+                    folder_item = {
+                        "type": "folder",
+                        "name": entry.capitalize(),
+                        "path": relative_entry_path,
+                        "icon": get_folder_icon(entry),
+                        "children": children
+                    }
+
+                items.append(folder_item)
+
         elif entry.endswith(".json"):
             # It's a form spec file
             form_name = entry[:-5]  # Remove .json extension
@@ -112,6 +158,9 @@ def scan_specs_directory(base_path=SPECS_DIR, relative_path=""):
             except Exception:
                 # Skip invalid spec files
                 continue
+
+    # Sort items by order field if present, then by name
+    items.sort(key=lambda x: (x.get("order", 999), x.get("name", "")))
 
     return items
 
@@ -601,7 +650,7 @@ def get_main_page_template():
         <style>
             body {
                 font-family: Arial, sans-serif;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                background: #2c3e50;
                 margin: 0;
                 padding: 0;
                 display: flex;
@@ -612,22 +661,21 @@ def get_main_page_template():
             .container {
                 max-width: 1200px;
                 width: 90%;
-                background: #fff;
+                background: #2c3e50;
                 padding: 60px 80px;
                 border-radius: 15px;
-                box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
                 text-align: center;
             }
             h1 {
                 font-size: 72px;
                 font-style: italic;
-                color: #667eea;
+                color: #3498db;
                 margin: 0 0 20px 0;
-                text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
             }
             p {
                 font-size: 18px;
-                color: #666;
+                color: #ecf0f1;
                 margin: 20px 0 40px 0;
                 line-height: 1.6;
             }
@@ -638,7 +686,7 @@ def get_main_page_template():
                 margin-top: 40px;
             }
             .form-card {
-                background: #667eea;
+                background: #3498db;
                 color: #fff;
                 text-decoration: none;
                 padding: 30px 20px;
@@ -653,9 +701,9 @@ def get_main_page_template():
                 box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             }
             .form-card:hover {
-                background: #5568d3;
+                background: #2980b9;
                 transform: translateY(-5px);
-                box-shadow: 0 8px 20px rgba(102, 126, 234, 0.5);
+                box-shadow: 0 8px 20px rgba(52, 152, 219, 0.5);
             }
             .form-card i {
                 font-size: 48px;
