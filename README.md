@@ -26,21 +26,41 @@ The project demonstrates how to build a **dynamic form management system** using
 
 ## 🚧 Current Status
 - ✅ First version completed: **simple contact form with CRUD** (create, read, update, delete).
-- ✅ Unit tests implemented with `pytest` (11 tests passing).
+- ✅ Unit tests implemented with `pytest` (16 tests passing).
 - ✅ Validations included (no empty records, required name/phone).
 - 🎨 Styled with CSS + icons (FontAwesome).
-- ✅ **Dynamic form generation** now implemented!
+
+### Recent Improvements (Version 2.1)
+- ✅ **Icon Support in Form Specs**
+  - Custom icons per form via JSON spec files
+  - Icons display in menu and landing page cards
+  - No more hardcoded icon mappings
+
+- ✅ **Folder Configuration System**
+  - `_folder.json` files for category customization
+  - Custom names, descriptions, icons, and display order
+  - Declarative configuration without code changes
+
+- ✅ **Template System**
+  - Separation of HTML templates from Python code
+  - Jinja2 templates in dedicated `src/templates/` directory
+  - Reduced VibeCForms.py from 925 to 587 lines (-36.5%)
+  - Better maintainability and follows Flask best practices
+
+### Core Features
+- ✅ **Dynamic form generation**
   - Forms are generated from JSON spec files
   - URL-based routing with support for nested paths (e.g., `/contatos`, `/financeiro/contas`)
   - Support for multiple field types (text, email, number, checkbox, textarea)
   - Automatic validation based on specs
-- ✅ **Modern Navigation System** implemented!
+
+- ✅ **Modern Navigation System**
   - 🏠 Main landing page with dynamic form cards
   - 📋 Persistent sidebar menu with hierarchical navigation
   - 📁 Multi-level submenu support (folders as categories)
   - 🎯 Active item highlighting
   - 🔄 Automatic directory scanning for form discovery
-  - 🎨 Intuitive icon assignment based on category names  
+  - 🎨 Custom icons for forms and folders  
 
 ---
 
@@ -49,23 +69,30 @@ The project demonstrates how to build a **dynamic form management system** using
 VibeCForms/
 │
 ├── src/                           # Main source code
-│   ├── VibeCForms.py             # Main application
+│   ├── VibeCForms.py             # Main application (587 lines)
+│   ├── templates/                # Jinja2 HTML templates
+│   │   ├── index.html            # Landing page template
+│   │   ├── form.html             # Main CRUD form template
+│   │   └── edit.html             # Edit form template
 │   ├── specs/                    # Form specification files (JSON)
-│   │   ├── contatos.json         # Contacts form spec (root level)
-│   │   ├── produtos.json         # Products form spec (root level)
+│   │   ├── contatos.json         # Contacts form spec (with icon)
+│   │   ├── produtos.json         # Products form spec (with icon)
 │   │   ├── financeiro/           # Financial forms category
+│   │   │   ├── _folder.json      # Folder configuration
 │   │   │   ├── contas.json       # Accounts form
 │   │   │   └── pagamentos.json   # Payments form
 │   │   └── rh/                   # HR forms category
+│   │       ├── _folder.json      # Folder configuration
 │   │       ├── funcionarios.json # Employees form
 │   │       └── departamentos/    # Departments subcategory
+│   │           ├── _folder.json  # Subfolder configuration
 │   │           └── areas.json    # Areas form
 │   ├── contatos.txt              # Contact data storage
 │   ├── produtos.txt              # Product data storage
 │   ├── financeiro_contas.txt     # Financial accounts data
 │   └── rh_funcionarios.txt       # HR employees data
 │
-├── tests/                         # Unit tests (11 tests)
+├── tests/                         # Unit tests (16 tests)
 │   └── test_form.py
 │
 ├── docs/                          # Documentation
@@ -196,15 +223,23 @@ I am learning as I build, and my goal is to share both the code and the journey 
 VibeCForms é um projeto open source em Python que explora o Vibe Coding, ou seja, programação conduzida por IA.
 
 **Funcionalidades Implementadas:**
+
+**Melhorias Recentes (Versão 2.1):**
+- ✅ Suporte a ícones personalizados nos specs dos formulários
+- ✅ Sistema de configuração de pastas via arquivos `_folder.json`
+- ✅ Sistema de templates Jinja2 separados do código Python
+- ✅ Redução de 36.5% no tamanho do código principal (925 → 587 linhas)
+
+**Funcionalidades Principais:**
 - ✅ Sistema de formulários dinâmicos baseados em especificações JSON
 - ✅ Página inicial com cards interativos de todos os formulários
 - ✅ Menu lateral persistente com navegação hierárquica
 - ✅ Suporte a múltiplos níveis de submenus (pastas como categorias)
 - ✅ Descoberta automática de formulários via varredura de diretórios
-- ✅ Atribuição inteligente de ícones baseada em nomes de categorias
+- ✅ Ícones customizáveis para formulários e pastas
 - ✅ CRUD completo (criar, ler, atualizar, deletar) para cada formulário
 - ✅ Validações dinâmicas baseadas nas especificações
-- ✅ 11 testes unitários (todos passando)
+- ✅ 16 testes unitários (todos passando)
 
 📌 Toda a documentação de prompts está mantida em português para preservar a originalidade do que foi solicitado à IA.
 📌 Este é o meu primeiro projeto publicado, criado totalmente com ferramentas gratuitas.

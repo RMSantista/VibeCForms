@@ -443,3 +443,288 @@ O VibeCForms evoluiu de uma aplicação CRUD simples para um **sistema completo 
 - Organizar formulários em categorias e subcategorias
 - Navegação intuitiva via menu e página principal
 - Escalabilidade ilimitada de níveis de aninhamento
+
+---
+
+## Prompt 13 - Suporte a Ícones Personalizados (PR #5, Melhoria #1)
+
+**Ferramenta:** Claude Code (claude.ai/code)
+**Modelo:** Claude Sonnet 4.5
+**Data:** Janeiro 2025
+
+### Contexto:
+Os ícones dos formulários eram atribuídos através de mapeamentos hardcoded na função `get_folder_icon()`. Isso exigia mudanças no código Python sempre que um novo ícone era necessário.
+
+### Solicitação:
+Implementar suporte a campo `icon` opcional nos arquivos de especificação dos formulários.
+
+### Implementação:
+
+**Alterações no formato do spec:**
+```json
+{
+  "title": "Agenda Pessoal",
+  "icon": "fa-address-book",
+  "fields": [...]
+}
+```
+
+**Função atualizada:**
+- `scan_specs_directory()` - Passou a ler o campo `icon` dos specs
+- Formulários sem ícone recebem fallback "fa-file-alt"
+- Ícones são usados no menu lateral e nos cards da página principal
+
+**Specs atualizados:**
+- `contatos.json` - Adicionado `"icon": "fa-address-book"`
+- `produtos.json` - Adicionado `"icon": "fa-box"`
+- `financeiro/contas.json` - Adicionado `"icon": "fa-file-invoice-dollar"`
+- `financeiro/pagamentos.json` - Adicionado `"icon": "fa-money-check-alt"`
+- `rh/funcionarios.json` - Adicionado `"icon": "fa-id-card"`
+- `rh/departamentos/areas.json` - Adicionado `"icon": "fa-project-diagram"`
+
+**Novos testes:**
+- `test_icon_from_spec()` - Valida leitura de ícones dos specs
+- `test_icon_in_menu_items()` - Verifica ícones na estrutura do menu
+
+### Resultado:
+✅ Ícones personalizáveis por formulário via configuração JSON
+✅ Elimina necessidade de mapeamento hardcoded
+✅ Consistência visual entre menu e página principal
+✅ Mais flexibilidade para personalização
+
+---
+
+## Prompt 14 - Sistema de Configuração de Pastas (PR #5, Melhoria #2)
+
+**Ferramenta:** Claude Code (claude.ai/code)
+**Modelo:** Claude Sonnet 4.5
+**Data:** Janeiro 2025
+
+### Contexto:
+As pastas de specs tinham nomes técnicos (ex: "rh" em vez de "Recursos Humanos") e não havia forma de customizar ícones, descrições ou ordem de exibição sem alterar código Python.
+
+### Solicitação:
+Implementar sistema de configuração declarativa para pastas usando arquivos `_folder.json`.
+
+### Implementação:
+
+**Formato do arquivo _folder.json:**
+```json
+{
+  "name": "Nome de Exibição",
+  "description": "Descrição opcional da categoria",
+  "icon": "fa-icon-name",
+  "order": 1
+}
+```
+
+**Exemplos criados:**
+
+**src/specs/financeiro/_folder.json:**
+```json
+{
+  "name": "Financeiro",
+  "description": "Gestão financeira e contábil",
+  "icon": "fa-dollar-sign",
+  "order": 1
+}
+```
+
+**src/specs/rh/_folder.json:**
+```json
+{
+  "name": "Recursos Humanos",
+  "description": "Gestão de pessoas e departamentos",
+  "icon": "fa-users",
+  "order": 2
+}
+```
+
+**src/specs/rh/departamentos/_folder.json:**
+```json
+{
+  "name": "Departamentos",
+  "description": "Estrutura organizacional",
+  "icon": "fa-sitemap",
+  "order": 1
+}
+```
+
+**Nova função:**
+- `load_folder_config(folder_path)` - Carrega e parseia _folder.json
+
+**Função atualizada:**
+- `scan_specs_directory()` - Aplica configuração de _folder.json quando disponível
+- Menu ordenado automaticamente pelo campo `order`
+
+**Novos testes:**
+- `test_folder_config_loading()` - Valida carregamento dos arquivos de configuração
+- `test_folder_items_use_config()` - Verifica aplicação das configurações
+- `test_menu_items_sorted_by_order()` - Valida ordenação pelo campo order
+
+### Resultado:
+✅ Customização declarativa de pastas
+✅ Nomes de exibição mais profissionais
+✅ Descrições opcionais para documentação
+✅ Controle de ordem de exibição
+✅ Ícones customizáveis por pasta
+✅ Escalável para estruturas complexas
+
+---
+
+## Prompt 15 - Sistema de Templates Jinja2 (PR #5, Melhoria #3)
+
+**Ferramenta:** Claude Code (claude.ai/code)
+**Modelo:** Claude Sonnet 4.5
+**Data:** Outubro 2025
+
+### Contexto:
+O código do VibeCForms.py havia crescido para 925 linhas, com cerca de 330 linhas sendo strings HTML/CSS/JavaScript embutidas em três funções de template. Isso dificultava a manutenção e não seguia as melhores práticas do Flask.
+
+### Solicitação:
+"Implemente o Sistema de Templates"
+(Sugestão #3 do code review do PR #5)
+
+### Plano de Implementação (11 tarefas):
+
+1. **Criar diretório src/templates/**
+2. **Extrair index.html** (landing page)
+3. **Extrair form.html** (formulário principal)
+4. **Extrair edit.html** (página de edição)
+5. **Modificar imports** no VibeCForms.py
+6. **Configurar Flask template_folder**
+7. **Substituir render_template_string por render_template**
+8. **Remover funções get_*_template()**
+9. **Rodar suite de testes completa**
+10. **Testar aplicação manualmente**
+11. **Commit e push das mudanças**
+
+### Arquivos de Template Criados:
+
+**1. src/templates/index.html** (99 linhas)
+- Landing page com grid de formulários
+- Cards interativos com ícones, títulos e categorias
+- Background gradient (#2c3e50)
+- Hover effects com elevação e sombra
+
+**2. src/templates/form.html** (124 linhas)
+- Página principal CRUD com sidebar persistente
+- Menu lateral com navegação hierárquica
+- Formulário de cadastro com validação
+- Tabela de registros com botões editar/excluir
+- JavaScript para posicionamento de submenus
+
+**3. src/templates/edit.html** (101 linhas)
+- Página de edição de registros
+- Sidebar idêntico ao form.html para consistência
+- Formulário pré-preenchido com dados atuais
+- Botões Salvar e Cancelar
+
+### Mudanças no VibeCForms.py:
+
+**Import atualizado:**
+```python
+# Antes:
+from flask import Flask, render_template_string, request, redirect, abort
+
+# Depois:
+from flask import Flask, render_template, request, redirect, abort
+```
+
+**Configuração do Flask:**
+```python
+TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")
+app = Flask(__name__, template_folder=TEMPLATE_DIR)
+```
+
+**Substituição nas rotas:**
+```python
+# Antes:
+return render_template_string(get_main_template(), title=..., ...)
+
+# Depois:
+return render_template('form.html', title=..., ...)
+```
+
+**Funções removidas:**
+- `get_main_template()` (~126 linhas)
+- `get_edit_template()` (~103 linhas)
+- `get_main_page_template()` (~101 linhas)
+
+### Resultados:
+
+**Redução de Código:**
+- VibeCForms.py: 925 → 587 linhas
+- Redução de 338 linhas (36.5%)
+
+**Benefícios Obtidos:**
+- ✅ Separação clara entre lógica (Python) e apresentação (HTML)
+- ✅ Syntax highlighting adequado para HTML/CSS/JavaScript
+- ✅ Melhor suporte de IDEs para templates
+- ✅ Facilita manutenção e modificação de UI
+- ✅ Segue melhores práticas do Flask
+- ✅ Reutilização de código via herança de templates (preparado para futuro)
+
+**Testes:**
+- ✅ Todos os 16 testes unitários continuam passando
+- ✅ Nenhuma mudança funcional, apenas arquitetural
+- ✅ Aplicação testada manualmente (navegação, CRUD, validações)
+
+### Impacto:
+A implementação do sistema de templates representa uma melhoria significativa na **qualidade do código** e **manutenibilidade** do projeto, sem alterar funcionalidades. O VibeCForms agora segue a arquitetura padrão do Flask, separando preocupações e facilitando futuras evoluções da interface.
+
+---
+
+## Resumo das Melhorias - Versão 2.1 (PR #5)
+
+### Overview das 3 Melhorias Implementadas:
+
+**Melhoria #1: Suporte a Ícones Personalizados**
+- Campo `icon` opcional em specs de formulários
+- Elimina hardcoding de ícones no código Python
+- Consistência visual entre menu e landing page
+
+**Melhoria #2: Sistema de Configuração de Pastas**
+- Arquivos `_folder.json` para customização declarativa
+- Nomes profissionais, descrições, ícones e ordenação
+- Escalável para estruturas organizacionais complexas
+
+**Melhoria #3: Sistema de Templates Jinja2**
+- Separação HTML/CSS/JS do código Python
+- Redução de 36.5% no tamanho do código (925 → 587 linhas)
+- Arquitetura padrão Flask com melhor manutenibilidade
+
+### Testes Implementados:
+Total: **16 testes unitários**, todos passando ✅
+- 5 testes originais (CRUD básico)
+- 6 testes de formulários dinâmicos
+- 2 testes de suporte a ícones
+- 3 testes de configuração de pastas
+
+### Arquivos Adicionados:
+**Templates:**
+- `src/templates/index.html` (99 linhas)
+- `src/templates/form.html` (124 linhas)
+- `src/templates/edit.html` (101 linhas)
+
+**Configurações de pastas:**
+- `src/specs/financeiro/_folder.json`
+- `src/specs/rh/_folder.json`
+- `src/specs/rh/departamentos/_folder.json`
+
+**Ícones adicionados aos specs:**
+- Todos os 6 formulários atualizados com campo `icon`
+
+### Arquivos Modificados:
+- `src/VibeCForms.py` - Reduzido de 925 para 587 linhas
+- `tests/test_form.py` - 5 novos testes adicionados
+
+### Benefícios Acumulados:
+1. **Configurabilidade**: Ícones e pastas configuráveis via JSON
+2. **Manutenibilidade**: Código Python mais enxuto e focado
+3. **Escalabilidade**: Estrutura preparada para crescimento
+4. **Padronização**: Segue melhores práticas do Flask
+5. **Documentação**: Código autodocumentado via specs
+
+### Impacto Geral:
+As 3 melhorias transformam o VibeCForms em um sistema ainda mais **declarativo** e **profissional**, onde praticamente **tudo é configurável via JSON** sem necessidade de tocar no código Python. A separação de templates prepara o projeto para futuras evoluções da UI e facilita colaboração entre desenvolvedores front-end e back-end.
