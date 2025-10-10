@@ -1,5 +1,6 @@
 {
   "title": "Funcionários",
+  "icon": "fa-id-card",
   "fields": [
     {
       "name": "nome",

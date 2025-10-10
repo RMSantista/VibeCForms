@@ -286,3 +286,125 @@ def test_generate_menu_html_with_active():
 
     # Check if active class is present
     assert "active" in html
+
+
+def test_icon_from_spec():
+    """Test that icons are loaded from spec files."""
+    # Test root level form with icon
+    spec = load_spec("contatos")
+    assert "icon" in spec
+    assert spec["icon"] == "fa-address-book"
+
+    # Test another root level form
+    spec = load_spec("produtos")
+    assert "icon" in spec
+    assert spec["icon"] == "fa-box"
+
+    # Test nested form
+    spec = load_spec("financeiro/contas")
+    assert "icon" in spec
+    assert spec["icon"] == "fa-file-invoice-dollar"
+
+
+def test_icon_in_menu_items():
+    """Test that icons appear correctly in menu items."""
+    menu_items = scan_specs_directory()
+
+    # Find contatos form
+    contatos_forms = [
+        item for item in menu_items if item["type"] == "form" and item["name"] == "contatos"
+    ]
+    assert len(contatos_forms) == 1
+    assert contatos_forms[0]["icon"] == "fa-address-book"
+
+    # Find produtos form
+    produtos_forms = [
+        item for item in menu_items if item["type"] == "form" and item["name"] == "produtos"
+    ]
+    assert len(produtos_forms) == 1
+    assert produtos_forms[0]["icon"] == "fa-box"
+
+
+def test_folder_config_loading():
+    """Test loading folder configuration from _folder.json files."""
+    from src.VibeCForms import load_folder_config
+    import os
+
+    # Test loading financeiro folder config
+    financeiro_path = os.path.join("src", "specs", "financeiro")
+    config = load_folder_config(financeiro_path)
+
+    assert config is not None
+    assert config["name"] == "Financeiro"
+    assert config["icon"] == "fa-dollar-sign"
+    assert config["description"] == "Gestão financeira e contábil"
+    assert config["order"] == 1
+
+    # Test loading rh folder config
+    rh_path = os.path.join("src", "specs", "rh")
+    config = load_folder_config(rh_path)
+
+    assert config is not None
+    assert config["name"] == "Recursos Humanos"
+    assert config["icon"] == "fa-users"
+    assert config["order"] == 2
+
+    # Test loading nested folder config (rh/departamentos)
+    departamentos_path = os.path.join("src", "specs", "rh", "departamentos")
+    config = load_folder_config(departamentos_path)
+
+    assert config is not None
+    assert config["name"] == "Departamentos"
+    assert config["icon"] == "fa-sitemap"
+    assert config["order"] == 1
+
+
+def test_folder_items_use_config():
+    """Test that folder items in menu use configuration from _folder.json."""
+    menu_items = scan_specs_directory()
+
+    # Find financeiro folder
+    financeiro_folders = [
+        item for item in menu_items if item["type"] == "folder" and item["path"] == "financeiro"
+    ]
+    assert len(financeiro_folders) == 1
+    financeiro = financeiro_folders[0]
+
+    # Check it uses config values
+    assert financeiro["name"] == "Financeiro"
+    assert financeiro["icon"] == "fa-dollar-sign"
+    assert "description" in financeiro
+    assert financeiro["description"] == "Gestão financeira e contábil"
+    assert "order" in financeiro
+    assert financeiro["order"] == 1
+
+    # Find rh folder
+    rh_folders = [
+        item for item in menu_items if item["type"] == "folder" and item["path"] == "rh"
+    ]
+    assert len(rh_folders) == 1
+    rh = rh_folders[0]
+
+    # Check it uses config values
+    assert rh["name"] == "Recursos Humanos"
+    assert rh["icon"] == "fa-users"
+    assert "order" in rh
+    assert rh["order"] == 2
+
+
+def test_menu_items_sorted_by_order():
+    """Test that menu items are sorted by order field."""
+    menu_items = scan_specs_directory()
+
+    # Get folder items
+    folder_items = [item for item in menu_items if item["type"] == "folder"]
+
+    # Should have at least financeiro and rh
+    assert len(folder_items) >= 2
+
+    # Items with order should be sorted
+    items_with_order = [item for item in folder_items if "order" in item]
+    if len(items_with_order) >= 2:
+        orders = [item["order"] for item in items_with_order]
+        # Check if sorted (ascending)
+        assert orders == sorted(orders), "Items should be sorted by order field"
