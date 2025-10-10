@@ -1,5 +1,6 @@
 {
   "title": "Áreas",
+  "icon": "fa-network-wired",
   "fields": [
     {
       "name": "nome_area",
