@@ -906,4 +906,3 @@ Aplicado em ambos templates:
 
 ### Impacto:
 A **Versão 2.2** completa a separação de templates iniciada na versão anterior, granularizando até o nível de campo individual. Isso torna o VibeCForms ainda mais flexível e customizável, permitindo ajustar a apresentação de cada tipo de campo de forma independente.
->>>>>>> dev_vcforms_cc
