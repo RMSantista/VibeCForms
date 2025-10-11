@@ -1,6 +1,6 @@
 import os
 import json
-from flask import Flask, render_template, request, redirect, abort
+from flask import Flask, render_template, render_template_string, request, redirect, abort
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -258,7 +258,7 @@ def write_forms(forms, spec, data_file):
 
 
 def generate_form_field(field, form_data=None):
-    """Generate HTML for a single form field based on spec."""
+    """Generate HTML for a single form field based on spec using templates."""
     field_name = field["name"]
     field_label = field["label"]
     field_type = field["type"]
@@ -268,30 +268,53 @@ def generate_form_field(field, form_data=None):
     if form_data:
         value = form_data.get(field_name, "")
 
+    # Load appropriate template based on field type
+    template_path = os.path.join(TEMPLATE_DIR, "fields")
+
     if field_type == "checkbox":
-        checked = "checked" if (form_data and form_data.get(field_name)) else ""
-        return f"""
-        <div class="form-row">
-            <label for="{field_name}">{field_label}:</label>
-            <input type="checkbox" name="{field_name}" id="{field_name}" {checked}>
-        </div>"""
-    elif field_type == "textarea":
-        required_attr = "required" if required else ""
-        return f"""
-        <div class="form-row">
-            <label for="{field_name}">{field_label}:</label>
-            <textarea name="{field_name}" id="{field_name}" {required_attr}>{value}</textarea>
-        </div>"""
-    else:
-        required_attr = "required" if required else ""
-        input_type = (
-            field_type if field_type in ["text", "tel", "email", "number"] else "text"
+        template_file = os.path.join(template_path, "checkbox.html")
+        with open(template_file, "r", encoding="utf-8") as f:
+            template_content = f.read()
+
+        checked = form_data and form_data.get(field_name)
+        return render_template_string(
+            template_content,
+            field_name=field_name,
+            field_label=field_label,
+            checked=checked
         )
-        return f"""
-        <div class="form-row">
-            <label for="{field_name}">{field_label}:</label>
-            <input type="{input_type}" name="{field_name}" id="{field_name}" {required_attr} value="{value}">
-        </div>"""
+
+    elif field_type == "textarea":
+        template_file = os.path.join(template_path, "textarea.html")
+        with open(template_file, "r", encoding="utf-8") as f:
+            template_content = f.read()
+
+        return render_template_string(
+            template_content,
+            field_name=field_name,
+            field_label=field_label,
+            required=required,
+            value=value
+        )
+
+    else:
+        # Input types: text, tel, email, number, password, date
+        template_file = os.path.join(template_path, "input.html")
+        with open(template_file, "r", encoding="utf-8") as f:
+            template_content = f.read()
+
+        input_type = (
+            field_type if field_type in ["text", "tel", "email", "number", "password", "date"] else "text"
+        )
+
+        return render_template_string(
+            template_content,
+            field_name=field_name,
+            field_label=field_label,
+            input_type=input_type,
+            required=required,
+            value=value
+        )
 
 
 def generate_table_headers(spec):

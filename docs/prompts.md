@@ -728,3 +728,182 @@ Total: **16 testes unitários**, todos passando ✅
 
 ### Impacto Geral:
 As 3 melhorias transformam o VibeCForms em um sistema ainda mais **declarativo** e **profissional**, onde praticamente **tudo é configurável via JSON** sem necessidade de tocar no código Python. A separação de templates prepara o projeto para futuras evoluções da UI e facilita colaboração entre desenvolvedores front-end e back-end.
+
+---
+
+## Prompt 16 - Templates por Campo de Formulário e Novos Tipos (Versão 2.2)
+
+**Ferramenta:** Claude Code (claude.ai/code)
+**Modelo:** Claude Sonnet 4.5
+**Data:** Outubro 2025
+**Branch:** dev_vcforms_cc
+
+### Solicitação 1: Templates Individuais por Campo
+"Criar um template por campo de formulário na branch dev_vcforms_cc do repositório VibeCForms."
+
+### Implementação:
+
+**Diretório criado:**
+- `src/templates/fields/` - Pasta para templates de campos
+
+**Templates criados:**
+
+**1. src/templates/fields/input.html**
+```html
+<div class="form-row">
+    <label for="{{ field_name }}">{{ field_label }}:</label>
+    <input type="{{ input_type }}" name="{{ field_name }}"
+           id="{{ field_name }}" {% if required %}required{% endif %}
+           value="{{ value }}">
+</div>
+```
+
+**2. src/templates/fields/textarea.html**
+```html
+<div class="form-row">
+    <label for="{{ field_name }}">{{ field_label }}:</label>
+    <textarea name="{{ field_name }}" id="{{ field_name }}"
+              {% if required %}required{% endif %}>{{ value }}</textarea>
+</div>
+```
+
+**3. src/templates/fields/checkbox.html**
+```html
+<div class="form-row">
+    <label for="{{ field_name }}">{{ field_label }}:</label>
+    <input type="checkbox" name="{{ field_name }}"
+           id="{{ field_name }}" {% if checked %}checked{% endif %}>
+</div>
+```
+
+**Refatoração de `generate_form_field()`:**
+```python
+def generate_form_field(field, form_data=None):
+    """Generate HTML for a single form field based on spec using templates."""
+    # Carrega template apropriado baseado no tipo do campo
+    template_path = os.path.join(TEMPLATE_DIR, "fields")
+
+    if field_type == "checkbox":
+        template_file = os.path.join(template_path, "checkbox.html")
+        # Renderiza com render_template_string()
+    elif field_type == "textarea":
+        template_file = os.path.join(template_path, "textarea.html")
+    else:
+        template_file = os.path.join(template_path, "input.html")
+        # Suporta: text, tel, email, number
+```
+
+### Solicitação 2: Novos Tipos de Campo
+"Crie templates ou ajuste os existentes para campos: Senha e Data."
+
+**Atualização da função:**
+- Adicionado `"password"` e `"date"` à lista de tipos válidos
+- Template `input.html` já suporta qualquer tipo de input HTML
+
+**Spec de exemplo criado:**
+`src/specs/usuarios.json` - Formulário de cadastro de usuários com novos campos:
+```json
+{
+  "title": "Cadastro de Usuários",
+  "icon": "fa-user-plus",
+  "fields": [
+    {"name": "nome", "type": "text", "required": true},
+    {"name": "email", "type": "email", "required": true},
+    {"name": "senha", "type": "password", "required": true},
+    {"name": "data_nascimento", "type": "date", "required": true},
+    {"name": "ativo", "type": "checkbox", "required": false}
+  ]
+}
+```
+
+**Tipos de campo agora suportados (8 total):**
+1. `text` - Texto simples
+2. `tel` - Telefone
+3. `email` - E-mail
+4. `number` - Numérico
+5. `password` - Senha (mascarada) ⭐ **NOVO**
+6. `date` - Seletor de data ⭐ **NOVO**
+7. `textarea` - Texto multilinha
+8. `checkbox` - Booleano
+
+### Solicitação 3: Ajustes de Layout CSS
+
+**Primeira tentativa - Campos em linha:**
+"Ajuste os nomes dos campos no formulário, para que apareçam em uma única linha."
+
+CSS implementado:
+```css
+form { display: flex; flex-wrap: wrap; gap: 15px; }
+.form-row {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 200px;
+    min-width: 200px;
+}
+```
+Resultado: Múltiplos campos lado a lado com layout responsivo
+
+**Correção - Campos verticais:**
+"Os campos devem se manter um abaixo do outro."
+
+CSS corrigido:
+```css
+form { display: flex; flex-direction: column; gap: 15px; }
+label { font-weight: bold; min-width: 180px; }
+input, textarea { flex: 1; }
+.form-row { display: flex; align-items: center; gap: 10px; }
+```
+
+**Layout final:**
+- Campos empilhados verticalmente (um abaixo do outro)
+- Dentro de cada campo: label e input na mesma linha horizontal
+- Label com largura fixa de 180px à esquerda
+- Input ocupando o espaço restante à direita
+
+Aplicado em ambos templates:
+- `src/templates/form.html` (cadastro)
+- `src/templates/edit.html` (edição)
+
+### Resultados:
+
+**Arquivos criados:**
+- 3 templates de campos individuais
+- 1 spec de exemplo (usuarios.json)
+
+**Arquivos modificados:**
+- `src/VibeCForms.py` - Função `generate_form_field()` refatorada
+- `src/templates/form.html` - CSS atualizado
+- `src/templates/edit.html` - CSS atualizado
+- `CLAUDE.md` - Documentação atualizada
+- `docs/prompts.md` - Este arquivo
+
+**Testes:**
+- ✅ Todos os 16 testes unitários continuam passando
+- ✅ Servidor rodando em modo desenvolvimento
+- ✅ Formulários testados visualmente no navegador
+
+### Benefícios:
+
+1. **Modularização de Templates**
+   - HTML separado por tipo de campo
+   - Fácil customização de aparência por tipo
+   - Reduz acoplamento no código Python
+
+2. **Expansibilidade de Tipos**
+   - Suporte a password e date sem código adicional
+   - Preparado para novos tipos HTML5
+   - Template genérico reutilizável
+
+3. **Layout Profissional**
+   - Label e input alinhados horizontalmente
+   - Campos organizados verticalmente
+   - Design consistente e responsivo
+
+4. **Manutenibilidade**
+   - Separação completa de estrutura HTML
+   - CSS isolado e modular
+   - Alterações sem impactar lógica
+
+### Impacto:
+A **Versão 2.2** completa a separação de templates iniciada na versão anterior, granularizando até o nível de campo individual. Isso torna o VibeCForms ainda mais flexível e customizável, permitindo ajustar a apresentação de cada tipo de campo de forma independente.
+>>>>>>> dev_vcforms_cc

@@ -10,13 +10,25 @@ The system generates forms dynamically from JSON specification files, supports h
 
 ## Core Architecture
 
-### Template System (Version 2.1 - Improvement #3)
+### Template System (Version 2.2 - Improvement #4)
 The application uses Flask's standard template system with Jinja2 templates separated into dedicated files in `src/templates/`:
 - `index.html` - Landing page with form cards grid (99 lines)
 - `form.html` - Main CRUD form page with sidebar navigation (124 lines)
 - `edit.html` - Edit form page (101 lines)
 
-This separation improves maintainability and follows Flask best practices by keeping HTML/CSS/JavaScript separate from Python logic in `src/VibeCForms.py` (now 587 lines, down from 925).
+**Field Templates (Version 2.2 - Improvement #4):**
+Form fields are now rendered using individual templates in `src/templates/fields/`:
+- `input.html` - Template for text, tel, email, number, password, and date input fields
+- `textarea.html` - Template for textarea fields
+- `checkbox.html` - Template for checkbox fields
+
+The `generate_form_field()` function loads the appropriate template based on field type and renders it using `render_template_string()`. This provides:
+- Complete separation of HTML from Python code
+- Easy customization of field appearance per type
+- Consistent field rendering across all forms
+- Better maintainability and testability
+
+This separation improves maintainability and follows Flask best practices by keeping HTML/CSS/JavaScript separate from Python logic in `src/VibeCForms.py`.
 
 ### Dynamic Form Generation
 Forms are defined by JSON specification files in `src/specs/`:
@@ -35,6 +47,17 @@ Forms are defined by JSON specification files in `src/specs/`:
   }
 }
 ```
+
+**Supported Field Types:**
+The system supports the following field types:
+- `text` - Single-line text input
+- `tel` - Telephone number input
+- `email` - Email address input with validation
+- `number` - Numeric input
+- `password` - Password input (masked characters)
+- `date` - Date picker input
+- `textarea` - Multi-line text input
+- `checkbox` - Boolean checkbox input
 
 **Icon Support (Version 2.1 - Improvement #1):**
 - Optional `icon` field in spec files (e.g., "fa-address-book")
@@ -175,19 +198,44 @@ To customize a folder:
 2. Specify `name`, `description`, `icon`, and `order`
 3. The menu will automatically use these settings
 
-## Recent Improvements (Version 2.1)
+## Recent Improvements
 
-### Improvement #1: Icon Support
+### Version 2.2
+
+#### Improvement #4: Field Template System
+- Separated field rendering into individual Jinja2 templates
+- Created `src/templates/fields/` directory with 3 templates:
+  - `input.html` - For text, tel, email, number, password, date fields
+  - `textarea.html` - For textarea fields
+  - `checkbox.html` - For checkbox fields
+- Refactored `generate_form_field()` to use template files
+- Complete separation of field HTML from Python logic
+- Extended support to include password and date input types
+- Created example spec (`usuarios.json`) demonstrating new field types
+- All 16 tests continue to pass
+
+#### Improvement #5: Form Layout Enhancement
+- Improved form field layout with horizontal label-input alignment
+- Fields stacked vertically (one below the other)
+- Label and input on the same horizontal line within each field
+- Labels with fixed width (180px) for consistent alignment
+- Inputs expand to fill remaining space
+- Applied consistently to both `form.html` and `edit.html` templates
+- Responsive design maintained across different screen sizes
+
+### Version 2.1
+
+#### Improvement #1: Icon Support
 - Added optional `icon` field to form specs
 - Eliminates hardcoded icon mappings
 - Icons display consistently in menu and cards
 
-### Improvement #2: Folder Configuration
+#### Improvement #2: Folder Configuration
 - Added `_folder.json` for declarative folder config
 - Supports custom names, descriptions, icons, and sort order
 - No code changes needed for customization
 
-### Improvement #3: Template System
+#### Improvement #3: Template System
 - Separated HTML into dedicated template files
 - Reduced main file from 925 to 587 lines (-36.5%)
 - Better IDE support and maintainability
