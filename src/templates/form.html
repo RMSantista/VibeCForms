@@ -37,7 +37,8 @@
         .form-actions { display: flex; justify-content: flex-start; gap: 10px; }
         button, .icon-btn { background: #3498db; color: #fff; border: none; border-radius: 5px; padding: 7px 14px; cursor: pointer; font-size: 15px; transition: background 0.2s; }
         button:hover, .icon-btn:hover { background: #2980b9; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .table-wrapper { width: 100%; overflow-x: auto; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; min-width: 600px; }
         th, td { padding: 10px; border-bottom: 1px solid #eee; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         th { background: #3498db; color: #fff; }
         tr:last-child td { border-bottom: none; }
@@ -110,12 +111,14 @@
                 </div>
             </form>
             <h3 style="margin-top:0;">Registros cadastrados:</h3>
-            <table>
-                <tr>
-                    {{ table_headers|safe }}
-                </tr>
-                {{ table_rows|safe }}
-            </table>
+            <div class="table-wrapper">
+                <table>
+                    <tr>
+                        {{ table_headers|safe }}
+                    </tr>
+                    {{ table_rows|safe }}
+                </table>
+            </div>
         </div>
     </div>
 </div>

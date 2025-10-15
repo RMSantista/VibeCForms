@@ -51,7 +51,7 @@ The project demonstrates how to build a **dynamic form management system** using
 - ✅ **Dynamic form generation**
   - Forms are generated from JSON spec files
   - URL-based routing with support for nested paths (e.g., `/contatos`, `/financeiro/contas`)
-  - Support for multiple field types (text, email, number, checkbox, textarea)
+  - **Complete HTML5 field type support (20 types)**: text, email, tel, number, password, url, search, date, time, datetime-local, month, week, color, range, select, radio, checkbox, textarea, hidden, and search with autocomplete
   - Automatic validation based on specs
 
 - ✅ **Modern Navigation System**

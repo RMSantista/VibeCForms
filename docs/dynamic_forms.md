@@ -36,25 +36,158 @@ Crie um arquivo JSON em `src/specs/<form_name>.json`:
 }
 ```
 
-### 2. Tipos de Campos Suportados
+### 2. Tipos de Campos Suportados (20 tipos)
 
+O VibeCForms agora suporta **todos os 20 tipos de campos HTML5**:
+
+#### Campos Básicos (7):
 - **text**: Campo de texto simples
 - **tel**: Campo de telefone
-- **email**: Campo de email
+- **email**: Campo de email com validação
 - **number**: Campo numérico
+- **password**: Campo de senha (caracteres mascarados)
+- **url**: Campo de URL com validação
+- **search**: Campo de busca
+
+#### Campos de Data/Hora (5):
+- **date**: Seletor de data
+- **time**: Seletor de hora
+- **datetime-local**: Seletor de data e hora combinados
+- **month**: Seletor de mês e ano
+- **week**: Seletor de semana
+
+#### Campos de Seleção (3):
+- **select**: Lista suspensa (dropdown) - requer array `options`
+- **radio**: Grupo de botões de opção - requer array `options`
 - **checkbox**: Caixa de seleção (booleano)
+
+#### Campos Avançados (2):
+- **color**: Seletor de cores com exibição hex
+- **range**: Slider numérico - requer `min`, `max`, `step`
+
+#### Outros Campos (3):
 - **textarea**: Área de texto multilinha
+- **hidden**: Campo oculto
+- **search com autocomplete**: Campo de busca com sugestões dinâmicas - requer atributo `datasource`
 
 ### 3. Propriedades dos Campos
 
 Cada campo pode ter as seguintes propriedades:
 
+#### Propriedades Básicas:
 - `name` (obrigatório): Nome interno do campo (usado no armazenamento)
 - `label` (obrigatório): Texto exibido ao usuário
 - `type` (obrigatório): Tipo do campo (veja lista acima)
 - `required` (opcional): Se o campo é obrigatório (padrão: false)
 
-### 4. Mensagens de Validação
+#### Propriedades Específicas por Tipo:
+
+**Para campos select e radio:**
+- `options` (obrigatório): Array de objetos com `value` e `label`
+  ```json
+  "options": [
+    {"value": "SP", "label": "São Paulo"},
+    {"value": "RJ", "label": "Rio de Janeiro"}
+  ]
+  ```
+
+**Para campo range:**
+- `min` (opcional): Valor mínimo (padrão: 0)
+- `max` (opcional): Valor máximo (padrão: 100)
+- `step` (opcional): Incremento (padrão: 1)
+
+**Para campo search com autocomplete:**
+- `datasource` (opcional): Nome da fonte de dados para autocomplete (ex: "contatos")
+
+### 4. Exemplos de Novos Campos
+
+#### Campo Select (Dropdown):
+```json
+{
+  "name": "estado",
+  "label": "Estado",
+  "type": "select",
+  "options": [
+    {"value": "SP", "label": "São Paulo"},
+    {"value": "RJ", "label": "Rio de Janeiro"},
+    {"value": "MG", "label": "Minas Gerais"}
+  ],
+  "required": true
+}
+```
+
+#### Campo Radio:
+```json
+{
+  "name": "genero",
+  "label": "Gênero",
+  "type": "radio",
+  "options": [
+    {"value": "M", "label": "Masculino"},
+    {"value": "F", "label": "Feminino"},
+    {"value": "O", "label": "Outro"}
+  ],
+  "required": true
+}
+```
+
+#### Campo Color:
+```json
+{
+  "name": "cor_favorita",
+  "label": "Cor Favorita",
+  "type": "color",
+  "required": false
+}
+```
+
+#### Campo Range:
+```json
+{
+  "name": "prioridade",
+  "label": "Prioridade (1-10)",
+  "type": "range",
+  "min": 1,
+  "max": 10,
+  "step": 1,
+  "required": false
+}
+```
+
+#### Campo Search com Autocomplete:
+```json
+{
+  "name": "contato_favorito",
+  "label": "Contato Favorito",
+  "type": "search",
+  "datasource": "contatos",
+  "required": false
+}
+```
+
+#### Campos de Data/Hora:
+```json
+{
+  "name": "data_nascimento",
+  "label": "Data de Nascimento",
+  "type": "date",
+  "required": true
+},
+{
+  "name": "horario",
+  "label": "Horário",
+  "type": "time",
+  "required": false
+},
+{
+  "name": "agendamento",
+  "label": "Data e Hora",
+  "type": "datetime-local",
+  "required": false
+}
+```
+
+### 5. Mensagens de Validação
 
 O objeto `validation_messages` pode conter:
 

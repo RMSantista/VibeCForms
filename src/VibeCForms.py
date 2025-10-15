@@ -1,6 +1,6 @@
 import os
 import json
-from flask import Flask, render_template, render_template_string, request, redirect, abort
+from flask import Flask, render_template, render_template_string, request, redirect, abort, jsonify
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -297,14 +297,95 @@ def generate_form_field(field, form_data=None):
             value=value
         )
 
+    elif field_type == "select":
+        template_file = os.path.join(template_path, "select.html")
+        with open(template_file, "r", encoding="utf-8") as f:
+            template_content = f.read()
+
+        options = field.get("options", [])
+        return render_template_string(
+            template_content,
+            field_name=field_name,
+            field_label=field_label,
+            required=required,
+            value=value,
+            options=options
+        )
+
+    elif field_type == "radio":
+        template_file = os.path.join(template_path, "radio.html")
+        with open(template_file, "r", encoding="utf-8") as f:
+            template_content = f.read()
+
+        options = field.get("options", [])
+        return render_template_string(
+            template_content,
+            field_name=field_name,
+            field_label=field_label,
+            required=required,
+            value=value,
+            options=options
+        )
+
+    elif field_type == "color":
+        template_file = os.path.join(template_path, "color.html")
+        with open(template_file, "r", encoding="utf-8") as f:
+            template_content = f.read()
+
+        return render_template_string(
+            template_content,
+            field_name=field_name,
+            field_label=field_label,
+            required=required,
+            value=value
+        )
+
+    elif field_type == "range":
+        template_file = os.path.join(template_path, "range.html")
+        with open(template_file, "r", encoding="utf-8") as f:
+            template_content = f.read()
+
+        min_value = field.get("min", 0)
+        max_value = field.get("max", 100)
+        step_value = field.get("step", 1)
+
+        return render_template_string(
+            template_content,
+            field_name=field_name,
+            field_label=field_label,
+            required=required,
+            value=value,
+            min_value=min_value,
+            max_value=max_value,
+            step_value=step_value
+        )
+
+    elif field_type == "search" and field.get("datasource"):
+        # Search field with autocomplete from datasource
+        template_file = os.path.join(template_path, "search_autocomplete.html")
+        with open(template_file, "r", encoding="utf-8") as f:
+            template_content = f.read()
+
+        return render_template_string(
+            template_content,
+            field_name=field_name,
+            field_label=field_label,
+            required=required,
+            value=value
+        )
+
     else:
-        # Input types: text, tel, email, number, password, date
+        # Input types: text, tel, email, number, password, date, url, search, datetime-local, time, month, week, hidden
         template_file = os.path.join(template_path, "input.html")
         with open(template_file, "r", encoding="utf-8") as f:
             template_content = f.read()
 
         input_type = (
-            field_type if field_type in ["text", "tel", "email", "number", "password", "date"] else "text"
+            field_type if field_type in [
+                "text", "tel", "email", "number", "password", "date",
+                "url", "search", "datetime-local", "time",
+                "month", "week", "hidden"
+            ] else "text"
         )
 
         return render_template_string(
@@ -341,6 +422,23 @@ def generate_table_row(form_data, spec, idx, form_name):
 
         if field_type == "checkbox":
             display_value = "Sim" if value else "Não"
+        elif field_type == "select" or field_type == "radio":
+            # Find label for the selected value
+            options = field.get("options", [])
+            display_value = value
+            for option in options:
+                if option.get("value") == value:
+                    display_value = option.get("label", value)
+                    break
+        elif field_type == "color":
+            # Display color swatch alongside hex value
+            display_value = f'<span style="display:inline-block;width:20px;height:20px;background-color:{value};border:1px solid #ccc;vertical-align:middle;margin-right:5px;"></span>{value}'
+        elif field_type == "password":
+            # Don't display password values
+            display_value = "••••••••"
+        elif field_type == "hidden":
+            # Don't display hidden values
+            display_value = ""
         else:
             display_value = value
 
@@ -427,6 +525,36 @@ def generate_menu_html(menu_items, current_form_path="", level=0):
             </li>\n'''
 
     return html
+
+
+@app.route("/api/search/contatos")
+def api_search_contatos():
+    """API endpoint to search contacts by name."""
+    query = request.args.get('q', '').strip().lower()
+
+    if not query:
+        return jsonify([])
+
+    # Read contacts from contatos.txt
+    contatos_file = get_data_file("contatos")
+    if not os.path.exists(contatos_file):
+        return jsonify([])
+
+    try:
+        contatos_spec = load_spec("contatos")
+    except:
+        return jsonify([])
+
+    forms = read_forms(contatos_spec, contatos_file)
+
+    # Filter contacts by name (case-insensitive substring match)
+    results = []
+    for form in forms:
+        nome = form.get("nome", "").lower()
+        if query in nome:
+            results.append(form.get("nome", ""))
+
+    return jsonify(results)
 
 
 @app.route("/")
