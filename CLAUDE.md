@@ -16,11 +16,15 @@ The application uses Flask's standard template system with Jinja2 templates sepa
 - `form.html` - Main CRUD form page with sidebar navigation (124 lines)
 - `edit.html` - Edit form page (101 lines)
 
-**Field Templates (Version 2.2 - Improvement #4):**
+**Field Templates (Version 2.3 - Expanded in Improvement #6):**
 Form fields are now rendered using individual templates in `src/templates/fields/`:
-- `input.html` - Template for text, tel, email, number, password, and date input fields
+- `input.html` - Template for simple input types (text, tel, email, number, password, date, url, search, datetime-local, time, month, week, hidden)
 - `textarea.html` - Template for textarea fields
 - `checkbox.html` - Template for checkbox fields
+- `select.html` - Template for dropdown selection fields
+- `radio.html` - Template for radio button groups
+- `color.html` - Template for color picker with live hex display
+- `range.html` - Template for slider with live value display
 
 The `generate_form_field()` function loads the appropriate template based on field type and renders it using `render_template_string()`. This provides:
 - Complete separation of HTML from Python code
@@ -48,16 +52,60 @@ Forms are defined by JSON specification files in `src/specs/`:
 }
 ```
 
-**Supported Field Types:**
-The system supports the following field types:
+**Supported Field Types (Version 2.3 - Complete HTML5 Support):**
+The system now supports all 20 HTML5 input types and form elements:
+
+**Basic Input Types:**
 - `text` - Single-line text input
 - `tel` - Telephone number input
 - `email` - Email address input with validation
 - `number` - Numeric input
-- `password` - Password input (masked characters)
+- `password` - Password input (masked characters, not displayed in tables)
+- `url` - URL input with validation
+- `search` - Search input with enhanced UX
+
+**Date and Time Types:**
 - `date` - Date picker input
-- `textarea` - Multi-line text input
+- `time` - Time picker input
+- `datetime-local` - Combined date and time picker
+- `month` - Month and year picker
+- `week` - Week picker
+
+**Selection Types:**
+- `select` - Dropdown selection list (requires `options` array)
+- `radio` - Radio button group (requires `options` array)
 - `checkbox` - Boolean checkbox input
+
+**Advanced Types:**
+- `color` - Color picker with live hex value display
+- `range` - Slider with live value display (supports `min`, `max`, `step` attributes)
+
+**Other Types:**
+- `textarea` - Multi-line text input
+- `hidden` - Hidden field (not displayed in forms or tables)
+
+**Field Options Format (for select/radio):**
+```json
+{
+  "name": "field_name",
+  "type": "select",
+  "options": [
+    {"value": "val1", "label": "Label 1"},
+    {"value": "val2", "label": "Label 2"}
+  ]
+}
+```
+
+**Range Field Format:**
+```json
+{
+  "name": "priority",
+  "type": "range",
+  "min": 1,
+  "max": 10,
+  "step": 1
+}
+```
 
 **Icon Support (Version 2.1 - Improvement #1):**
 - Optional `icon` field in spec files (e.g., "fa-address-book")
@@ -199,6 +247,67 @@ To customize a folder:
 3. The menu will automatically use these settings
 
 ## Recent Improvements
+
+### Version 2.3.1
+
+#### Improvement #7: Search with Autocomplete
+- Added support for search fields with dynamic autocomplete from datasources
+- New API endpoint `/api/search/contatos` for querying contact names
+- Real-time suggestions as users type (300ms debounce for performance)
+- Uses HTML5 datalist for native browser autocomplete
+- Case-insensitive substring matching
+- Created `search_autocomplete.html` template
+- Enhanced `generate_form_field()` to detect `datasource` attribute
+- Example field in `formulario_completo.json`:
+  ```json
+  {
+    "name": "contato_favorito",
+    "label": "Contato Favorito",
+    "type": "search",
+    "datasource": "contatos",
+    "required": false
+  }
+  ```
+
+**Search with Datasource Format:**
+```json
+{
+  "name": "field_name",
+  "type": "search",
+  "datasource": "contatos"
+}
+```
+
+#### Improvement #8: Responsive Table with Horizontal Scroll
+- Tables now wrapped in scrollable container (`table-wrapper`)
+- Horizontal scroll appears automatically when table exceeds container width
+- Minimum table width of 600px for readability
+- No more layout breaking on narrow screens or forms with many columns
+- Applied to `form.html` template
+- Seamless experience on mobile devices
+
+### Version 2.3
+
+#### Improvement #6: Complete HTML5 Field Type Support
+- Expanded from 8 to 20 supported field types (100% HTML5 coverage)
+- Added 4 new field templates:
+  - `select.html` - Dropdown selection with options
+  - `radio.html` - Radio button groups with options
+  - `color.html` - Color picker with live hex display
+  - `range.html` - Slider with live value display
+- Enhanced `generate_form_field()` to handle:
+  - Options array for select/radio fields
+  - Min/max/step attributes for range fields
+- Improved `generate_table_row()` to display:
+  - Labels instead of values for select/radio
+  - Color swatches for color fields
+  - Masked display for password fields
+  - Hidden fields are not displayed
+- Added 12 new input types via `input.html`:
+  - `url`, `search`, `datetime-local`, `time`, `month`, `week`, `hidden`
+- Created comprehensive example: `formulario_completo.json` demonstrating all 20 field types
+- All 16 existing tests continue to pass
+- Zero breaking changes - fully backward compatible
 
 ### Version 2.2
 

@@ -1,0 +1,1 @@
+Fulano de Tal;fulanodetal@yahoo.com.br;(11) 99999-7117;T3st3;50;1975-06-22;19:15;2025-10-15T20:30;2025-05;2025-W42;http://www.teste.com;Medicina;SP;M;#0f36d2;7;Vamos testar todos os campos;True;
