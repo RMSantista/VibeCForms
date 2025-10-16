@@ -242,3 +242,103 @@ class BaseRepository(ABC):
             For TXT: Returns True (no-op, indexes not applicable)
         """
         pass
+
+    @abstractmethod
+    def rename_field(self, form_path: str, spec: Dict[str, Any], old_name: str, new_name: str) -> bool:
+        """
+        Rename a field in the storage, preserving all data.
+
+        This is a schema migration operation that changes the name of a field
+        without losing the existing data in that field.
+
+        Args:
+            form_path: Path to the form
+            spec: Updated form specification (with new field name)
+            old_name: Current name of the field
+            new_name: New name for the field
+
+        Returns:
+            True if field was renamed successfully
+            False if field doesn't exist or rename failed
+
+        Implementation notes:
+            - For TXT: Rewrite file with new field order
+            - For SQLite: Recreate table (SQLite doesn't support RENAME COLUMN in old versions)
+            - For other DBs: Use ALTER TABLE RENAME COLUMN
+            - Should preserve all data values
+            - Should create backup before operation if configured
+
+        Example:
+            rename_field('contatos', spec, 'telefone', 'celular')
+        """
+        pass
+
+    @abstractmethod
+    def change_field_type(
+        self,
+        form_path: str,
+        spec: Dict[str, Any],
+        field_name: str,
+        old_type: str,
+        new_type: str
+    ) -> bool:
+        """
+        Change the type of a field, attempting to convert existing data.
+
+        This is a schema migration operation that changes a field's type
+        and tries to convert existing data to the new type.
+
+        Args:
+            form_path: Path to the form
+            spec: Updated form specification (with new field type)
+            field_name: Name of the field to change
+            old_type: Current type of the field (e.g., 'text')
+            new_type: New type for the field (e.g., 'number')
+
+        Returns:
+            True if type was changed and data converted successfully
+            False if conversion is not possible or failed
+
+        Implementation notes:
+            - Should validate if conversion is possible before attempting
+            - Compatible conversions: text→number, number→text, etc.
+            - Should create backup before operation if configured
+            - If any record fails conversion, should rollback
+
+        Example:
+            change_field_type('produtos', spec, 'preco', 'text', 'number')
+        """
+        pass
+
+    @abstractmethod
+    def remove_field(self, form_path: str, spec: Dict[str, Any], field_name: str) -> bool:
+        """
+        Remove a field from the storage structure.
+
+        This is a destructive schema migration operation that permanently
+        deletes a field and all its data.
+
+        Args:
+            form_path: Path to the form
+            spec: Updated form specification (without the removed field)
+            field_name: Name of the field to remove
+
+        Returns:
+            True if field was removed successfully
+            False if field doesn't exist or removal failed
+
+        Implementation notes:
+            - For TXT: Rewrite file without the field column
+            - For SQLite: ALTER TABLE DROP COLUMN (or recreate table)
+            - For other DBs: Use ALTER TABLE DROP COLUMN
+            - Should create backup before operation if configured
+            - This operation is irreversible - data is lost!
+
+        Warning:
+            This permanently deletes all data in this field!
+            User confirmation should be required before calling this method.
+
+        Example:
+            remove_field('contatos', spec, 'fax')  # Remove obsolete fax field
+        """
+        pass

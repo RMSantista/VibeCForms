@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import logging
 from flask import Flask, render_template, render_template_string, request, redirect, abort, jsonify
 from dotenv import load_dotenv
 
@@ -8,8 +9,13 @@ from dotenv import load_dotenv
 sys.path.insert(0, os.path.dirname(__file__))
 
 from persistence.factory import RepositoryFactory
+from persistence.change_manager import check_form_changes, update_form_tracking
 
 load_dotenv()
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 DATA_FILE = os.path.join(os.path.dirname(__file__), "registros.txt")
 SPECS_DIR = os.path.join(os.path.dirname(__file__), "specs")
@@ -217,11 +223,50 @@ def read_forms(spec, form_path):
     """
     repo = RepositoryFactory.get_repository(form_path)
 
+    # Check if storage exists and has data
+    has_data = repo.exists(form_path) and repo.has_data(form_path)
+    record_count = 0
+
+    if has_data:
+        try:
+            existing_data = repo.read_all(form_path, spec)
+            record_count = len(existing_data)
+        except Exception as e:
+            logger.warning(f"Error reading existing data for change detection: {e}")
+            has_data = False
+
+    # Check for schema or backend changes
+    schema_change, backend_change = check_form_changes(
+        form_path=form_path,
+        spec=spec,
+        has_data=has_data,
+        record_count=record_count
+    )
+
+    # Log detected changes (confirmation UI will be added in Part 4)
+    if schema_change or backend_change:
+        if schema_change and schema_change.has_changes():
+            logger.info(f"Schema changes detected for '{form_path}': "
+                       f"{schema_change.get_summary()}")
+
+        if backend_change:
+            logger.info(f"Backend change detected for '{form_path}': "
+                       f"{backend_change.old_backend} -> {backend_change.new_backend}")
+
+        # TODO: In Part 4, redirect to confirmation UI if requires_confirmation
+        # For now, just log and continue
+
     # Auto-create storage if it doesn't exist
     if not repo.exists(form_path):
         repo.create_storage(form_path, spec)
 
-    return repo.read_all(form_path, spec)
+    # Read data
+    data = repo.read_all(form_path, spec)
+
+    # Update tracking after successful read
+    update_form_tracking(form_path, spec, len(data))
+
+    return data
 
 
 def write_forms(forms, spec, form_path):

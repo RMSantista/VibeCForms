@@ -1910,5 +1910,252 @@ Este plano faz parte do projeto VibeCForms (MIT License).
 
 **Plano criado em:** Outubro 2025
 **Última atualização:** Outubro 2025
-**Status:** ✅ Aprovado para implementação
-**Próxima revisão:** Após conclusão da Fase 1
+**Status:** ✅ Fase 1 completa, Fase 1.5 em andamento
+**Próxima revisão:** Após conclusão da Fase 1.5
+
+---
+
+## 🚀 Fase 1.5: Melhorias Críticas de Migration (EM ANDAMENTO)
+
+**Data de Início:** 16 Outubro 2025
+**Status:** 🔄 30% Completo (Parte 1 concluída)
+**Objetivo:** Implementar funcionalidades críticas de migration identificadas pelo usuário
+
+### Requisitos Adicionais Identificados
+
+Durante a revisão da Fase 1, foram identificados 4 requisitos críticos que devem ser implementados:
+
+1. **Schema Migration Completo**
+   - ✅ Já implementado: Adicionar campos
+   - ❌ Falta: Alterar campos (tipo, nome, required)
+   - ❌ Falta: Remover campos
+
+2. **Migração Automática Entre Backends**
+   - Detectar mudança de backend na configuração
+   - Migrar dados automaticamente (TXT → SQLite, SQLite → TXT, etc.)
+   - Criar backup antes da migração
+   - Verificar sucesso da migração
+
+3. **Sistema de Confirmação para Alterações**
+   - Detectar alteração de campos com dados
+   - Exibir alerta na interface web
+   - Pedir confirmação antes de aplicar
+   - Tentar preservar dados durante alteração
+
+4. **Sistema de Confirmação para Exclusões**
+   - Detectar exclusão de campos com dados
+   - Exibir alerta na interface web
+   - Avisar sobre perda permanente de dados
+   - Pedir confirmação explícita
+
+### Arquitetura da Fase 1.5
+
+#### Novos Componentes Criados
+
+**1. SchemaChangeDetector** (`src/persistence/schema_detector.py` - 430 linhas)
+```python
+class SchemaChangeDetector:
+    - detect_changes(old_spec, new_spec) -> SchemaChange
+    - detect_backend_change(form_path, old_backend, new_backend) -> BackendChange
+    - _detect_renames(old_spec, new_spec, removed, added) -> List[Tuple]
+    - _is_type_compatible(old_type, new_type) -> bool
+```
+
+Detecta 5 tipos de mudanças:
+- ADD_FIELD - Adicionar campos
+- REMOVE_FIELD - Remover campos (destrutivo)
+- RENAME_FIELD - Renomear campos (preserva dados)
+- CHANGE_TYPE - Alterar tipo de campo
+- BACKEND_CHANGE - Mudança de backend de persistência
+
+**2. SchemaHistory** (`src/persistence/schema_history.py` - 250 linhas)
+```python
+class SchemaHistory:
+    - get_form_history(form_path) -> Dict
+    - update_form_history(form_path, spec_hash, backend, record_count)
+    - has_spec_changed(form_path, current_spec_hash) -> bool
+    - has_backend_changed(form_path, current_backend) -> bool
+```
+
+Rastreia histórico via `src/config/schema_history.json`:
+```json
+{
+  "contatos": {
+    "last_spec_hash": "abc123...",
+    "last_backend": "txt",
+    "last_updated": "2025-10-16T10:30:00Z",
+    "record_count": 42
+  }
+}
+```
+
+**3. ChangeManager** (`src/persistence/change_manager.py` - 200 linhas)
+```python
+class ChangeManager:
+    - check_for_changes(form_path, spec, backend, has_data, record_count)
+    - update_tracking(form_path, spec, backend, record_count)
+    - requires_confirmation(schema_change, backend_change) -> bool
+```
+
+Coordena detecção e rastreamento de mudanças.
+
+**4. BaseRepository - Novos Métodos Abstratos**
+
+Adicionados 3 novos métodos à interface base:
+
+```python
+@abstractmethod
+def rename_field(form_path, spec, old_name, new_name) -> bool:
+    """Renomeia campo preservando dados"""
+
+@abstractmethod
+def change_field_type(form_path, spec, field_name, old_type, new_type) -> bool:
+    """Altera tipo do campo com conversão de dados"""
+
+@abstractmethod
+def remove_field(form_path, spec, field_name) -> bool:
+    """Remove campo (destrutivo)"""
+```
+
+**5. Hook de Detecção em VibeCForms.py**
+
+Integrado na função `read_forms()`:
+```python
+def read_forms(spec, form_path):
+    # Check for schema or backend changes
+    schema_change, backend_change = check_form_changes(
+        form_path=form_path,
+        spec=spec,
+        has_data=has_data,
+        record_count=record_count
+    )
+
+    # Log detected changes
+    if schema_change or backend_change:
+        logger.info(f"Changes detected for '{form_path}'")
+        # TODO: Redirect to confirmation UI (Part 4)
+
+    # Continue with normal flow...
+```
+
+### Implementação por Partes
+
+#### ✅ Parte 1: Infraestrutura de Detecção (100% completa)
+
+**Status:** ✅ Completa
+**Tarefas:**
+1. ✅ Criar SchemaChangeDetector
+2. ✅ Criar SchemaHistory e schema_history.json
+3. ✅ Detectar mudança de backend
+4. ✅ Hook de detecção em read_forms()
+
+**Resultado:**
+- Sistema detecta mudanças de schema e backend
+- Logs detalhados no console
+- Rastreamento histórico funcional
+- Sem impacto no fluxo normal da aplicação
+
+#### 🔄 Parte 2: Schema Migrations Avançadas (0% completa)
+
+**Status:** 🔄 Pendente
+**Tarefas:**
+1. ❌ Implementar rename_field() no TxtRepository
+2. ❌ Implementar rename_field() no SQLiteRepository
+3. ❌ Implementar change_field_type() nos adapters
+4. ❌ Implementar remove_field() nos adapters
+5. ❌ Atualizar migrate_schema() existente
+
+**Estimativa:** ~600 linhas, 4-5 horas
+
+#### ⏳ Parte 3: Migração Entre Backends (0% completa)
+
+**Status:** ⏳ Pendente
+**Tarefas:**
+1. ❌ Criar MigrationManager.migrate_backend()
+2. ❌ Implementar estratégias de conversão
+3. ❌ Sistema de backup para cross-backend
+4. ❌ Rollback automático em falha
+
+**Estimativa:** ~500 linhas, 3-4 horas
+
+#### ⏳ Parte 4: Interface de Confirmação (0% completa)
+
+**Status:** ⏳ Pendente
+**Tarefas:**
+1. ❌ Criar template migration_confirm.html
+2. ❌ Criar rota /migrate/confirm/<form_path>
+3. ❌ Criar rota /migrate/execute/<form_path>
+4. ❌ Integrar confirmações no fluxo
+
+**Estimativa:** ~300 linhas, 2-3 horas
+
+### Arquivos Criados/Modificados
+
+**Novos arquivos (4):**
+- `src/persistence/schema_detector.py` (430 linhas)
+- `src/persistence/schema_history.py` (250 linhas)
+- `src/persistence/change_manager.py` (200 linhas)
+- `src/config/schema_history.json` (vazio inicialmente)
+
+**Arquivos modificados (2):**
+- `src/persistence/base.py` (+97 linhas - 3 novos métodos abstratos)
+- `src/VibeCForms.py` (+40 linhas - hook de detecção)
+
+**Total de código novo até agora:** ~1017 linhas
+**Estimativa restante:** ~1400 linhas
+
+### Cronograma Atualizado
+
+| Fase | Status | Duração | Prioridade |
+|------|--------|---------|------------|
+| Fase 1 (Foundation + SQLite) | ✅ Completa | 3 dias | ⭐⭐⭐ |
+| **Fase 1.5 (Migrations)** | **🔄 30%** | **2 dias** | **⭐⭐⭐** |
+| Fase 2 (MySQL/Postgres) | ⏳ Planejada | 3 dias | ⭐⭐ |
+| Fase 3 (Arquivos) | ⏳ Planejada | 2 dias | ⭐ |
+| Fase 4 (NoSQL) | ⏳ Planejada | 2 dias | Opcional |
+| Fase 5 (UI/CLI) | ⏳ Planejada | 2 dias | ⭐⭐ |
+
+### Próximos Passos
+
+**Imediato (Parte 2):**
+1. Implementar `rename_field()` no TxtRepository
+2. Implementar `rename_field()` no SQLiteRepository
+3. Implementar `change_field_type()` nos adapters
+4. Implementar `remove_field()` nos adapters
+5. Testes unitários para novos métodos
+
+**Após Parte 2:**
+1. Criar MigrationManager para migrations entre backends
+2. Implementar UI de confirmação web
+3. Testes de integração completos
+4. Documentação atualizada
+
+### Decisões Técnicas
+
+1. **Detecção de Renames:** Heurística baseada em posição e tipo
+   - Se campo removido e adicionado na mesma posição com mesmo tipo = rename provável
+
+2. **Compatibilidade de Tipos:** Lista de conversões seguras
+   - text ↔ email, tel, url, search (safe)
+   - number ↔ range (safe)
+   - text → any (sempre safe, conversível para string)
+
+3. **Confirmação Obrigatória:** Quando há dados e mudança destrutiva
+   - Remover campos: sempre requer confirmação
+   - Alterar tipo: se incompatível
+   - Renomear: se há dados (para confirmar que é rename, não add+remove)
+
+4. **Backup Automático:** Antes de qualquer migration destrutiva
+   - Formato: `src/backups/{form_path}_{timestamp}.json`
+   - Preserva dados em formato portável
+
+### Notas de Implementação
+
+**Logging Detalhado:**
+```python
+logger.info(f"Schema changes detected for 'contatos': {{'add_field': 1, 'remove_field': 1}}")
+logger.info(f"Backend change detected for 'produtos': txt -> sqlite (42 records)")
+logger.warning(f"Destructive change detected: removing field 'fax' with data")
+```
+
+**Próxima Sessão:** Implementar Parte 2 (Schema Migrations Avançadas)
