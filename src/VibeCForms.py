@@ -1,7 +1,13 @@
 import os
+import sys
 import json
 from flask import Flask, render_template, render_template_string, request, redirect, abort, jsonify
 from dotenv import load_dotenv
+
+# Add src directory to Python path for imports
+sys.path.insert(0, os.path.dirname(__file__))
+
+from persistence.factory import RepositoryFactory
 
 load_dotenv()
 
@@ -199,62 +205,47 @@ def get_all_forms_flat(menu_items=None, prefix=""):
     return forms
 
 
-def read_forms(spec, data_file):
-    """Read forms from data file based on spec definition."""
-    if not os.path.exists(data_file):
-        return []
+def read_forms(spec, form_path):
+    """Read forms using configured persistence backend.
 
-    with open(data_file, "r", encoding="utf-8") as f:
-        lines = f.readlines()
+    Args:
+        spec: Form specification
+        form_path: Path to the form (e.g., 'contatos', 'financeiro/contas')
 
-    forms = []
-    field_names = [field["name"] for field in spec["fields"]]
+    Returns:
+        List of form data dictionaries
+    """
+    repo = RepositoryFactory.get_repository(form_path)
 
-    for line in lines:
-        if not line.strip():
-            continue
-        values = line.strip().split(";")
-        if len(values) != len(field_names):
-            continue  # Skip malformed lines
+    # Auto-create storage if it doesn't exist
+    if not repo.exists(form_path):
+        repo.create_storage(form_path, spec)
 
-        form_data = {}
-        for i, field in enumerate(spec["fields"]):
-            field_name = field["name"]
-            field_type = field["type"]
-            value = values[i]
-
-            # Convert value based on field type
-            if field_type == "checkbox":
-                form_data[field_name] = value == "True"
-            elif field_type == "number":
-                try:
-                    form_data[field_name] = int(value) if value else 0
-                except ValueError:
-                    form_data[field_name] = 0
-            else:
-                form_data[field_name] = value
-
-        forms.append(form_data)
-
-    return forms
+    return repo.read_all(form_path, spec)
 
 
-def write_forms(forms, spec, data_file):
-    """Write forms to data file based on spec definition."""
-    with open(data_file, "w", encoding="utf-8") as f:
-        for form_data in forms:
-            values = []
-            for field in spec["fields"]:
-                field_name = field["name"]
-                value = form_data.get(field_name, "")
+def write_forms(forms, spec, form_path):
+    """Write forms using configured persistence backend.
 
-                # Convert value to string for storage
-                if isinstance(value, bool):
-                    values.append(str(value))
-                else:
-                    values.append(str(value))
+    Args:
+        forms: List of form data dictionaries
+        spec: Form specification
+        form_path: Path to the form (e.g., 'contatos', 'financeiro/contas')
+    """
+    repo = RepositoryFactory.get_repository(form_path)
 
-            f.write(";".join(values) + "\n")
+    # Auto-create storage if it doesn't exist
+    if not repo.exists(form_path):
+        repo.create_storage(form_path, spec)
+
+    # Clear all existing records
+    current = repo.read_all(form_path, spec)
+    for i in range(len(current)):
+        repo.delete(form_path, spec, 0)  # Always delete the first record
+
+    # Insert new records
+    for form_data in forms:
+        repo.create(form_path, spec, form_data)
 
 
 def generate_form_field(field, form_data=None):
@@ -535,17 +526,12 @@ def api_search_contatos():
     if not query:
         return jsonify([])
 
-    # Read contacts from contatos.txt
-    contatos_file = get_data_file("contatos")
-    if not os.path.exists(contatos_file):
-        return jsonify([])
-
     try:
         contatos_spec = load_spec("contatos")
     except:
         return jsonify([])
 
-    forms = read_forms(contatos_spec, contatos_file)
+    forms = read_forms(contatos_spec, "contatos")
 
     # Filter contacts by name (case-insensitive substring match)
     results = []
@@ -567,7 +553,6 @@ def main_page():
 @app.route("/<path:form_name>", methods=["GET", "POST"])
 def index(form_name):
     spec = load_spec(form_name)
-    data_file = get_data_file(form_name)
     error = ""
 
     # Generate dynamic menu
@@ -591,7 +576,7 @@ def index(form_name):
 
         if error:
             # Re-render with error and preserve form data
-            forms = read_forms(spec, data_file)
+            forms = read_forms(spec, form_name)
             form_fields = "".join(
                 [generate_form_field(f, form_data) for f in spec["fields"]]
             )
@@ -615,13 +600,13 @@ def index(form_name):
             )
 
         # Save the form
-        forms = read_forms(spec, data_file)
+        forms = read_forms(spec, form_name)
         forms.append(form_data)
-        write_forms(forms, spec, data_file)
+        write_forms(forms, spec, form_name)
         return redirect(f"/{form_name}")
 
     # GET request - show the form
-    forms = read_forms(spec, data_file)
+    forms = read_forms(spec, form_name)
     form_fields = "".join([generate_form_field(f) for f in spec["fields"]])
     table_headers = generate_table_headers(spec)
     table_rows = "".join(
@@ -645,8 +630,7 @@ def index(form_name):
 @app.route("/<path:form_name>/edit/<int:idx>", methods=["GET", "POST"])
 def edit(form_name, idx):
     spec = load_spec(form_name)
-    data_file = get_data_file(form_name)
-    forms = read_forms(spec, data_file)
+    forms = read_forms(spec, form_name)
     error = ""
 
     # Generate dynamic menu
@@ -687,7 +671,7 @@ def edit(form_name, idx):
 
         # Update the form
         forms[idx] = form_data
-        write_forms(forms, spec, data_file)
+        write_forms(forms, spec, form_name)
         return redirect(f"/{form_name}")
 
     # GET request - show edit form
@@ -706,14 +690,13 @@ def edit(form_name, idx):
 @app.route("/<path:form_name>/delete/<int:idx>")
 def delete(form_name, idx):
     spec = load_spec(form_name)
-    data_file = get_data_file(form_name)
-    forms = read_forms(spec, data_file)
+    forms = read_forms(spec, form_name)
 
     if idx < 0 or idx >= len(forms):
         return "Formulário não encontrado", 404
 
     forms.pop(idx)
-    write_forms(forms, spec, data_file)
+    write_forms(forms, spec, form_name)
     return redirect(f"/{form_name}")
 
 
