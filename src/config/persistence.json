@@ -73,8 +73,8 @@
   },
 
   "form_mappings": {
-    "contatos": "txt",
-    "produtos": "txt",
+    "contatos": "sqlite",
+    "produtos": "sqlite",
     "*": "default_backend"
   },
 
