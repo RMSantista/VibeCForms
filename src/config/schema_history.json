@@ -1,1 +1,32 @@
-{}
+{
+  "financeiro/contas": {
+    "last_spec_hash": "5b7f40de8f2d127347e9096e73db5e38",
+    "last_backend": "txt",
+    "last_updated": "2025-10-16T14:56:25.312716",
+    "record_count": 1
+  },
+  "financeiro/pagamentos": {
+    "last_spec_hash": "31a89c6f61ac4fe2b4441601460e163f",
+    "last_backend": "txt",
+    "last_updated": "2025-10-16T14:55:58.791240",
+    "record_count": 0
+  },
+  "/tmp/pytest-of-rodrigo/pytest-6/test_write_and_read_forms0/test.txt": {
+    "last_spec_hash": "ee014237f822ba2d7ea15758cd6056dd",
+    "last_backend": "txt",
+    "last_updated": "2025-10-16T15:06:36.243396",
+    "record_count": 2
+  },
+  "/tmp/pytest-of-rodrigo/pytest-6/test_update_form0/test.txt": {
+    "last_spec_hash": "ee014237f822ba2d7ea15758cd6056dd",
+    "last_backend": "txt",
+    "last_updated": "2025-10-16T15:06:36.247213",
+    "record_count": 2
+  },
+  "/tmp/pytest-of-rodrigo/pytest-6/test_delete_form0/test.txt": {
+    "last_spec_hash": "ee014237f822ba2d7ea15758cd6056dd",
+    "last_backend": "txt",
+    "last_updated": "2025-10-16T15:06:36.250082",
+    "record_count": 1
+  }
+}

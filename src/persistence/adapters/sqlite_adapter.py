@@ -14,6 +14,7 @@ from typing import Dict, Any, List, Optional
 from pathlib import Path
 from datetime import datetime
 from persistence.base import BaseRepository
+from persistence.schema_detector import SchemaChangeDetector, ChangeType
 
 logger = logging.getLogger(__name__)
 
@@ -413,10 +414,11 @@ class SQLiteRepository(BaseRepository):
         """
         Migrate schema when form specification changes.
 
-        For SQLite, this handles:
-        - Add new fields: ALTER TABLE ADD COLUMN
-        - Existing fields are preserved
-        - Cannot remove fields easily in SQLite (requires table recreation)
+        This method now uses change detection to intelligently handle:
+        - Rename fields: Preserves data while renaming
+        - Change field types: Converts data to new type
+        - Remove fields: Deletes field and data (with backup)
+        - Add fields: Adds new fields with default values
 
         A backup is created before migration.
         """
@@ -426,45 +428,101 @@ class SQLiteRepository(BaseRepository):
             logger.info(f"No table to migrate: {table_name}")
             return True
 
-        # Create backup
+        # Detect schema changes
+        has_data = self.has_data(form_path)
+        schema_change = SchemaChangeDetector.detect_changes(
+            form_path=form_path,
+            old_spec=old_spec,
+            new_spec=new_spec,
+            has_data=has_data
+        )
+
+        if not schema_change.has_changes():
+            logger.info(f"No schema changes detected for {form_path}")
+            return True
+
+        logger.info(f"Detected changes for {form_path}: {schema_change.get_summary()}")
+
+        # Create backup before any changes
         backup_path = self._create_backup()
         if not backup_path:
             logger.error("Failed to create backup, aborting migration")
             return False
 
         try:
-            # Determine which fields are new
-            old_field_names = {f["name"] for f in old_spec["fields"]}
-            new_fields = [
-                f for f in new_spec["fields"]
-                if f["name"] not in old_field_names
-            ]
+            # Process changes in order: renames, type changes, removes, adds
+            current_spec = old_spec.copy()
 
-            if not new_fields:
-                logger.info(f"No new fields to add in {table_name}")
-                return True
+            # 1. Process field renames first (preserves data)
+            for change in schema_change.changes:
+                if change.change_type == ChangeType.RENAME_FIELD:
+                    logger.info(f"Renaming field '{change.old_name}' to '{change.new_name}'")
 
-            # Add each new field
+                    # Update current_spec to reflect the rename
+                    for field in current_spec["fields"]:
+                        if field["name"] == change.old_name:
+                            field["name"] = change.new_name
+                            break
+
+                    # Execute rename
+                    if not self.rename_field(form_path, current_spec, change.old_name, change.new_name):
+                        raise Exception(f"Failed to rename field '{change.old_name}'")
+
+            # 2. Process type changes
+            for change in schema_change.changes:
+                if change.change_type == ChangeType.CHANGE_TYPE:
+                    logger.info(f"Changing type of '{change.field_name}' from {change.old_type} to {change.new_type}")
+
+                    # Update current_spec to reflect the type change
+                    for field in current_spec["fields"]:
+                        if field["name"] == change.field_name:
+                            field["type"] = change.new_type
+                            break
+
+                    # Execute type change
+                    if not self.change_field_type(form_path, current_spec, change.field_name, change.old_type, change.new_type):
+                        raise Exception(f"Failed to change type of field '{change.field_name}'")
+
+            # 3. Process field removals (destructive)
+            for change in schema_change.changes:
+                if change.change_type == ChangeType.REMOVE_FIELD:
+                    logger.warning(f"Removing field '{change.field_name}' (data will be lost)")
+
+                    # Remove from current_spec
+                    current_spec["fields"] = [f for f in current_spec["fields"] if f["name"] != change.field_name]
+
+                    # Execute removal
+                    if not self.remove_field(form_path, current_spec, change.field_name):
+                        raise Exception(f"Failed to remove field '{change.field_name}'")
+
+            # 4. Process field additions (safe)
             conn = self._get_connection()
             cursor = conn.cursor()
 
-            for field in new_fields:
-                field_name = field["name"]
-                field_type = field["type"]
-                sql_type = self.TYPE_MAPPING.get(field_type, 'TEXT')
+            for change in schema_change.changes:
+                if change.change_type == ChangeType.ADD_FIELD:
+                    logger.info(f"Adding new field '{change.field_name}' with type {change.field_type}")
 
-                # Get default value for the field type
-                default_value = self._get_default_value_sql(field_type)
+                    field_name = change.field_name
+                    field_type = change.field_type
+                    sql_type = self.TYPE_MAPPING.get(field_type, 'TEXT')
 
-                alter_sql = f"ALTER TABLE {table_name} ADD COLUMN {field_name} {sql_type} DEFAULT {default_value}"
+                    # Get default value for the field type
+                    default_value = self._get_default_value_sql(field_type)
 
-                cursor.execute(alter_sql)
-                logger.info(f"Added column {field_name} to {table_name}")
+                    alter_sql = f"ALTER TABLE {table_name} ADD COLUMN {field_name} {sql_type} DEFAULT {default_value}"
+                    cursor.execute(alter_sql)
+
+                    # Update current_spec
+                    current_spec["fields"].append({
+                        "name": field_name,
+                        "type": field_type
+                    })
 
             conn.commit()
             conn.close()
 
-            logger.info(f"Successfully migrated {table_name}: added {len(new_fields)} fields")
+            logger.info(f"Successfully migrated schema for {form_path}")
             return True
 
         except Exception as e:
@@ -515,6 +573,363 @@ class SQLiteRepository(BaseRepository):
             return "0"
         else:
             return "''"
+
+    def rename_field(
+        self,
+        form_path: str,
+        spec: Dict[str, Any],
+        old_name: str,
+        new_name: str
+    ) -> bool:
+        """
+        Rename a field in the table, preserving all data.
+
+        For SQLite, we recreate the table since ALTER TABLE RENAME COLUMN
+        is not supported in older versions.
+
+        Args:
+            form_path: Path to the form
+            spec: Updated form specification (with new field name)
+            old_name: Current name of the field
+            new_name: New name for the field
+
+        Returns:
+            True if field was renamed successfully
+        """
+        table_name = self._get_table_name(form_path)
+
+        if not self.exists(form_path):
+            logger.error(f"Cannot rename field: table {table_name} doesn't exist")
+            return False
+
+        # Create backup
+        backup_path = self._create_backup()
+        if not backup_path:
+            logger.error("Failed to create backup, aborting rename")
+            return False
+
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+
+            # Create new table with renamed field
+            temp_table = f"{table_name}_temp"
+
+            # Build CREATE TABLE for new structure
+            columns = ["id INTEGER PRIMARY KEY AUTOINCREMENT"]
+            for field in spec["fields"]:
+                field_name = field["name"]
+                field_type = field["type"]
+                sql_type = self.TYPE_MAPPING.get(field_type, 'TEXT')
+
+                required = field.get("required", False)
+                constraint = " NOT NULL" if required and field_type != "checkbox" else ""
+
+                columns.append(f"{field_name} {sql_type}{constraint}")
+
+            columns_sql = ",\n    ".join(columns)
+            create_sql = f"CREATE TABLE {temp_table} (\n    {columns_sql}\n)"
+
+            cursor.execute(create_sql)
+
+            # Copy data from old table to new table
+            # Build field list with old_name -> new_name mapping
+            old_fields = [old_name if f["name"] == new_name else f["name"] for f in spec["fields"]]
+            new_fields = [f["name"] for f in spec["fields"]]
+
+            old_fields_sql = ", ".join(old_fields)
+            new_fields_sql = ", ".join(new_fields)
+
+            copy_sql = f"""
+                INSERT INTO {temp_table} ({new_fields_sql})
+                SELECT {old_fields_sql}
+                FROM {table_name}
+            """
+            cursor.execute(copy_sql)
+
+            # Drop old table and rename new table
+            cursor.execute(f"DROP TABLE {table_name}")
+            cursor.execute(f"ALTER TABLE {temp_table} RENAME TO {table_name}")
+
+            conn.commit()
+            conn.close()
+
+            logger.info(f"Renamed field '{old_name}' to '{new_name}' in {table_name}")
+            return True
+
+        except Exception as e:
+            # Restore from backup on error
+            if backup_path:
+                self._restore_backup(backup_path)
+            logger.error(f"Failed to rename field: {e}, restored from backup")
+            return False
+
+    def change_field_type(
+        self,
+        form_path: str,
+        spec: Dict[str, Any],
+        field_name: str,
+        old_type: str,
+        new_type: str
+    ) -> bool:
+        """
+        Change the type of a field, attempting to convert existing data.
+
+        For SQLite, we recreate the table with the new type and copy/convert data.
+
+        Args:
+            form_path: Path to the form
+            spec: Updated form specification (with new field type)
+            field_name: Name of the field to change
+            old_type: Current type of the field
+            new_type: New type for the field
+
+        Returns:
+            True if type was changed successfully
+        """
+        table_name = self._get_table_name(form_path)
+
+        if not self.exists(form_path):
+            logger.error(f"Cannot change field type: table {table_name} doesn't exist")
+            return False
+
+        # Create backup
+        backup_path = self._create_backup()
+        if not backup_path:
+            logger.error("Failed to create backup, aborting type change")
+            return False
+
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+
+            # Read all existing data
+            cursor.execute(f"SELECT * FROM {table_name}")
+            rows = cursor.fetchall()
+
+            # Create new table with updated type
+            temp_table = f"{table_name}_temp"
+
+            # Build CREATE TABLE with new field type
+            columns = ["id INTEGER PRIMARY KEY AUTOINCREMENT"]
+            for field in spec["fields"]:
+                fname = field["name"]
+                ftype = field["type"]
+                sql_type = self.TYPE_MAPPING.get(ftype, 'TEXT')
+
+                required = field.get("required", False)
+                constraint = " NOT NULL" if required and ftype != "checkbox" else ""
+
+                columns.append(f"{fname} {sql_type}{constraint}")
+
+            columns_sql = ",\n    ".join(columns)
+            create_sql = f"CREATE TABLE {temp_table} (\n    {columns_sql}\n)"
+
+            cursor.execute(create_sql)
+
+            # Convert and insert data
+            field_names = [f["name"] for f in spec["fields"]]
+            placeholders = ", ".join(["?" for _ in field_names])
+            columns_insert = ", ".join(field_names)
+
+            insert_sql = f"INSERT INTO {temp_table} ({columns_insert}) VALUES ({placeholders})"
+
+            conversion_errors = 0
+            for row in rows:
+                values = []
+                for field in spec["fields"]:
+                    fname = field["name"]
+                    ftype = field["type"]
+                    value = row[fname]
+
+                    # Convert the changed field
+                    if fname == field_name:
+                        try:
+                            value = self._convert_value(value, old_type, new_type)
+                        except Exception as e:
+                            logger.warning(f"Conversion error for {fname}: {e}")
+                            conversion_errors += 1
+                            value = self._get_default_value(new_type)
+
+                    # Apply type conversion
+                    if ftype == "checkbox":
+                        values.append(1 if value else 0)
+                    elif ftype == "number" or ftype == "range":
+                        try:
+                            values.append(int(value) if value else 0)
+                        except ValueError:
+                            values.append(0)
+                    else:
+                        values.append(str(value) if value else "")
+
+                cursor.execute(insert_sql, values)
+
+            # Check if too many conversions failed
+            total_rows = len(rows)
+            if total_rows > 0 and conversion_errors / total_rows > 0.5:
+                raise Exception(f"Too many conversion errors: {conversion_errors}/{total_rows}")
+
+            # Drop old table and rename new table
+            cursor.execute(f"DROP TABLE {table_name}")
+            cursor.execute(f"ALTER TABLE {temp_table} RENAME TO {table_name}")
+
+            conn.commit()
+            conn.close()
+
+            logger.info(
+                f"Changed field '{field_name}' from {old_type} to {new_type} "
+                f"in {table_name} ({conversion_errors} conversion errors)"
+            )
+            return True
+
+        except Exception as e:
+            # Restore from backup on error
+            if backup_path:
+                self._restore_backup(backup_path)
+            logger.error(f"Failed to change field type: {e}, restored from backup")
+            return False
+
+    def remove_field(
+        self,
+        form_path: str,
+        spec: Dict[str, Any],
+        field_name: str
+    ) -> bool:
+        """
+        Remove a field from the table (destructive operation).
+
+        For SQLite, we recreate the table without the removed field.
+
+        Args:
+            form_path: Path to the form
+            spec: Updated form specification (without the removed field)
+            field_name: Name of the field to remove
+
+        Returns:
+            True if field was removed successfully
+        """
+        table_name = self._get_table_name(form_path)
+
+        if not self.exists(form_path):
+            logger.error(f"Cannot remove field: table {table_name} doesn't exist")
+            return False
+
+        # Create backup (critical for destructive operations!)
+        backup_path = self._create_backup()
+        if not backup_path:
+            logger.error("Failed to create backup, aborting field removal")
+            return False
+
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+
+            # Create new table without the removed field
+            temp_table = f"{table_name}_temp"
+
+            # Build CREATE TABLE without removed field
+            columns = ["id INTEGER PRIMARY KEY AUTOINCREMENT"]
+            for field in spec["fields"]:
+                fname = field["name"]
+                ftype = field["type"]
+                sql_type = self.TYPE_MAPPING.get(ftype, 'TEXT')
+
+                required = field.get("required", False)
+                constraint = " NOT NULL" if required and ftype != "checkbox" else ""
+
+                columns.append(f"{fname} {sql_type}{constraint}")
+
+            columns_sql = ",\n    ".join(columns)
+            create_sql = f"CREATE TABLE {temp_table} (\n    {columns_sql}\n)"
+
+            cursor.execute(create_sql)
+
+            # Copy data excluding the removed field
+            field_names = [f["name"] for f in spec["fields"]]
+            fields_sql = ", ".join(field_names)
+
+            copy_sql = f"""
+                INSERT INTO {temp_table} ({fields_sql})
+                SELECT {fields_sql}
+                FROM {table_name}
+            """
+            cursor.execute(copy_sql)
+
+            # Drop old table and rename new table
+            cursor.execute(f"DROP TABLE {table_name}")
+            cursor.execute(f"ALTER TABLE {temp_table} RENAME TO {table_name}")
+
+            conn.commit()
+            conn.close()
+
+            logger.info(f"Removed field '{field_name}' from {table_name}")
+            return True
+
+        except Exception as e:
+            # Restore from backup on error
+            if backup_path:
+                self._restore_backup(backup_path)
+            logger.error(f"Failed to remove field: {e}, restored from backup")
+            return False
+
+    def _convert_value(self, value: Any, old_type: str, new_type: str) -> Any:
+        """
+        Convert a value from one type to another.
+
+        Args:
+            value: Original value
+            old_type: Original field type
+            new_type: Target field type
+
+        Returns:
+            Converted value
+
+        Raises:
+            ValueError: If conversion is not possible
+        """
+        # None/empty values
+        if value is None or value == "":
+            return self._get_default_value(new_type)
+
+        # text -> number
+        if old_type in ["text", "email", "tel", "url", "search"] and new_type in ["number", "range"]:
+            return int(value)
+
+        # number -> text
+        if old_type in ["number", "range"] and new_type in ["text", "email", "tel", "url", "search"]:
+            return str(value)
+
+        # text -> checkbox
+        if old_type in ["text", "email", "tel", "url", "search"] and new_type == "checkbox":
+            return value.lower() in ["true", "1", "yes", "sim"]
+
+        # checkbox -> text
+        if old_type == "checkbox" and new_type in ["text", "email", "tel", "url", "search"]:
+            return "true" if value else "false"
+
+        # Any type -> text (always safe)
+        if new_type in ["text", "textarea", "email", "tel", "url", "search"]:
+            return str(value)
+
+        # Same type or compatible types
+        return value
+
+    def _get_default_value(self, field_type: str) -> Any:
+        """
+        Get default value for a field type.
+
+        Args:
+            field_type: Type of field
+
+        Returns:
+            Default value for that type
+        """
+        if field_type == "checkbox":
+            return False
+        elif field_type in ["number", "range"]:
+            return 0
+        else:
+            return ""
 
     def _create_backup(self) -> Optional[str]:
         """

@@ -13,6 +13,7 @@ from typing import Dict, Any, List, Optional
 from pathlib import Path
 from datetime import datetime
 from persistence.base import BaseRepository
+from persistence.schema_detector import SchemaChangeDetector, ChangeType
 
 logger = logging.getLogger(__name__)
 
@@ -280,10 +281,11 @@ class TxtRepository(BaseRepository):
         """
         Migrate schema when form specification changes.
 
-        For text files, this means:
-        - Add new fields: Append empty values to each line
-        - Remove fields: Remove corresponding values from each line
-        - Reorder fields: Reorder values in each line
+        This method now uses change detection to intelligently handle:
+        - Rename fields: Preserves data while renaming
+        - Change field types: Converts data to new type
+        - Remove fields: Deletes field and data (with backup)
+        - Add fields: Adds new fields with default values
 
         A backup is created before migration.
         """
@@ -293,52 +295,102 @@ class TxtRepository(BaseRepository):
             logger.info(f"No file to migrate: {file_path}")
             return True
 
-        # Create backup
+        # Detect schema changes
+        has_data = self.has_data(form_path)
+        schema_change = SchemaChangeDetector.detect_changes(
+            form_path=form_path,
+            old_spec=old_spec,
+            new_spec=new_spec,
+            has_data=has_data
+        )
+
+        if not schema_change.has_changes():
+            logger.info(f"No schema changes detected for {form_path}")
+            return True
+
+        logger.info(f"Detected changes for {form_path}: {schema_change.get_summary()}")
+
+        # Create backup before any changes
         backup_path = self._create_backup(file_path)
         if not backup_path:
             logger.error("Failed to create backup, aborting migration")
             return False
 
         try:
-            # Read data with old spec
-            old_forms = self.read_all(form_path, old_spec)
+            # Process changes in order: renames, type changes, removes, adds
+            current_spec = old_spec.copy()
 
-            # Build mapping of old fields to new fields
-            old_field_names = [f["name"] for f in old_spec["fields"]]
-            new_field_names = [f["name"] for f in new_spec["fields"]]
+            # 1. Process field renames first (preserves data)
+            for change in schema_change.changes:
+                if change.change_type == ChangeType.RENAME_FIELD:
+                    logger.info(f"Renaming field '{change.old_name}' to '{change.new_name}'")
 
-            # Migrate each record
-            migrated_forms = []
-            for old_form in old_forms:
-                new_form = {}
-                for new_field in new_spec["fields"]:
-                    field_name = new_field["name"]
-                    field_type = new_field["type"]
+                    # Update current_spec to reflect the rename
+                    for field in current_spec["fields"]:
+                        if field["name"] == change.old_name:
+                            field["name"] = change.new_name
+                            break
 
-                    if field_name in old_form:
-                        # Field exists in old data
-                        new_form[field_name] = old_form[field_name]
-                    else:
-                        # New field, use default value
-                        new_form[field_name] = self._get_default_value(field_type)
+                    # Execute rename
+                    if not self.rename_field(form_path, current_spec, change.old_name, change.new_name):
+                        raise Exception(f"Failed to rename field '{change.old_name}'")
 
-                migrated_forms.append(new_form)
+            # 2. Process type changes
+            for change in schema_change.changes:
+                if change.change_type == ChangeType.CHANGE_TYPE:
+                    logger.info(f"Changing type of '{change.field_name}' from {change.old_type} to {change.new_type}")
 
-            # Write migrated data with new spec
-            success = self._write_all(form_path, new_spec, migrated_forms)
+                    # Update current_spec to reflect the type change
+                    for field in current_spec["fields"]:
+                        if field["name"] == change.field_name:
+                            field["type"] = change.new_type
+                            break
 
-            if success:
-                logger.info(
-                    f"Successfully migrated {form_path}: "
-                    f"{len(old_field_names)} -> {len(new_field_names)} fields, "
-                    f"{len(migrated_forms)} records"
-                )
-            else:
-                # Restore from backup on failure
-                shutil.copy2(backup_path, file_path)
-                logger.error(f"Migration failed, restored from backup")
+                    # Execute type change
+                    if not self.change_field_type(form_path, current_spec, change.field_name, change.old_type, change.new_type):
+                        raise Exception(f"Failed to change type of field '{change.field_name}'")
 
-            return success
+            # 3. Process field removals (destructive)
+            for change in schema_change.changes:
+                if change.change_type == ChangeType.REMOVE_FIELD:
+                    logger.warning(f"Removing field '{change.field_name}' (data will be lost)")
+
+                    # Remove from current_spec
+                    current_spec["fields"] = [f for f in current_spec["fields"] if f["name"] != change.field_name]
+
+                    # Execute removal
+                    if not self.remove_field(form_path, current_spec, change.field_name):
+                        raise Exception(f"Failed to remove field '{change.field_name}'")
+
+            # 4. Process field additions (safe)
+            added_fields = []
+            for change in schema_change.changes:
+                if change.change_type == ChangeType.ADD_FIELD:
+                    logger.info(f"Adding new field '{change.field_name}' with type {change.field_type}")
+                    added_fields.append(change)
+
+            # Add new fields by reading all data and writing with new spec
+            if added_fields:
+                forms = self.read_all(form_path, current_spec)
+
+                # Add new fields to current_spec
+                for change in added_fields:
+                    current_spec["fields"].append({
+                        "name": change.field_name,
+                        "type": change.field_type
+                    })
+
+                # Add default values for new fields in each record
+                for form in forms:
+                    for change in added_fields:
+                        form[change.field_name] = self._get_default_value(change.field_type)
+
+                # Write with new spec
+                if not self._write_all(form_path, current_spec, forms):
+                    raise Exception("Failed to add new fields")
+
+            logger.info(f"Successfully migrated schema for {form_path}")
+            return True
 
         except Exception as e:
             # Restore from backup on error
@@ -355,6 +407,250 @@ class TxtRepository(BaseRepository):
         """
         logger.debug(f"create_index is no-op for TxtRepository")
         return True
+
+    def rename_field(self, form_path: str, spec: Dict[str, Any], old_name: str, new_name: str) -> bool:
+        """
+        Rename a field in the text file, preserving all data.
+
+        This reads all data, renames the field in each record, and writes back.
+        The spec parameter should already have the new field name.
+
+        Args:
+            form_path: Path to the form
+            spec: Updated form specification (with new field name)
+            old_name: Current name of the field
+            new_name: New name for the field
+
+        Returns:
+            True if field was renamed successfully
+        """
+        file_path = self._get_file_path(form_path)
+
+        if not os.path.exists(file_path):
+            logger.warning(f"Cannot rename field: file doesn't exist: {file_path}")
+            return False
+
+        # Create backup
+        backup_path = self._create_backup(file_path)
+        if not backup_path:
+            logger.error("Failed to create backup, aborting rename")
+            return False
+
+        try:
+            # Create a temporary old spec for reading current data
+            old_spec = {"fields": []}
+            for field in spec["fields"]:
+                if field["name"] == new_name:
+                    # This is the renamed field, use old name for reading
+                    old_field = field.copy()
+                    old_field["name"] = old_name
+                    old_spec["fields"].append(old_field)
+                else:
+                    old_spec["fields"].append(field)
+
+            # Read data with old field name
+            forms = self.read_all(form_path, old_spec)
+
+            # Rename field in each record
+            for form in forms:
+                if old_name in form:
+                    form[new_name] = form.pop(old_name)
+
+            # Write with new spec
+            success = self._write_all(form_path, spec, forms)
+
+            if success:
+                logger.info(f"Successfully renamed field '{old_name}' to '{new_name}' in {form_path}")
+            else:
+                # Restore from backup
+                shutil.copy2(backup_path, file_path)
+                logger.error(f"Rename failed, restored from backup")
+
+            return success
+
+        except Exception as e:
+            # Restore from backup on error
+            if backup_path and os.path.exists(backup_path):
+                shutil.copy2(backup_path, file_path)
+            logger.error(f"Rename error: {e}, restored from backup")
+            return False
+
+    def change_field_type(
+        self,
+        form_path: str,
+        spec: Dict[str, Any],
+        field_name: str,
+        old_type: str,
+        new_type: str
+    ) -> bool:
+        """
+        Change the type of a field, attempting to convert existing data.
+
+        Args:
+            form_path: Path to the form
+            spec: Updated form specification (with new field type)
+            field_name: Name of the field to change
+            old_type: Current type of the field
+            new_type: New type for the field
+
+        Returns:
+            True if type was changed and data converted successfully
+        """
+        file_path = self._get_file_path(form_path)
+
+        if not os.path.exists(file_path):
+            logger.warning(f"Cannot change field type: file doesn't exist: {file_path}")
+            return False
+
+        # Create backup
+        backup_path = self._create_backup(file_path)
+        if not backup_path:
+            logger.error("Failed to create backup, aborting type change")
+            return False
+
+        try:
+            # Read all data
+            forms = self.read_all(form_path, spec)
+
+            # Convert each record's field value
+            conversion_errors = 0
+            for i, form in enumerate(forms):
+                if field_name in form:
+                    old_value = form[field_name]
+
+                    try:
+                        # Attempt conversion based on new type
+                        if new_type == "number" or new_type == "range":
+                            # Convert to number
+                            if isinstance(old_value, (int, float)):
+                                new_value = int(old_value)
+                            elif isinstance(old_value, str):
+                                new_value = int(old_value) if old_value else 0
+                            elif isinstance(old_value, bool):
+                                new_value = 1 if old_value else 0
+                            else:
+                                new_value = 0
+
+                        elif new_type == "checkbox":
+                            # Convert to boolean
+                            if isinstance(old_value, bool):
+                                new_value = old_value
+                            elif isinstance(old_value, (int, float)):
+                                new_value = old_value != 0
+                            elif isinstance(old_value, str):
+                                new_value = old_value.lower() in ('true', '1', 'yes', 'sim')
+                            else:
+                                new_value = False
+
+                        else:
+                            # Convert to string (always safe)
+                            new_value = str(old_value)
+
+                        form[field_name] = new_value
+
+                    except (ValueError, TypeError) as e:
+                        logger.warning(
+                            f"Failed to convert record {i} field '{field_name}' "
+                            f"from {old_type} to {new_type}: {e}"
+                        )
+                        conversion_errors += 1
+                        # Use default value on conversion failure
+                        form[field_name] = self._get_default_value(new_type)
+
+            # If too many conversion errors, abort
+            if conversion_errors > len(forms) * 0.5:  # More than 50% failed
+                logger.error(
+                    f"Too many conversion errors ({conversion_errors}/{len(forms)}), "
+                    f"aborting type change"
+                )
+                shutil.copy2(backup_path, file_path)
+                return False
+
+            # Write converted data
+            success = self._write_all(form_path, spec, forms)
+
+            if success:
+                logger.info(
+                    f"Successfully changed field '{field_name}' type from {old_type} to {new_type} "
+                    f"in {form_path} ({conversion_errors} conversion warnings)"
+                )
+            else:
+                # Restore from backup
+                shutil.copy2(backup_path, file_path)
+                logger.error(f"Type change failed, restored from backup")
+
+            return success
+
+        except Exception as e:
+            # Restore from backup on error
+            if backup_path and os.path.exists(backup_path):
+                shutil.copy2(backup_path, file_path)
+            logger.error(f"Type change error: {e}, restored from backup")
+            return False
+
+    def remove_field(self, form_path: str, spec: Dict[str, Any], field_name: str) -> bool:
+        """
+        Remove a field from the text file (destructive operation).
+
+        This permanently deletes all data in this field!
+        The spec parameter should already NOT contain the removed field.
+
+        Args:
+            form_path: Path to the form
+            spec: Updated form specification (without the removed field)
+            field_name: Name of the field to remove
+
+        Returns:
+            True if field was removed successfully
+        """
+        file_path = self._get_file_path(form_path)
+
+        if not os.path.exists(file_path):
+            logger.warning(f"Cannot remove field: file doesn't exist: {file_path}")
+            return False
+
+        # Create backup (important for destructive operation!)
+        backup_path = self._create_backup(file_path)
+        if not backup_path:
+            logger.error("Failed to create backup, aborting field removal")
+            return False
+
+        try:
+            # Create a temporary old spec that includes the removed field
+            old_spec = {"fields": list(spec["fields"])}
+            # Find where the removed field should be inserted (maintain order if possible)
+            # For simplicity, add it at the end
+            old_spec["fields"].append({"name": field_name, "type": "text"})
+
+            # Read all data with old spec
+            forms = self.read_all(form_path, old_spec)
+
+            # Remove field from each record
+            for form in forms:
+                if field_name in form:
+                    del form[field_name]
+
+            # Write with new spec (without the removed field)
+            success = self._write_all(form_path, spec, forms)
+
+            if success:
+                logger.warning(
+                    f"Field '{field_name}' permanently removed from {form_path} "
+                    f"({len(forms)} records affected)"
+                )
+            else:
+                # Restore from backup
+                shutil.copy2(backup_path, file_path)
+                logger.error(f"Field removal failed, restored from backup")
+
+            return success
+
+        except Exception as e:
+            # Restore from backup on error
+            if backup_path and os.path.exists(backup_path):
+                shutil.copy2(backup_path, file_path)
+            logger.error(f"Field removal error: {e}, restored from backup")
+            return False
 
     def _get_default_value(self, field_type: str) -> Any:
         """
