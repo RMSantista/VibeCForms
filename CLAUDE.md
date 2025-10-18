@@ -10,6 +10,129 @@ The system generates forms dynamically from JSON specification files, supports h
 
 ## Core Architecture
 
+### Persistence System (Version 3.0)
+The application uses a pluggable persistence system that supports multiple storage backends, allowing different forms to use different storage technologies without code changes.
+
+#### Multi-Backend Architecture
+The system implements three design patterns:
+- **Repository Pattern**: Unified `BaseRepository` interface for all storage operations
+- **Adapter Pattern**: Backend-specific implementations (TxtAdapter, SQLiteAdapter, etc.)
+- **Factory Pattern**: `RepositoryFactory` creates appropriate repository instances
+
+#### BaseRepository Interface
+All backends implement these 11 methods:
+```python
+class BaseRepository(ABC):
+    @abstractmethod
+    def create(self, form_path: str, spec: dict, data: dict) -> bool
+    @abstractmethod
+    def read_all(self, form_path: str, spec: dict) -> list
+    @abstractmethod
+    def update(self, form_path: str, spec: dict, idx: int, data: dict) -> bool
+    @abstractmethod
+    def delete(self, form_path: str, spec: dict, idx: int) -> bool
+    @abstractmethod
+    def exists(self, form_path: str) -> bool
+    @abstractmethod
+    def has_data(self, form_path: str) -> bool
+    @abstractmethod
+    def create_storage(self, form_path: str, spec: dict) -> bool
+    @abstractmethod
+    def drop_storage(self, form_path: str) -> bool
+    # ... +3 auxiliary methods
+```
+
+#### Supported Backends
+
+**TXT (Original)**: Semicolon-delimited text files
+- Path: `src/`
+- Extension: `.txt`
+- Delimiter: `;`
+- Encoding: `utf-8`
+
+**SQLite (Implemented)**: Embedded database
+- Database: `src/vibecforms.db`
+- Each form becomes a table
+- Automatic type mapping (text, number, boolean)
+- Timeout: 10 seconds
+
+**Configured (Future)**: MySQL, PostgreSQL, MongoDB, CSV, JSON, XML
+- Full configurations in `persistence.json`
+- Architecture ready for implementation
+
+#### Configuration
+Backend selection is configured in `src/config/persistence.json`:
+```json
+{
+  "default_backend": "txt",
+  "backends": { ... },
+  "form_mappings": {
+    "contatos": "sqlite",
+    "produtos": "sqlite",
+    "*": "default_backend"
+  }
+}
+```
+
+#### Migration System
+The system includes automatic backend migration with:
+1. **Change Detection**: Compares `persistence.json` with `schema_history.json`
+2. **User Confirmation**: Web UI at `/migrate/confirm/<form_path>`
+3. **Automatic Backup**: Creates backup in `src/backups/migrations/`
+4. **Data Migration**: Copies all records to new backend
+5. **History Update**: Updates `schema_history.json`
+
+Successfully migrated 40 records:
+- contatos: 23 records (TXT → SQLite)
+- produtos: 17 records (TXT → SQLite)
+
+#### Schema Change Detection
+The system tracks schema changes using MD5 hashes:
+- **ADD_FIELD**: Field added (automatic, no confirmation)
+- **REMOVE_FIELD**: Field removed (requires confirmation if data exists)
+- **CHANGE_TYPE**: Field type changed (requires confirmation)
+- **CHANGE_REQUIRED**: Required flag changed (warning)
+
+Schema history is tracked automatically in `src/config/schema_history.json`:
+```json
+{
+  "contatos": {
+    "last_spec_hash": "ee014237f822ba2d7ea15758cd6056dd",
+    "last_backend": "sqlite",
+    "last_updated": "2025-10-16T17:29:30.878397",
+    "record_count": 23
+  }
+}
+```
+
+#### Key Classes
+
+**RepositoryFactory** (`src/persistence/repository_factory.py`):
+- Creates appropriate repository instances based on backend type
+- Loads backend configuration from `persistence.json`
+
+**MigrationManager** (`src/persistence/migration_manager.py`):
+- Handles backend migrations
+- Creates backups before migrations
+- Rollback support on failure
+
+**SchemaChangeDetector** (`src/persistence/schema_detector.py`):
+- Computes MD5 hashes of specs
+- Detects schema changes
+- Identifies backend changes
+- Requires confirmation for risky operations
+
+**TxtRepository** (`src/persistence/adapters/txt_adapter.py`):
+- Original TXT backend refactored into adapter pattern
+- Maintains backward compatibility
+
+**SQLiteRepository** (`src/persistence/adapters/sqlite_adapter.py`):
+- New SQLite backend implementation
+- Automatic table creation from specs
+- Type-safe field mapping
+
+---
+
 ### Template System (Version 2.2 - Improvement #4)
 The application uses Flask's standard template system with Jinja2 templates separated into dedicated files in `src/templates/`:
 - `index.html` - Landing page with form cards grid (99 lines)

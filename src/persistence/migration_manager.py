@@ -189,7 +189,7 @@ class MigrationManager:
         config = get_config()
 
         # Get backend configuration
-        backend_config = config.backends.get(backend_type)
+        backend_config = config.config.get('backends', {}).get(backend_type)
         if not backend_config:
             logger.error(f"No configuration found for backend type: {backend_type}")
             return None

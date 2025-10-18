@@ -75,6 +75,7 @@
   "form_mappings": {
     "contatos": "sqlite",
     "produtos": "sqlite",
+    "rh/departamentos/areas": "sqlite",
     "*": "default_backend"
   },
 

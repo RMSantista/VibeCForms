@@ -222,19 +222,43 @@ def read_forms(spec, form_path):
     Returns:
         List of form data dictionaries
     """
+    from persistence.schema_history import get_history
+    from persistence.config import get_config
+
+    # Check if backend has changed by comparing history with current config
+    history = get_history()
+    form_history = history.get_form_history(form_path)
+
+    config = get_config()
+    current_backend_config = config.get_backend_config(form_path)
+    current_backend = current_backend_config.get("type")
+
+    last_backend = history.get_last_backend(form_path)
+    backend_changed = last_backend and last_backend != current_backend
+
+    # Get repository for current (new) backend
     repo = RepositoryFactory.get_repository(form_path)
 
     # Check if storage exists and has data
-    has_data = repo.exists(form_path) and repo.has_data(form_path)
+    has_data = False
     record_count = 0
 
-    if has_data:
-        try:
-            existing_data = repo.read_all(form_path, spec)
-            record_count = len(existing_data)
-        except Exception as e:
-            logger.warning(f"Error reading existing data for change detection: {e}")
-            has_data = False
+    if backend_changed and form_history:
+        # Backend changed: use record count from history (reflects data in old backend)
+        record_count = form_history.get('record_count', 0)
+        has_data = record_count > 0
+        logger.info(f"Backend changed for '{form_path}', using historical record count: {record_count}")
+    else:
+        # No backend change: check current backend for data
+        has_data = repo.exists(form_path) and repo.has_data(form_path)
+
+        if has_data:
+            try:
+                existing_data = repo.read_all(form_path, spec)
+                record_count = len(existing_data)
+            except Exception as e:
+                logger.warning(f"Error reading existing data for change detection: {e}")
+                has_data = False
 
     # Check for schema or backend changes
     schema_change, backend_change = check_form_changes(
@@ -707,18 +731,43 @@ def migrate_confirm(form_path):
     """Display migration confirmation page."""
     spec = load_spec(form_path)
 
-    # Get repository for data check
+    from persistence.schema_history import get_history
+    from persistence.config import get_config
+
+    # Check if backend has changed by comparing history with current config
+    history = get_history()
+    form_history = history.get_form_history(form_path)
+
+    config = get_config()
+    current_backend_config = config.get_backend_config(form_path)
+    current_backend = current_backend_config.get("type")
+
+    last_backend = history.get_last_backend(form_path)
+    backend_changed = last_backend and last_backend != current_backend
+
+    # Get repository for current (new) backend
     repo = RepositoryFactory.get_repository(form_path)
-    has_data = repo.exists(form_path) and repo.has_data(form_path)
+
+    # Check if storage exists and has data
+    has_data = False
     record_count = 0
 
-    if has_data:
-        try:
-            existing_data = repo.read_all(form_path, spec)
-            record_count = len(existing_data)
-        except Exception as e:
-            logger.warning(f"Error reading existing data: {e}")
-            has_data = False
+    if backend_changed and form_history:
+        # Backend changed: use record count from history (reflects data in old backend)
+        record_count = form_history.get('record_count', 0)
+        has_data = record_count > 0
+        logger.info(f"Migration confirmation: Backend changed for '{form_path}', using historical record count: {record_count}")
+    else:
+        # No backend change: check current backend for data
+        has_data = repo.exists(form_path) and repo.has_data(form_path)
+
+        if has_data:
+            try:
+                existing_data = repo.read_all(form_path, spec)
+                record_count = len(existing_data)
+            except Exception as e:
+                logger.warning(f"Error reading existing data: {e}")
+                has_data = False
 
     # Check for schema or backend changes
     schema_change, backend_change = check_form_changes(
@@ -773,18 +822,43 @@ def migrate_execute(form_path):
     """Execute the migration after user confirmation."""
     spec = load_spec(form_path)
 
-    # Get repository for data check
+    from persistence.schema_history import get_history
+    from persistence.config import get_config
+
+    # Check if backend has changed by comparing history with current config
+    history = get_history()
+    form_history = history.get_form_history(form_path)
+
+    config = get_config()
+    current_backend_config = config.get_backend_config(form_path)
+    current_backend = current_backend_config.get("type")
+
+    last_backend = history.get_last_backend(form_path)
+    backend_changed = last_backend and last_backend != current_backend
+
+    # Get repository for current (new) backend
     repo = RepositoryFactory.get_repository(form_path)
-    has_data = repo.exists(form_path) and repo.has_data(form_path)
+
+    # Check if storage exists and has data
+    has_data = False
     record_count = 0
 
-    if has_data:
-        try:
-            existing_data = repo.read_all(form_path, spec)
-            record_count = len(existing_data)
-        except Exception as e:
-            logger.warning(f"Error reading existing data: {e}")
-            has_data = False
+    if backend_changed and form_history:
+        # Backend changed: use record count from history (reflects data in old backend)
+        record_count = form_history.get('record_count', 0)
+        has_data = record_count > 0
+        logger.info(f"Backend changed for '{form_path}', using historical record count for migration: {record_count}")
+    else:
+        # No backend change: check current backend for data
+        has_data = repo.exists(form_path) and repo.has_data(form_path)
+
+        if has_data:
+            try:
+                existing_data = repo.read_all(form_path, spec)
+                record_count = len(existing_data)
+            except Exception as e:
+                logger.warning(f"Error reading existing data: {e}")
+                has_data = False
 
     # Check for schema or backend changes
     schema_change, backend_change = check_form_changes(
