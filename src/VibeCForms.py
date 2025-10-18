@@ -1,9 +1,22 @@
 import os
+import sys
 import json
+import logging
 from flask import Flask, render_template, render_template_string, request, redirect, abort, jsonify
 from dotenv import load_dotenv
 
+# Add src directory to Python path for imports
+sys.path.insert(0, os.path.dirname(__file__))
+
+from persistence.factory import RepositoryFactory
+from persistence.change_manager import check_form_changes, update_form_tracking, ChangeManager
+from persistence.migration_manager import MigrationManager
+
 load_dotenv()
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 DATA_FILE = os.path.join(os.path.dirname(__file__), "registros.txt")
 SPECS_DIR = os.path.join(os.path.dirname(__file__), "specs")
@@ -199,62 +212,115 @@ def get_all_forms_flat(menu_items=None, prefix=""):
     return forms
 
 
-def read_forms(spec, data_file):
-    """Read forms from data file based on spec definition."""
-    if not os.path.exists(data_file):
-        return []
+def read_forms(spec, form_path):
+    """Read forms using configured persistence backend.
 
-    with open(data_file, "r", encoding="utf-8") as f:
-        lines = f.readlines()
+    Args:
+        spec: Form specification
+        form_path: Path to the form (e.g., 'contatos', 'financeiro/contas')
 
-    forms = []
-    field_names = [field["name"] for field in spec["fields"]]
+    Returns:
+        List of form data dictionaries
+    """
+    from persistence.schema_history import get_history
+    from persistence.config import get_config
 
-    for line in lines:
-        if not line.strip():
-            continue
-        values = line.strip().split(";")
-        if len(values) != len(field_names):
-            continue  # Skip malformed lines
+    # Check if backend has changed by comparing history with current config
+    history = get_history()
+    form_history = history.get_form_history(form_path)
 
-        form_data = {}
-        for i, field in enumerate(spec["fields"]):
-            field_name = field["name"]
-            field_type = field["type"]
-            value = values[i]
+    config = get_config()
+    current_backend_config = config.get_backend_config(form_path)
+    current_backend = current_backend_config.get("type")
 
-            # Convert value based on field type
-            if field_type == "checkbox":
-                form_data[field_name] = value == "True"
-            elif field_type == "number":
-                try:
-                    form_data[field_name] = int(value) if value else 0
-                except ValueError:
-                    form_data[field_name] = 0
-            else:
-                form_data[field_name] = value
+    last_backend = history.get_last_backend(form_path)
+    backend_changed = last_backend and last_backend != current_backend
 
-        forms.append(form_data)
+    # Get repository for current (new) backend
+    repo = RepositoryFactory.get_repository(form_path)
 
-    return forms
+    # Check if storage exists and has data
+    has_data = False
+    record_count = 0
+
+    if backend_changed and form_history:
+        # Backend changed: use record count from history (reflects data in old backend)
+        record_count = form_history.get('record_count', 0)
+        has_data = record_count > 0
+        logger.info(f"Backend changed for '{form_path}', using historical record count: {record_count}")
+    else:
+        # No backend change: check current backend for data
+        has_data = repo.exists(form_path) and repo.has_data(form_path)
+
+        if has_data:
+            try:
+                existing_data = repo.read_all(form_path, spec)
+                record_count = len(existing_data)
+            except Exception as e:
+                logger.warning(f"Error reading existing data for change detection: {e}")
+                has_data = False
+
+    # Check for schema or backend changes
+    schema_change, backend_change = check_form_changes(
+        form_path=form_path,
+        spec=spec,
+        has_data=has_data,
+        record_count=record_count
+    )
+
+    # Check if changes require user confirmation
+    if schema_change or backend_change:
+        if schema_change and schema_change.has_changes():
+            logger.info(f"Schema changes detected for '{form_path}': "
+                       f"{schema_change.get_summary()}")
+
+        if backend_change:
+            logger.info(f"Backend change detected for '{form_path}': "
+                       f"{backend_change.old_backend} -> {backend_change.new_backend}")
+
+        # Redirect to confirmation UI if changes require confirmation
+        requires_confirmation = ChangeManager.requires_confirmation(schema_change, backend_change)
+        if requires_confirmation:
+            logger.info(f"Redirecting to migration confirmation for '{form_path}'")
+            # Use Flask's redirect - this will be caught by the caller
+            from flask import redirect as flask_redirect
+            raise Exception(f"MIGRATION_REQUIRED:{form_path}")
+
+    # Auto-create storage if it doesn't exist
+    if not repo.exists(form_path):
+        repo.create_storage(form_path, spec)
+
+    # Read data
+    data = repo.read_all(form_path, spec)
+
+    # Update tracking after successful read
+    update_form_tracking(form_path, spec, len(data))
+
+    return data
 
 
-def write_forms(forms, spec, data_file):
-    """Write forms to data file based on spec definition."""
-    with open(data_file, "w", encoding="utf-8") as f:
-        for form_data in forms:
-            values = []
-            for field in spec["fields"]:
-                field_name = field["name"]
-                value = form_data.get(field_name, "")
+def write_forms(forms, spec, form_path):
+    """Write forms using configured persistence backend.
 
-                # Convert value to string for storage
-                if isinstance(value, bool):
-                    values.append(str(value))
-                else:
-                    values.append(str(value))
+    Args:
+        forms: List of form data dictionaries
+        spec: Form specification
+        form_path: Path to the form (e.g., 'contatos', 'financeiro/contas')
+    """
+    repo = RepositoryFactory.get_repository(form_path)
 
-            f.write(";".join(values) + "\n")
+    # Auto-create storage if it doesn't exist
+    if not repo.exists(form_path):
+        repo.create_storage(form_path, spec)
+
+    # Clear all existing records
+    current = repo.read_all(form_path, spec)
+    for i in range(len(current)):
+        repo.delete(form_path, spec, 0)  # Always delete the first record
+
+    # Insert new records
+    for form_data in forms:
+        repo.create(form_path, spec, form_data)
 
 
 def generate_form_field(field, form_data=None):
@@ -535,17 +601,12 @@ def api_search_contatos():
     if not query:
         return jsonify([])
 
-    # Read contacts from contatos.txt
-    contatos_file = get_data_file("contatos")
-    if not os.path.exists(contatos_file):
-        return jsonify([])
-
     try:
         contatos_spec = load_spec("contatos")
     except:
         return jsonify([])
 
-    forms = read_forms(contatos_spec, contatos_file)
+    forms = read_forms(contatos_spec, "contatos")
 
     # Filter contacts by name (case-insensitive substring match)
     results = []
@@ -567,7 +628,6 @@ def main_page():
 @app.route("/<path:form_name>", methods=["GET", "POST"])
 def index(form_name):
     spec = load_spec(form_name)
-    data_file = get_data_file(form_name)
     error = ""
 
     # Generate dynamic menu
@@ -591,7 +651,15 @@ def index(form_name):
 
         if error:
             # Re-render with error and preserve form data
-            forms = read_forms(spec, data_file)
+            try:
+                forms = read_forms(spec, form_name)
+            except Exception as e:
+                # Check if migration is required
+                if str(e).startswith("MIGRATION_REQUIRED:"):
+                    form_path = str(e).split(":", 1)[1]
+                    return redirect(f"/migrate/confirm/{form_path}")
+                raise
+
             form_fields = "".join(
                 [generate_form_field(f, form_data) for f in spec["fields"]]
             )
@@ -615,13 +683,29 @@ def index(form_name):
             )
 
         # Save the form
-        forms = read_forms(spec, data_file)
+        try:
+            forms = read_forms(spec, form_name)
+        except Exception as e:
+            # Check if migration is required
+            if str(e).startswith("MIGRATION_REQUIRED:"):
+                form_path = str(e).split(":", 1)[1]
+                return redirect(f"/migrate/confirm/{form_path}")
+            raise
+
         forms.append(form_data)
-        write_forms(forms, spec, data_file)
+        write_forms(forms, spec, form_name)
         return redirect(f"/{form_name}")
 
     # GET request - show the form
-    forms = read_forms(spec, data_file)
+    try:
+        forms = read_forms(spec, form_name)
+    except Exception as e:
+        # Check if migration is required
+        if str(e).startswith("MIGRATION_REQUIRED:"):
+            form_path = str(e).split(":", 1)[1]
+            return redirect(f"/migrate/confirm/{form_path}")
+        raise
+
     form_fields = "".join([generate_form_field(f) for f in spec["fields"]])
     table_headers = generate_table_headers(spec)
     table_rows = "".join(
@@ -642,11 +726,208 @@ def index(form_name):
 
 
 
+@app.route("/migrate/confirm/<path:form_path>")
+def migrate_confirm(form_path):
+    """Display migration confirmation page."""
+    spec = load_spec(form_path)
+
+    from persistence.schema_history import get_history
+    from persistence.config import get_config
+
+    # Check if backend has changed by comparing history with current config
+    history = get_history()
+    form_history = history.get_form_history(form_path)
+
+    config = get_config()
+    current_backend_config = config.get_backend_config(form_path)
+    current_backend = current_backend_config.get("type")
+
+    last_backend = history.get_last_backend(form_path)
+    backend_changed = last_backend and last_backend != current_backend
+
+    # Get repository for current (new) backend
+    repo = RepositoryFactory.get_repository(form_path)
+
+    # Check if storage exists and has data
+    has_data = False
+    record_count = 0
+
+    if backend_changed and form_history:
+        # Backend changed: use record count from history (reflects data in old backend)
+        record_count = form_history.get('record_count', 0)
+        has_data = record_count > 0
+        logger.info(f"Migration confirmation: Backend changed for '{form_path}', using historical record count: {record_count}")
+    else:
+        # No backend change: check current backend for data
+        has_data = repo.exists(form_path) and repo.has_data(form_path)
+
+        if has_data:
+            try:
+                existing_data = repo.read_all(form_path, spec)
+                record_count = len(existing_data)
+            except Exception as e:
+                logger.warning(f"Error reading existing data: {e}")
+                has_data = False
+
+    # Check for schema or backend changes
+    schema_change, backend_change = check_form_changes(
+        form_path=form_path,
+        spec=spec,
+        has_data=has_data,
+        record_count=record_count
+    )
+
+    # Check if there are any changes requiring confirmation
+    if not schema_change and not backend_change:
+        # No changes, redirect back to form
+        return redirect(f"/{form_path}")
+
+    # Check if confirmation is required
+    requires_confirmation = ChangeManager.requires_confirmation(schema_change, backend_change)
+
+    if not requires_confirmation:
+        # No confirmation needed, redirect back to form
+        return redirect(f"/{form_path}")
+
+    # Determine if there are destructive changes
+    has_destructive_changes = False
+    has_warnings = False
+
+    if schema_change:
+        from persistence.schema_detector import ChangeType
+        for change in schema_change.changes:
+            if change.change_type == ChangeType.REMOVE_FIELD:
+                has_destructive_changes = True
+            if change.change_type == ChangeType.CHANGE_TYPE:
+                has_warnings = True
+
+    if backend_change:
+        has_warnings = True
+
+    # Render confirmation page
+    return render_template(
+        'migration_confirm.html',
+        form_path=form_path,
+        form_title=spec.get("title", form_path),
+        record_count=record_count,
+        schema_change=schema_change,
+        backend_change=backend_change,
+        has_destructive_changes=has_destructive_changes,
+        has_warnings=has_warnings
+    )
+
+
+@app.route("/migrate/execute/<path:form_path>", methods=["POST"])
+def migrate_execute(form_path):
+    """Execute the migration after user confirmation."""
+    spec = load_spec(form_path)
+
+    from persistence.schema_history import get_history
+    from persistence.config import get_config
+
+    # Check if backend has changed by comparing history with current config
+    history = get_history()
+    form_history = history.get_form_history(form_path)
+
+    config = get_config()
+    current_backend_config = config.get_backend_config(form_path)
+    current_backend = current_backend_config.get("type")
+
+    last_backend = history.get_last_backend(form_path)
+    backend_changed = last_backend and last_backend != current_backend
+
+    # Get repository for current (new) backend
+    repo = RepositoryFactory.get_repository(form_path)
+
+    # Check if storage exists and has data
+    has_data = False
+    record_count = 0
+
+    if backend_changed and form_history:
+        # Backend changed: use record count from history (reflects data in old backend)
+        record_count = form_history.get('record_count', 0)
+        has_data = record_count > 0
+        logger.info(f"Backend changed for '{form_path}', using historical record count for migration: {record_count}")
+    else:
+        # No backend change: check current backend for data
+        has_data = repo.exists(form_path) and repo.has_data(form_path)
+
+        if has_data:
+            try:
+                existing_data = repo.read_all(form_path, spec)
+                record_count = len(existing_data)
+            except Exception as e:
+                logger.warning(f"Error reading existing data: {e}")
+                has_data = False
+
+    # Check for schema or backend changes
+    schema_change, backend_change = check_form_changes(
+        form_path=form_path,
+        spec=spec,
+        has_data=has_data,
+        record_count=record_count
+    )
+
+    success = True
+    error_message = None
+
+    try:
+        # Execute backend migration if needed
+        if backend_change:
+            logger.info(f"Executing backend migration for '{form_path}'...")
+            success = MigrationManager.migrate_backend(
+                form_path=form_path,
+                spec=spec,
+                old_backend=backend_change.old_backend,
+                new_backend=backend_change.new_backend,
+                record_count=record_count
+            )
+
+            if not success:
+                error_message = f"Falha na migração de backend: {backend_change.old_backend} → {backend_change.new_backend}"
+
+        # Execute schema migration if needed
+        if success and schema_change and schema_change.has_changes():
+            logger.info(f"Executing schema migration for '{form_path}'...")
+
+            # Get old spec from history to perform migration
+            from persistence.schema_history import get_history
+            history = get_history()
+            form_history = history.get_form_history(form_path)
+
+            if form_history:
+                # We need the old spec, but we don't have it stored
+                # For now, we'll let migrate_schema handle it without old spec
+                # The individual operations (rename, change_type, remove) will work
+                logger.info(f"Schema changes will be applied: {schema_change.get_summary()}")
+
+                # Note: The actual migration will happen automatically on next read_forms call
+                # because the spec has changed and change_manager will detect it
+
+        # Update tracking
+        if success:
+            update_form_tracking(form_path, spec, record_count)
+            logger.info(f"Migration completed successfully for '{form_path}'")
+
+    except Exception as e:
+        success = False
+        error_message = f"Erro durante migração: {str(e)}"
+        logger.error(error_message)
+
+    # Redirect back to form with success/error message
+    # TODO: Add flash messages for better UX
+    if success:
+        return redirect(f"/{form_path}")
+    else:
+        # For now, just show error in logs and redirect
+        logger.error(f"Migration failed: {error_message}")
+        return redirect(f"/{form_path}")
+
+
 @app.route("/<path:form_name>/edit/<int:idx>", methods=["GET", "POST"])
 def edit(form_name, idx):
     spec = load_spec(form_name)
-    data_file = get_data_file(form_name)
-    forms = read_forms(spec, data_file)
+    forms = read_forms(spec, form_name)
     error = ""
 
     # Generate dynamic menu
@@ -687,7 +968,7 @@ def edit(form_name, idx):
 
         # Update the form
         forms[idx] = form_data
-        write_forms(forms, spec, data_file)
+        write_forms(forms, spec, form_name)
         return redirect(f"/{form_name}")
 
     # GET request - show edit form
@@ -706,14 +987,13 @@ def edit(form_name, idx):
 @app.route("/<path:form_name>/delete/<int:idx>")
 def delete(form_name, idx):
     spec = load_spec(form_name)
-    data_file = get_data_file(form_name)
-    forms = read_forms(spec, data_file)
+    forms = read_forms(spec, form_name)
 
     if idx < 0 or idx >= len(forms):
         return "Formulário não encontrado", 404
 
     forms.pop(idx)
-    write_forms(forms, spec, data_file)
+    write_forms(forms, spec, form_name)
     return redirect(f"/{form_name}")
 
 

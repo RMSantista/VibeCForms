@@ -1,0 +1,20 @@
+Francisco Pinto;Analista;peixotoguilherme@example.net;567;True
+Ayla da Costa;Coordenador;maria-fernandada-rosa@example.net;250;True
+Benjamin Ramos;Desenvolvedor;luccaferreira@example.net;646;True
+Joana Rocha;Analista;sabruna@example.com;232;False
+Ana Cecília Duarte;Analista;davi-lucas26@example.org;628;True
+Leonardo da Cruz;Coordenador;anunes@example.net;631;False
+Sra. Ana Liz Viana;Desenvolvedor;emanuellabarros@example.org;937;False
+Rafaela Montenegro;Desenvolvedor;breno47@example.org;283;True
+Sra. Letícia Ribeiro;Gerente;jose-pedrocosta@example.com;498;True
+Theodoro Casa Grande;Desenvolvedor;ribeiroelisa@example.net;784;True
+Lucas Gabriel Andrade;Analista;murilopinto@example.net;498;True
+Léo Nascimento;Analista;moraesluiza@example.org;5;True
+Dr. João Miguel Rezende;Analista;vianajoao@example.org;14;True
+Marcelo Aparecida;Desenvolvedor;vargaspedro-miguel@example.net;408;True
+Olivia Teixeira;Analista;da-pazallana@example.com;648;True
+Dr. Cauã Rodrigues;Diretor;jsousa@example.org;432;True
+Srta. Gabrielly Carvalho;Coordenador;da-cruzliz@example.com;88;False
+Dr. Otto da Cunha;Diretor;moreiraaylla@example.org;179;True
+Yasmin Cavalcante;Analista;raquelpimenta@example.org;805;False
+Zoe Nogueira;Diretor;elisamoraes@example.org;668;True

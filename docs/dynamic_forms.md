@@ -272,15 +272,135 @@ Arquivo: `src/specs/produtos.json`
 
 Acesso: `http://localhost:5000/produtos`
 
-## Armazenamento de Dados
+## Armazenamento de Dados (v3.0 - Sistema de Persistência Plugável)
 
-Cada formulário tem seu próprio arquivo de dados em `src/<form_name>.txt`. Os dados são armazenados em formato delimitado por ponto-e-vírgula (;), com uma linha por registro.
+A partir da versão 3.0, o VibeCForms suporta **múltiplos backends de armazenamento**. Você pode escolher onde seus dados serão armazenados sem alterar código, apenas configurando o arquivo `src/config/persistence.json`.
 
-Exemplo de `contatos.txt`:
+### Backends Suportados
+
+#### 1. TXT (Padrão Original)
+Arquivos de texto delimitados por ponto-e-vírgula.
+- Localização: `src/<form_name>.txt`
+- Formato: Uma linha por registro, campos separados por `;`
+- Exemplo de `contatos.txt`:
+  ```
+  João Silva;11999999999;True
+  Maria Santos;11988888888;False
+  ```
+
+#### 2. SQLite (Implementado)
+Banco de dados embutido, zero configuração.
+- Localização: `src/vibecforms.db`
+- Cada formulário vira uma tabela
+- Suporte a tipos (text, number, boolean, date)
+- Melhor performance para múltiplos formulários
+
+#### 3. Outros Backends (Configurados)
+O sistema está preparado para suportar:
+- **MySQL**: Banco relacional multiusuário
+- **PostgreSQL**: Banco relacional avançado
+- **MongoDB**: Banco NoSQL para dados semi-estruturados
+- **CSV**: Arquivos CSV para integração com Excel
+- **JSON**: Arquivos JSON para APIs
+- **XML**: Arquivos XML para sistemas legados
+
+### Configurando o Backend
+
+Edite o arquivo `src/config/persistence.json`:
+
+```json
+{
+  "version": "1.0",
+  "default_backend": "txt",
+
+  "form_mappings": {
+    "contatos": "sqlite",    // Usar SQLite para contatos
+    "produtos": "sqlite",    // Usar SQLite para produtos
+    "usuarios": "txt",       // Usar TXT para usuários
+    "*": "default_backend"   // Padrão para formulários não especificados
+  }
+}
 ```
-João Silva;11999999999;True
-Maria Santos;11988888888;False
+
+**Exemplo**: Para usar SQLite para um formulário chamado "clientes":
+```json
+"form_mappings": {
+  "clientes": "sqlite",
+  "*": "default_backend"
+}
 ```
+
+### Migração Automática de Dados
+
+Quando você altera o backend de um formulário (ex: TXT → SQLite), o sistema:
+1. **Detecta a mudança** automaticamente
+2. **Exibe tela de confirmação** com número de registros a migrar
+3. **Cria backup** automático em `src/backups/migrations/`
+4. **Migra todos os dados** preservando integridade
+5. **Atualiza histórico** em `src/config/schema_history.json`
+
+**Exemplo de migração bem-sucedida:**
+- contatos: 23 registros migrados de TXT → SQLite
+- produtos: 17 registros migrados de TXT → SQLite
+
+### Como Migrar um Formulário
+
+**Passo 1**: Verifique os dados atuais acessando o formulário
+
+**Passo 2**: Edite `persistence.json` alterando o backend:
+```json
+"form_mappings": {
+  "meu_formulario": "sqlite"  // Altere de "txt" para "sqlite"
+}
+```
+
+**Passo 3**: Acesse o formulário no navegador
+
+**Passo 4**: O sistema exibirá tela de confirmação:
+- Backend origem: TXT
+- Backend destino: SQLite
+- Número de registros: X
+- [Confirmar e Migrar]
+
+**Passo 5**: Clique em "Confirmar e Migrar"
+- Backup criado automaticamente
+- Dados migrados
+- Pronto para uso!
+
+### Verificando o Backend Atual
+
+Você pode verificar qual backend um formulário está usando consultando o arquivo `src/config/schema_history.json`:
+
+```json
+{
+  "contatos": {
+    "last_backend": "sqlite",
+    "record_count": 23,
+    "last_updated": "2025-10-16T17:29:30.878397"
+  }
+}
+```
+
+### Consulta Manual ao SQLite
+
+Para consultar dados diretamente no SQLite:
+
+```bash
+# Via linha de comando
+sqlite3 src/vibecforms.db "SELECT * FROM contatos;"
+
+# Modo interativo
+sqlite3 src/vibecforms.db
+sqlite> .tables
+sqlite> SELECT * FROM contatos;
+sqlite> .quit
+```
+
+### Documentação Completa
+
+Para informações detalhadas sobre configuração de backends, consulte:
+- **[docs/Manual.md](Manual.md)**: Guia completo de configuração JSON
+- **[CHANGELOG.md](../CHANGELOG.md)**: Detalhes da implementação v3.0
 
 ## Rotas da API
 
