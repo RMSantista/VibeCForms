@@ -3,9 +3,7 @@
 
   VibeCForms v4.0 - Regras de Negócio com IA e Aprendizado por Padrões
 
-**Data:** 25/10/2025
-**Versão:** 2.0 - Planejamento Revisado
-**Status:** Em Revisão
+  Data: 25/10/2025Versão: 2.0 - Planejamento RevisadoStatus: Em Revisão
 
   ---
   📑 ÍNDICE
@@ -654,11 +652,9 @@
 
   Características-Chave:
 
-- ✅ **Herda BaseRepository:** Mantém compatibilidade com sistema existente
-- ✅ **Operações Específicas:** `change_state()`, `get_all_by_state()`, etc
-- ✅ **Backend-Aware:** SQL usa índices, TXT/JSON filtram em memória
-- ✅ **NÃO valida regras:** Apenas persiste dados, validação é em TransitionHandler
-- ✅ **Log separado:** Transitions vão para tabela/arquivo separado
+  ✅ Herda BaseRepository: Mantém compatibilidade com sistema existente✅ Operações Específicas: change_state(),
+  get_all_by_state(), etc✅ Backend-Aware: SQL usa índices, TXT/JSON filtram em memória✅ NÃO valida regras: Apenas
+  persiste dados, validação é em TransitionHandler✅ Log separado: Transitions vão para tabela/arquivo separado
 
   ---
   6. FLUXOS DE OPERAÇÃO
@@ -1947,15 +1943,22 @@
   ---
   11. RISCOS E MITIGAÇÕES
 
-| Risco                             | Probabilidade | Impacto | Mitigação                                            |
-|-----------------------------------|---------------|---------|------------------------------------------------------|
-| Performance com muitos processos  | Média         | Alto    | Indexação em SQL, paginação, cache em memória        |
-| IA detecta padrões errados        | Média         | Médio   | Threshold configurável, min_samples alto, revisão manual |
-| Usuários não justificam anomalias | Alta          | Baixo   | Campo obrigatório para anomalias críticas (futuro)   |
-| Agentes entram em loop infinito   | Baixa         | Alto    | Timeout por agente, max_transitions counter          |
-| Drag & drop não funciona mobile   | Média         | Médio   | Fallback para botões de ação                         |
-| JSON mal formatado quebra sistema | Baixa         | Alto    | Validação rigorosa com JSON Schema                   |
-
+  | Risco                             | Probabilidade | Impacto | Mitigação
+         |
+  |-----------------------------------|---------------|---------|---------------------------------------------------
+  -------|
+  | Performance com muitos processos  | Média         | Alto    | Indexação em SQL, paginação, cache em memória
+         |
+  | IA detecta padrões errados        | Média         | Médio   | Threshold configurável, min_samples alto, revisão
+  manual |
+  | Usuários não justificam anomalias | Alta          | Baixo   | Campo obrigatório para anomalias críticas (futuro)
+         |
+  | Agentes entram em loop infinito   | Baixa         | Alto    | Timeout por agente, max_transitions counter
+         |
+  | Drag & drop não funciona mobile   | Média         | Médio   | Fallback para botões de ação
+         |
+  | JSON mal formatado quebra sistema | Baixa         | Alto    | Validação rigorosa com JSON Schema
+         |
 
   ---
   12. EXEMPLOS PRÁTICOS
@@ -2014,14 +2017,9 @@
 
   Este planejamento:
 
-- ✅ Corrige todas as divergências apontadas
-- ✅ Kanban = 1 Processo (não regra de negócio)
-- ✅ NUNCA bloqueia, apenas avisa e audita
-- ✅ Adapter inteligente de persistência
-- ✅ Agentes determinísticos (não seguem "padrão")
-- ✅ Auditoria sem usuários (timestamp, estados, justificativa)
-- ✅ SEM estimativas de horas
-- ✅ Implementação em fases/etapas claras
+  ✅ Corrige todas as divergências apontadas✅ Kanban = 1 Processo (não regra de negócio)✅ NUNCA bloqueia, apenas
+  avisa e audita✅ Adapter inteligente de persistência✅ Agentes determinísticos (não seguem "padrão")✅ Auditoria
+  sem usuários (timestamp, estados, justificativa)✅ SEM estimativas de horas✅ Implementação em fases/etapas claras
 
   ---
   Pronto para revisão!
@@ -2102,22 +2100,16 @@ Inclua se o sistema não ainda contemplar isso.
 
   1. Transição AUTOMÁTICA (Sistema)
 
-**Trigger:** Pré-requisitos cumpridos
-**Direção:** Sempre para frente (flow_sequence)
-**Alerta:** Não
-**Justificativa:** Não
-**Log:** triggered_by: "system"
+  Trigger: Pré-requisitos cumpridosDireção: Sempre para frente (flow_sequence)Alerta: NãoJustificativa: NãoLog:
+  triggered_by: "system"
 
   # Sistema detecta e move
   auto_transition_engine.check_and_advance(process_id)
 
   2. Transição MANUAL (Usuário)
 
-**Trigger:** Drag & drop / botão
-**Direção:** Qualquer (para frente ou para trás)
-**Alerta:** Se anormal ou para trás
-**Justificativa:** Opcional (por enquanto)
-**Log:** triggered_by: "manual"
+  Trigger: Drag & drop / botãoDireção: Qualquer (para frente ou para trás)Alerta: Se anormal ou para
+  trásJustificativa: Opcional (por enquanto)Log: triggered_by: "manual"
 
   # Usuário arrasta card
   transition_handler.handle(
@@ -2128,11 +2120,8 @@ Inclua se o sistema não ainda contemplar isso.
 
   3. Transição POR AGENTE (IA)
 
-**Trigger:** Agente executando
-**Direção:** Conforme flow_sequence
-**Alerta:** Se anormal ou para trás
-**Justificativa:** OBRIGATÓRIA (sempre)
-**Log:** triggered_by: "agent:{agent_id}"
+  Trigger: Agente executandoDireção: Conforme flow_sequenceAlerta: Se anormal ou para trásJustificativa: OBRIGATÓRIA
+   (sempre)Log: triggered_by: "agent:{agent_id}"
 
   # Agente move
   agent.execute(process_id)
@@ -2500,6 +2489,9 @@ Inclua se o sistema não ainda contemplar isso.
      - (Valor é calculado automaticamente)
 
   3. Sistema detecta: TODOS os requisitos OK
+     ✅ cliente_informado: true
+     ✅ produtos_selecionados: true
+     ✅ valor_calculado: true (auto)
 
   4. AutoTransitionEngine.check_and_advance("proc_001")
 
@@ -2629,9 +2621,6 @@ Inclua se o sistema não ainda contemplar isso.
 
   O planejamento agora contempla:
 
-- ✅ Transições automáticas quando requisitos cumpridos
-- ✅ 3 tipos de transição: Sistema, Manual, Agente
-- ✅ Alertas inteligentes: Movimento para trás sempre alerta
-- ✅ Justificativas: Agente obrigatória, Usuário opcional
-- ✅ Auto-progressão em cascata: Move até encontrar requisito pendente
-- ✅ Log detalhado: triggered_by diferencia origem
+  ✅ Transições automáticas quando requisitos cumpridos✅ 3 tipos de transição: Sistema, Manual, Agente✅ Alertas
+  inteligentes: Movimento para trás sempre alerta✅ Justificativas: Agente obrigatória, Usuário opcional✅
+  Auto-progressão em cascata: Move até encontrar requisito pendente✅ Log detalhado: triggered_by diferencia origem
