@@ -1,0 +1,87 @@
+{
+  "version": "1.0",
+  "default_backend": "txt",
+
+  "backends": {
+    "txt": {
+      "type": "txt",
+      "path": "src/",
+      "delimiter": ";",
+      "encoding": "utf-8",
+      "extension": ".txt"
+    },
+
+    "sqlite": {
+      "type": "sqlite",
+      "database": "src/vibecforms.db",
+      "timeout": 10,
+      "check_same_thread": false
+    },
+
+    "mysql": {
+      "type": "mysql",
+      "host": "localhost",
+      "port": 3306,
+      "database": "vibecforms",
+      "user": "root",
+      "password": "${MYSQL_PASSWORD}",
+      "charset": "utf8mb4",
+      "pool_size": 5
+    },
+
+    "postgres": {
+      "type": "postgres",
+      "host": "localhost",
+      "port": 5432,
+      "database": "vibecforms",
+      "user": "postgres",
+      "password": "${POSTGRES_PASSWORD}",
+      "schema": "public",
+      "pool_size": 5
+    },
+
+    "mongodb": {
+      "type": "mongodb",
+      "host": "localhost",
+      "port": 27017,
+      "database": "vibecforms",
+      "user": "",
+      "password": "${MONGO_PASSWORD}"
+    },
+
+    "csv": {
+      "type": "csv",
+      "path": "src/data/csv/",
+      "delimiter": ",",
+      "encoding": "utf-8",
+      "quoting": "minimal"
+    },
+
+    "json": {
+      "type": "json",
+      "path": "src/data/json/",
+      "encoding": "utf-8",
+      "indent": 2
+    },
+
+    "xml": {
+      "type": "xml",
+      "path": "src/data/xml/",
+      "encoding": "utf-8",
+      "pretty_print": true
+    }
+  },
+
+  "form_mappings": {
+    "contatos": "sqlite",
+    "produtos": "sqlite",
+    "rh/departamentos/areas": "sqlite",
+    "financeiro/pagamentos": "sqlite",
+    "*": "default_backend"
+  },
+
+  "auto_create_storage": true,
+  "auto_migrate_schema": true,
+  "backup_before_migrate": true,
+  "backup_path": "src/backups/"
+}

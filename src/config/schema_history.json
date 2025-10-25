@@ -1,0 +1,104 @@
+{
+  "financeiro/contas": {
+    "last_spec_hash": "5b7f40de8f2d127347e9096e73db5e38",
+    "last_backend": "txt",
+    "last_updated": "2025-10-25T12:28:25.893937",
+    "record_count": 23
+  },
+  "financeiro/pagamentos": {
+    "last_spec_hash": "31a89c6f61ac4fe2b4441601460e163f",
+    "last_backend": "sqlite",
+    "last_updated": "2025-10-25T13:19:34.524893",
+    "record_count": 15
+  },
+  "/tmp/pytest-of-rodrigo/pytest-6/test_write_and_read_forms0/test.txt": {
+    "last_spec_hash": "ee014237f822ba2d7ea15758cd6056dd",
+    "last_backend": "txt",
+    "last_updated": "2025-10-16T15:06:36.243396",
+    "record_count": 2
+  },
+  "/tmp/pytest-of-rodrigo/pytest-6/test_update_form0/test.txt": {
+    "last_spec_hash": "ee014237f822ba2d7ea15758cd6056dd",
+    "last_backend": "txt",
+    "last_updated": "2025-10-16T15:06:36.247213",
+    "record_count": 2
+  },
+  "/tmp/pytest-of-rodrigo/pytest-6/test_delete_form0/test.txt": {
+    "last_spec_hash": "ee014237f822ba2d7ea15758cd6056dd",
+    "last_backend": "txt",
+    "last_updated": "2025-10-16T15:06:36.250082",
+    "record_count": 1
+  },
+  "rh/departamentos/areas": {
+    "last_spec_hash": "c7979c39355291a3daad8aac31b2b1aa",
+    "last_backend": "sqlite",
+    "last_updated": "2025-10-25T12:25:04.449749",
+    "record_count": 11
+  },
+  "rh/funcionarios": {
+    "last_spec_hash": "fba617ff655c616d4d87fa84fe07303a",
+    "last_backend": "txt",
+    "last_updated": "2025-10-16T15:16:59.345923",
+    "record_count": 20
+  },
+  "contatos": {
+    "last_spec_hash": "ee014237f822ba2d7ea15758cd6056dd",
+    "last_backend": "sqlite",
+    "last_updated": "2025-10-16T17:29:30.878397",
+    "record_count": 23
+  },
+  "formulario_completo": {
+    "last_spec_hash": "9ae62f333246a5ce6ac701cc6567a43d",
+    "last_backend": "txt",
+    "last_updated": "2025-10-16T15:17:22.696743",
+    "record_count": 11
+  },
+  "produtos": {
+    "last_spec_hash": "8e699969d9a6b89b7fc69a8901a4b138",
+    "last_backend": "sqlite",
+    "last_updated": "2025-10-16T16:43:38.148813",
+    "record_count": 17
+  },
+  "usuarios": {
+    "last_spec_hash": "220df93066086dbeee1df996e772fddd",
+    "last_backend": "txt",
+    "last_updated": "2025-10-16T17:26:16.097902",
+    "record_count": 19
+  },
+  "/tmp/pytest-of-rodrigo/pytest-8/test_write_and_read_forms0/test.txt": {
+    "last_spec_hash": "ee014237f822ba2d7ea15758cd6056dd",
+    "last_backend": "txt",
+    "last_updated": "2025-10-16T17:00:58.693133",
+    "record_count": 2
+  },
+  "/tmp/pytest-of-rodrigo/pytest-8/test_update_form0/test.txt": {
+    "last_spec_hash": "ee014237f822ba2d7ea15758cd6056dd",
+    "last_backend": "txt",
+    "last_updated": "2025-10-16T17:00:58.696293",
+    "record_count": 2
+  },
+  "/tmp/pytest-of-rodrigo/pytest-8/test_delete_form0/test.txt": {
+    "last_spec_hash": "ee014237f822ba2d7ea15758cd6056dd",
+    "last_backend": "txt",
+    "last_updated": "2025-10-16T17:00:58.699275",
+    "record_count": 1
+  },
+  "/tmp/pytest-of-rodrigo/pytest-9/test_write_and_read_forms0/test.txt": {
+    "last_spec_hash": "ee014237f822ba2d7ea15758cd6056dd",
+    "last_backend": "txt",
+    "last_updated": "2025-10-16T17:01:24.461547",
+    "record_count": 2
+  },
+  "/tmp/pytest-of-rodrigo/pytest-9/test_update_form0/test.txt": {
+    "last_spec_hash": "ee014237f822ba2d7ea15758cd6056dd",
+    "last_backend": "txt",
+    "last_updated": "2025-10-16T17:01:24.464840",
+    "record_count": 2
+  },
+  "/tmp/pytest-of-rodrigo/pytest-9/test_delete_form0/test.txt": {
+    "last_spec_hash": "ee014237f822ba2d7ea15758cd6056dd",
+    "last_backend": "txt",
+    "last_updated": "2025-10-16T17:01:24.467537",
+    "record_count": 1
+  }
+}
