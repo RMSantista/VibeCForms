@@ -25,3 +25,7 @@ registros.txt
 # Pasta de testes do pytest
 htmlcov/
 .cache/
+
+# Claude Code - manter skills e commands versionados
+# mas ignorar arquivos temporários/gerados
+# .claude/ está versionado intencionalmente para compartilhar skills
