@@ -59,9 +59,10 @@
 
     "json": {
       "type": "json",
-      "path": "src/data/json/",
+      "path": "data/workflows/",
       "encoding": "utf-8",
-      "indent": 2
+      "indent": 2,
+      "ensure_ascii": false
     },
 
     "xml": {
@@ -77,6 +78,7 @@
     "produtos": "sqlite",
     "rh/departamentos/areas": "sqlite",
     "financeiro/pagamentos": "sqlite",
+    "workflows_*": "json",
     "*": "default_backend"
   },
 

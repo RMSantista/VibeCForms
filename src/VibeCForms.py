@@ -12,6 +12,9 @@ from persistence.factory import RepositoryFactory
 from persistence.change_manager import check_form_changes, update_form_tracking, ChangeManager
 from persistence.migration_manager import MigrationManager
 
+# Import workflow routes
+from workflow_routes import workflow_bp
+
 load_dotenv()
 
 # Configure logging
@@ -23,6 +26,9 @@ SPECS_DIR = os.path.join(os.path.dirname(__file__), "specs")
 TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")
 
 app = Flask(__name__, template_folder=TEMPLATE_DIR)
+
+# Register workflow blueprint
+app.register_blueprint(workflow_bp)
 
 
 def load_spec(form_path):

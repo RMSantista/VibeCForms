@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ kanban.title }} - VibeCForms Workflow</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f7fa;
+            color: #2c3e50;
+        }
+
+        /* Header */
+        .header {
+            background: white;
+            border-bottom: 1px solid #e1e8ed;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .header-left i {
+            font-size: 1.5rem;
+            color: #3498db;
+        }
+
+        .header-left h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .header-right {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+
+        .btn-success {
+            background: #27ae60;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #229954;
+        }
+
+        /* Board Container */
+        .board-container {
+            padding: 2rem;
+            overflow-x: auto;
+        }
+
+        .board {
+            display: flex;
+            gap: 1.5rem;
+            min-height: calc(100vh - 150px);
+        }
+
+        /* Column */
+        .column {
+            background: #ecf0f1;
+            border-radius: 8px;
+            min-width: 320px;
+            max-width: 320px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .column-header {
+            padding: 1rem;
+            font-weight: 600;
+            font-size: 0.95rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid rgba(0,0,0,0.1);
+        }
+
+        .column-title {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .column-count {
+            background: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .column-body {
+            padding: 1rem;
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        /* Card */
+        .card {
+            background: white;
+            border-radius: 6px;
+            padding: 1rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+            cursor: grab;
+            transition: all 0.2s;
+        }
+
+        .card:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            transform: translateY(-2px);
+        }
+
+        .card.dragging {
+            opacity: 0.5;
+            cursor: grabbing;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.5rem;
+        }
+
+        .card-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: #2c3e50;
+            flex: 1;
+        }
+
+        .card-menu {
+            color: #95a5a6;
+            cursor: pointer;
+            padding: 0.25rem;
+        }
+
+        .card-menu:hover {
+            color: #2c3e50;
+        }
+
+        .card-body {
+            font-size: 0.85rem;
+            color: #7f8c8d;
+            margin-bottom: 0.75rem;
+        }
+
+        .card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8rem;
+            color: #95a5a6;
+        }
+
+        .card-meta {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .card-date {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .badge-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .badge-danger {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 8px;
+            padding: 2rem;
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-header h2 {
+            font-size: 1.5rem;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #95a5a6;
+        }
+
+        .modal-close:hover {
+            color: #2c3e50;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+            margin-top: 1.5rem;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            color: #95a5a6;
+            padding: 2rem;
+            font-size: 0.9rem;
+        }
+
+        .empty-state i {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Alerts */
+        .alert {
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+
+        .alert-warning {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+        }
+
+        .alert-danger {
+            background: #f8d7da;
+            border: 1px solid #dc3545;
+            color: #721c24;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            border: 1px solid #28a745;
+            color: #155724;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            border: 1px solid #17a2b8;
+            color: #0c5460;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-left">
+            <i class="fas {{ kanban.icon or 'fa-tasks' }}"></i>
+            <h1>{{ kanban.title }}</h1>
+        </div>
+        <div class="header-right">
+            <button class="btn btn-success" onclick="openCreateModal()">
+                <i class="fas fa-plus"></i> Novo Processo
+            </button>
+            <button class="btn btn-primary" onclick="runAutoTransition()">
+                <i class="fas fa-magic"></i> Auto-Transição
+            </button>
+            <button class="btn btn-secondary" onclick="window.location.href='/'">
+                <i class="fas fa-home"></i> Home
+            </button>
+        </div>
+    </div>
+
+    <!-- Board -->
+    <div class="board-container">
+        <div id="board" class="board">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Carregando board...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Create/Edit Process -->
+    <div id="processModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Novo Processo</h2>
+                <button class="modal-close" onclick="closeProcessModal()">&times;</button>
+            </div>
+            <form id="processForm">
+                <input type="hidden" id="processId" name="process_id">
+                <div id="formFields"></div>
+                <div id="prerequisitesAlert"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeProcessModal()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- SortableJS -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
+    <script>
+        const KANBAN_NAME = '{{ kanban.kanban_name }}';
+        const KANBAN_DEF = {{ kanban | tojson }};
+        let processes = [];
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadBoard();
+        });
+
+        // Load board
+        async function loadBoard() {
+            try {
+                const response = await fetch(`/workflow/processes?kanban=${KANBAN_NAME}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    processes = data.processes;
+                    renderBoard();
+                }
+            } catch (error) {
+                console.error('Error loading board:', error);
+                showError('Erro ao carregar board');
+            }
+        }
+
+        // Render board
+        function renderBoard() {
+            const board = document.getElementById('board');
+            board.innerHTML = '';
+
+            KANBAN_DEF.states.forEach(state => {
+                const stateProcesses = processes.filter(p => p.current_state === state.id);
+
+                const column = document.createElement('div');
+                column.className = 'column';
+                column.dataset.state = state.id;
+
+                column.innerHTML = `
+                    <div class="column-header" style="border-color: ${state.color || '#95a5a6'}">
+                        <div class="column-title">
+                            ${state.icon ? '<i class="fas ' + state.icon + '"></i>' : ''}
+                            <span>${state.name}</span>
+                        </div>
+                        <span class="column-count">${stateProcesses.length}</span>
+                    </div>
+                    <div class="column-body" data-state="${state.id}">
+                        ${stateProcesses.length === 0 ? '<div class="empty-state"><i class="fas fa-inbox"></i><div>Nenhum processo</div></div>' : ''}
+                    </div>
+                `;
+
+                board.appendChild(column);
+
+                // Render cards
+                const columnBody = column.querySelector('.column-body');
+                stateProcesses.forEach(process => {
+                    const card = createCard(process);
+                    columnBody.appendChild(card);
+                });
+
+                // Initialize Sortable
+                new Sortable(columnBody, {
+                    group: 'board',
+                    animation: 150,
+                    ghostClass: 'dragging',
+                    onEnd: handleDrop
+                });
+            });
+        }
+
+        // Create card
+        function createCard(process) {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.dataset.processId = process.id;
+
+            const title = process.form_data?.title || process.form_data?.nome || 'Sem título';
+            const description = process.form_data?.description || process.form_data?.descricao || '';
+            const createdAt = new Date(process.created_at).toLocaleDateString('pt-BR');
+
+            card.innerHTML = `
+                <div class="card-header">
+                    <div class="card-title">${title}</div>
+                    <div class="card-menu" onclick="openEditModal('${process.id}')">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </div>
+                </div>
+                ${description ? '<div class="card-body">' + description + '</div>' : ''}
+                <div class="card-footer">
+                    <div class="card-meta">
+                        <div class="card-date">
+                            <i class="fas fa-clock"></i>
+                            <span>${createdAt}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            return card;
+        }
+
+        // Handle drop
+        async function handleDrop(evt) {
+            const processId = evt.item.dataset.processId;
+            const newState = evt.to.dataset.state;
+
+            try {
+                const response = await fetch(`/workflow/processes/${processId}/transition`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        target_state: newState,
+                        triggered_by: 'user',
+                        justification: 'Drag and drop'
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Check for warnings only if there are actual messages
+                    const warnings = data.validation?.warnings || [];
+                    const errors = data.validation?.errors || [];
+
+                    if (warnings.length > 0 || errors.length > 0) {
+                        showWarnings({ warnings, errors });
+                    }
+
+                    await loadBoard();
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                console.error('Error transitioning:', error);
+                showError('Erro ao mover processo: ' + error.message);
+                await loadBoard();
+            }
+        }
+
+        // Modals
+        function openCreateModal() {
+            document.getElementById('modalTitle').textContent = 'Novo Processo';
+            document.getElementById('processId').value = '';
+            document.getElementById('processForm').reset();
+            renderFormFields();
+            document.getElementById('processModal').classList.add('active');
+        }
+
+        async function openEditModal(processId) {
+            const process = processes.find(p => p.id === processId);
+            if (!process) return;
+
+            document.getElementById('modalTitle').textContent = 'Editar Processo';
+            document.getElementById('processId').value = processId;
+            renderFormFields(process.form_data);
+            document.getElementById('processModal').classList.add('active');
+        }
+
+        function closeProcessModal() {
+            document.getElementById('processModal').classList.remove('active');
+        }
+
+        // Render form fields
+        function renderFormFields(data = {}) {
+            const container = document.getElementById('formFields');
+            container.innerHTML = '';
+
+            // Simple form with title and description
+            container.innerHTML = `
+                <div class="form-group">
+                    <label for="title">Título *</label>
+                    <input type="text" id="title" name="title" value="${data.title || ''}" required>
+                </div>
+                <div class="form-group">
+                    <label for="description">Descrição</label>
+                    <textarea id="description" name="description">${data.description || ''}</textarea>
+                </div>
+            `;
+        }
+
+        // Handle form submit
+        document.getElementById('processForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const processId = document.getElementById('processId').value;
+            const formData = {
+                title: document.getElementById('title').value,
+                description: document.getElementById('description').value
+            };
+
+            try {
+                if (processId) {
+                    // Update
+                    await fetch(`/workflow/processes/${processId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ form_data: formData })
+                    });
+                } else {
+                    // Create
+                    await fetch('/workflow/processes', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            kanban_name: KANBAN_NAME,
+                            form_data: formData
+                        })
+                    });
+                }
+
+                closeProcessModal();
+                await loadBoard();
+            } catch (error) {
+                console.error('Error saving process:', error);
+                showError('Erro ao salvar processo');
+            }
+        });
+
+        // Auto-transition
+        async function runAutoTransition() {
+            try {
+                const response = await fetch(`/workflow/auto-transition/kanban/${KANBAN_NAME}`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    showSuccess(`Auto-transição executada: ${data.result.total_transitions} transições`);
+                    await loadBoard();
+                }
+            } catch (error) {
+                console.error('Error running auto-transition:', error);
+                showError('Erro ao executar auto-transição');
+            }
+        }
+
+        // Alerts
+        function showWarnings(validation) {
+            const warnings = validation.warnings || [];
+            const errors = validation.errors || [];
+            const messages = [...warnings, ...errors];
+
+            if (messages.length > 0) {
+                alert('Avisos:\n' + messages.join('\n'));
+            }
+        }
+
+        function showError(message) {
+            alert('Erro: ' + message);
+        }
+
+        function showSuccess(message) {
+            alert('Sucesso: ' + message);
+        }
+    </script>
+</body>
+</html>

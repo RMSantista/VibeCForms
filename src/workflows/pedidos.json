@@ -1,0 +1,142 @@
+{
+  "kanban_name": "pedidos",
+  "title": "Fluxo de Pedidos",
+  "description": "Gerenciamento completo de pedidos de clientes - desde orçamento até entrega",
+  "icon": "fa-shopping-cart",
+  "created_at": "2025-10-26T00:00:00",
+
+  "states": [
+    {
+      "id": "orcamento",
+      "name": "Orçamento",
+      "order": 1,
+      "color": "#FFC107",
+      "icon": "fa-calculator",
+      "description": "Preparação do orçamento para o cliente",
+
+      "prerequisites": [
+        {
+          "id": "cliente_informado",
+          "type": "field_check",
+          "field": "cliente",
+          "condition": "not_empty",
+          "label": "Cliente informado",
+          "blocking": false,
+          "alert_message": "⚠️ Cliente não informado. Deseja continuar?"
+        },
+        {
+          "id": "produtos_selecionados",
+          "type": "field_check",
+          "field": "produtos",
+          "condition": "not_empty",
+          "label": "Produtos selecionados",
+          "blocking": false,
+          "alert_message": "⚠️ Nenhum produto selecionado. Deseja continuar?"
+        }
+      ]
+    },
+    {
+      "id": "aprovacao",
+      "name": "Aprovação",
+      "order": 2,
+      "color": "#2196F3",
+      "icon": "fa-check-circle",
+      "description": "Aguardando aprovação do cliente",
+
+      "prerequisites": [
+        {
+          "id": "valor_calculado",
+          "type": "field_check",
+          "field": "valor_total",
+          "condition": "greater_than",
+          "value": 0,
+          "label": "Valor total calculado",
+          "blocking": false,
+          "alert_message": "⚠️ Valor total não calculado (R$ 0,00)."
+        }
+      ]
+    },
+    {
+      "id": "entrega",
+      "name": "Entrega",
+      "order": 3,
+      "color": "#FF9800",
+      "icon": "fa-truck",
+      "description": "Pedido em processo de entrega",
+
+      "prerequisites": [
+        {
+          "id": "pagamento_confirmado",
+          "type": "field_check",
+          "field": "pagamento_confirmado",
+          "condition": "equals",
+          "value": true,
+          "label": "Pagamento confirmado",
+          "blocking": false,
+          "alert_message": "⚠️ Pagamento não confirmado. Prosseguir pode gerar problemas."
+        },
+        {
+          "id": "endereco_validado",
+          "type": "field_check",
+          "field": "endereco_entrega",
+          "condition": "not_empty",
+          "label": "Endereço de entrega validado",
+          "blocking": false,
+          "alert_message": "⚠️ Endereço de entrega não informado."
+        }
+      ]
+    },
+    {
+      "id": "concluido",
+      "name": "Concluído",
+      "order": 4,
+      "color": "#4CAF50",
+      "icon": "fa-check",
+      "description": "Pedido finalizado com sucesso",
+      "prerequisites": []
+    }
+  ],
+
+  "agents": {
+    "enabled": true,
+    "description": "Agentes de IA para automação (FUTURO - Fase 4)",
+    "state_assignments": {
+      "orcamento": "orcamento_agent",
+      "aprovacao": "aprovacao_agent",
+      "entrega": "entrega_agent"
+    },
+    "flow_sequence": [
+      "orcamento",
+      "aprovacao",
+      "entrega",
+      "concluido"
+    ]
+  },
+
+  "ai_settings": {
+    "pattern_detection": false,
+    "description": "Análise de padrões com IA (FUTURO - Fase 3)",
+    "min_samples_for_pattern": 10,
+    "anomaly_threshold": 0.1,
+    "learning_enabled": false
+  },
+
+  "form_integration": {
+    "form_name": "pedidos",
+    "description": "Integração com formulário de pedidos do VibeCForms",
+    "fields_mapping": {
+      "cliente": "nome_cliente",
+      "produtos": "lista_produtos",
+      "valor_total": "valor_total",
+      "pagamento_confirmado": "pagamento_ok",
+      "endereco_entrega": "endereco"
+    }
+  },
+
+  "metadata": {
+    "version": "4.0.0",
+    "created_by": "VibeCForms Workflow System",
+    "last_modified": "2025-10-26T00:00:00",
+    "tags": ["vendas", "comercial", "pedidos"]
+  }
+}

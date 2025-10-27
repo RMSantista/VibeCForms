@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kanbans - VibeCForms Workflow</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f7fa;
+            color: #2c3e50;
+        }
+
+        .header {
+            background: white;
+            border-bottom: 1px solid #e1e8ed;
+            padding: 1.5rem 2rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            color: #7f8c8d;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .actions {
+            margin-bottom: 2rem;
+            display: flex;
+            gap: 1rem;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+
+        .kanban-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .kanban-card {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .kanban-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transform: translateY(-4px);
+        }
+
+        .kanban-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .kanban-icon {
+            font-size: 2rem;
+            color: #3498db;
+        }
+
+        .kanban-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .kanban-description {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+            line-height: 1.5;
+        }
+
+        .kanban-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 1rem;
+            border-top: 1px solid #ecf0f1;
+            font-size: 0.85rem;
+            color: #95a5a6;
+        }
+
+        .kanban-states {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .badge {
+            background: #ecf0f1;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-weight: 500;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+        }
+
+        .empty-state i {
+            font-size: 4rem;
+            color: #bdc3c7;
+            margin-bottom: 1rem;
+        }
+
+        .empty-state h2 {
+            color: #7f8c8d;
+            margin-bottom: 0.5rem;
+        }
+
+        .empty-state p {
+            color: #95a5a6;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><i class="fas fa-layer-group"></i> Workflows Kanbans</h1>
+        <p>Gerenciar processos com boards visuais</p>
+    </div>
+
+    <div class="container">
+        <div class="actions">
+            <a href="/" class="btn btn-secondary">
+                <i class="fas fa-home"></i> Voltar para Home
+            </a>
+        </div>
+
+        {% if kanbans and kanbans|length > 0 %}
+        <div class="kanban-grid">
+            {% for kanban in kanbans %}
+            <a href="/workflow/board/{{ kanban.kanban_name }}" class="kanban-card">
+                <div class="kanban-header">
+                    <div class="kanban-icon">
+                        <i class="fas {{ kanban.icon or 'fa-tasks' }}"></i>
+                    </div>
+                    <div class="kanban-title">{{ kanban.title }}</div>
+                </div>
+                {% if kanban.description %}
+                <div class="kanban-description">
+                    {{ kanban.description }}
+                </div>
+                {% endif %}
+                <div class="kanban-meta">
+                    <div class="kanban-states">
+                        <i class="fas fa-stream"></i>
+                        <span class="badge">{{ kanban.states_count }} estados</span>
+                    </div>
+                    {% if kanban.created_at %}
+                    <div>
+                        <i class="fas fa-clock"></i>
+                        {{ kanban.created_at[:10] }}
+                    </div>
+                    {% endif %}
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-inbox"></i>
+            <h2>Nenhum Kanban configurado</h2>
+            <p>Crie um arquivo JSON em src/workflows/ para começar</p>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>
