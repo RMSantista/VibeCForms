@@ -1,6 +1,7 @@
 """
 Tests for SQLite adapter.
 """
+
 import pytest
 import os
 import sys
@@ -8,7 +9,7 @@ import sqlite3
 from pathlib import Path
 
 # Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from persistence.adapters.sqlite_adapter import SQLiteRepository
 
@@ -21,7 +22,7 @@ def temp_db(tmp_path):
         "type": "sqlite",
         "database": str(db_path),
         "timeout": 10,
-        "check_same_thread": False
+        "check_same_thread": False,
     }
     return config, db_path
 
@@ -34,8 +35,8 @@ def sample_spec():
         "fields": [
             {"name": "nome", "label": "Nome", "type": "text", "required": True},
             {"name": "email", "label": "Email", "type": "email", "required": False},
-            {"name": "ativo", "label": "Ativo", "type": "checkbox", "required": False}
-        ]
+            {"name": "ativo", "label": "Ativo", "type": "checkbox", "required": False},
+        ],
     }
 
 
@@ -59,7 +60,9 @@ def test_create_storage(temp_db, sample_spec):
     # Verify table exists
     conn = sqlite3.connect(str(db_path))
     cursor = conn.cursor()
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='test_form';")
+    cursor.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='test_form';"
+    )
     result = cursor.fetchone()
     conn.close()
 
@@ -113,7 +116,11 @@ def test_update_record(temp_db, sample_spec):
     repo.create("test_form", sample_spec, data)
 
     # Update record
-    updated_data = {"nome": "João Santos", "email": "joao.santos@example.com", "ativo": False}
+    updated_data = {
+        "nome": "João Santos",
+        "email": "joao.santos@example.com",
+        "ativo": False,
+    }
     assert repo.update("test_form", sample_spec, 0, updated_data)
 
     # Verify update
@@ -132,9 +139,21 @@ def test_delete_record(temp_db, sample_spec):
     repo.create_storage("test_form", sample_spec)
 
     # Create multiple records
-    repo.create("test_form", sample_spec, {"nome": "João", "email": "joao@example.com", "ativo": True})
-    repo.create("test_form", sample_spec, {"nome": "Maria", "email": "maria@example.com", "ativo": True})
-    repo.create("test_form", sample_spec, {"nome": "Pedro", "email": "pedro@example.com", "ativo": False})
+    repo.create(
+        "test_form",
+        sample_spec,
+        {"nome": "João", "email": "joao@example.com", "ativo": True},
+    )
+    repo.create(
+        "test_form",
+        sample_spec,
+        {"nome": "Maria", "email": "maria@example.com", "ativo": True},
+    )
+    repo.create(
+        "test_form",
+        sample_spec,
+        {"nome": "Pedro", "email": "pedro@example.com", "ativo": False},
+    )
 
     # Delete second record (index 1)
     assert repo.delete("test_form", sample_spec, 1)
@@ -157,7 +176,11 @@ def test_has_data(temp_db, sample_spec):
     assert not repo.has_data("test_form")
 
     # Create record
-    repo.create("test_form", sample_spec, {"nome": "João", "email": "joao@example.com", "ativo": True})
+    repo.create(
+        "test_form",
+        sample_spec,
+        {"nome": "João", "email": "joao@example.com", "ativo": True},
+    )
 
     # Should have data now
     assert repo.has_data("test_form")
@@ -185,12 +208,12 @@ def test_multiple_forms(temp_db):
 
     spec1 = {
         "title": "Contatos",
-        "fields": [{"name": "nome", "label": "Nome", "type": "text", "required": True}]
+        "fields": [{"name": "nome", "label": "Nome", "type": "text", "required": True}],
     }
 
     spec2 = {
         "title": "Produtos",
-        "fields": [{"name": "nome", "label": "Nome", "type": "text", "required": True}]
+        "fields": [{"name": "nome", "label": "Nome", "type": "text", "required": True}],
     }
 
     # Create two forms
@@ -220,7 +243,7 @@ def test_boolean_field_conversion(temp_db):
         "title": "Test",
         "fields": [
             {"name": "ativo", "label": "Ativo", "type": "checkbox", "required": False}
-        ]
+        ],
     }
 
     repo.create_storage("test", spec)

@@ -55,7 +55,7 @@ class SchemaHistory:
             return {}
 
         try:
-            with open(self.history_file, 'r', encoding='utf-8') as f:
+            with open(self.history_file, "r", encoding="utf-8") as f:
                 history = json.load(f)
             logger.info(f"Loaded schema history from {self.history_file}")
             return history
@@ -77,7 +77,7 @@ class SchemaHistory:
             # Ensure directory exists
             self.history_file.parent.mkdir(parents=True, exist_ok=True)
 
-            with open(self.history_file, 'w', encoding='utf-8') as f:
+            with open(self.history_file, "w", encoding="utf-8") as f:
                 json.dump(self.history, f, indent=2, ensure_ascii=False)
 
             logger.info(f"Saved schema history to {self.history_file}")
@@ -99,11 +99,7 @@ class SchemaHistory:
         return self.history.get(form_path)
 
     def update_form_history(
-        self,
-        form_path: str,
-        spec_hash: str,
-        backend: str,
-        record_count: int = 0
+        self, form_path: str, spec_hash: str, backend: str, record_count: int = 0
     ) -> bool:
         """
         Update history for a form.
@@ -121,7 +117,7 @@ class SchemaHistory:
             "last_spec_hash": spec_hash,
             "last_backend": backend,
             "last_updated": datetime.now().isoformat(),
-            "record_count": record_count
+            "record_count": record_count,
         }
 
         return self._save_history()
@@ -231,10 +227,7 @@ class SchemaHistory:
 
     def __repr__(self) -> str:
         """String representation of schema history."""
-        return (
-            f"SchemaHistory(file={self.history_file}, "
-            f"forms={len(self.history)})"
-        )
+        return f"SchemaHistory(file={self.history_file}, " f"forms={len(self.history)})"
 
 
 # Global history instance (singleton)

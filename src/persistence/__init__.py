@@ -27,11 +27,11 @@ from persistence.config import PersistenceConfig, get_config, reset_config
 from persistence.factory import RepositoryFactory
 
 __all__ = [
-    'BaseRepository',
-    'PersistenceConfig',
-    'get_config',
-    'reset_config',
-    'RepositoryFactory',
+    "BaseRepository",
+    "PersistenceConfig",
+    "get_config",
+    "reset_config",
+    "RepositoryFactory",
 ]
 
-__version__ = '3.0.0'
+__version__ = "3.0.0"

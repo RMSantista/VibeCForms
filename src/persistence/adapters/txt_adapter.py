@@ -43,10 +43,10 @@ class TxtRepository(BaseRepository):
                 - encoding: File encoding (default: 'utf-8')
                 - extension: File extension (default: '.txt')
         """
-        self.path = config.get('path', 'src/')
-        self.delimiter = config.get('delimiter', ';')
-        self.encoding = config.get('encoding', 'utf-8')
-        self.extension = config.get('extension', '.txt')
+        self.path = config.get("path", "src/")
+        self.delimiter = config.get("delimiter", ";")
+        self.encoding = config.get("encoding", "utf-8")
+        self.extension = config.get("extension", ".txt")
 
         # Ensure path exists
         Path(self.path).mkdir(parents=True, exist_ok=True)
@@ -82,7 +82,7 @@ class TxtRepository(BaseRepository):
             return False
 
         # Create empty file
-        with open(file_path, 'w', encoding=self.encoding) as f:
+        with open(file_path, "w", encoding=self.encoding) as f:
             pass
 
         logger.info(f"Created storage: {file_path}")
@@ -140,7 +140,9 @@ class TxtRepository(BaseRepository):
         logger.debug(f"Read {len(forms)} records from {file_path}")
         return forms
 
-    def read_one(self, form_path: str, spec: Dict[str, Any], idx: int) -> Optional[Dict[str, Any]]:
+    def read_one(
+        self, form_path: str, spec: Dict[str, Any], idx: int
+    ) -> Optional[Dict[str, Any]]:
         """Read a single record by index."""
         forms = self.read_all(form_path, spec)
 
@@ -150,7 +152,9 @@ class TxtRepository(BaseRepository):
 
         return forms[idx]
 
-    def create(self, form_path: str, spec: Dict[str, Any], data: Dict[str, Any]) -> bool:
+    def create(
+        self, form_path: str, spec: Dict[str, Any], data: Dict[str, Any]
+    ) -> bool:
         """Insert a new record."""
         # Read existing records
         forms = self.read_all(form_path, spec)
@@ -161,7 +165,9 @@ class TxtRepository(BaseRepository):
         # Write all records back
         return self._write_all(form_path, spec, forms)
 
-    def update(self, form_path: str, spec: Dict[str, Any], idx: int, data: Dict[str, Any]) -> bool:
+    def update(
+        self, form_path: str, spec: Dict[str, Any], idx: int, data: Dict[str, Any]
+    ) -> bool:
         """Update an existing record."""
         forms = self.read_all(form_path, spec)
 
@@ -189,7 +195,9 @@ class TxtRepository(BaseRepository):
         # Write remaining records back
         return self._write_all(form_path, spec, forms)
 
-    def _write_all(self, form_path: str, spec: Dict[str, Any], forms: List[Dict[str, Any]]) -> bool:
+    def _write_all(
+        self, form_path: str, spec: Dict[str, Any], forms: List[Dict[str, Any]]
+    ) -> bool:
         """
         Write all records to the text file.
 
@@ -238,9 +246,7 @@ class TxtRepository(BaseRepository):
 
         # Check if file has data and force is False
         if not force and self.has_data(form_path):
-            logger.warning(
-                f"Cannot drop {file_path}: file has data and force=False"
-            )
+            logger.warning(f"Cannot drop {file_path}: file has data and force=False")
             return False
 
         try:
@@ -273,10 +279,7 @@ class TxtRepository(BaseRepository):
             return False
 
     def migrate_schema(
-        self,
-        form_path: str,
-        old_spec: Dict[str, Any],
-        new_spec: Dict[str, Any]
+        self, form_path: str, old_spec: Dict[str, Any], new_spec: Dict[str, Any]
     ) -> bool:
         """
         Migrate schema when form specification changes.
@@ -298,10 +301,7 @@ class TxtRepository(BaseRepository):
         # Detect schema changes
         has_data = self.has_data(form_path)
         schema_change = SchemaChangeDetector.detect_changes(
-            form_path=form_path,
-            old_spec=old_spec,
-            new_spec=new_spec,
-            has_data=has_data
+            form_path=form_path, old_spec=old_spec, new_spec=new_spec, has_data=has_data
         )
 
         if not schema_change.has_changes():
@@ -323,7 +323,9 @@ class TxtRepository(BaseRepository):
             # 1. Process field renames first (preserves data)
             for change in schema_change.changes:
                 if change.change_type == ChangeType.RENAME_FIELD:
-                    logger.info(f"Renaming field '{change.old_name}' to '{change.new_name}'")
+                    logger.info(
+                        f"Renaming field '{change.old_name}' to '{change.new_name}'"
+                    )
 
                     # Update current_spec to reflect the rename
                     for field in current_spec["fields"]:
@@ -332,13 +334,17 @@ class TxtRepository(BaseRepository):
                             break
 
                     # Execute rename
-                    if not self.rename_field(form_path, current_spec, change.old_name, change.new_name):
+                    if not self.rename_field(
+                        form_path, current_spec, change.old_name, change.new_name
+                    ):
                         raise Exception(f"Failed to rename field '{change.old_name}'")
 
             # 2. Process type changes
             for change in schema_change.changes:
                 if change.change_type == ChangeType.CHANGE_TYPE:
-                    logger.info(f"Changing type of '{change.field_name}' from {change.old_type} to {change.new_type}")
+                    logger.info(
+                        f"Changing type of '{change.field_name}' from {change.old_type} to {change.new_type}"
+                    )
 
                     # Update current_spec to reflect the type change
                     for field in current_spec["fields"]:
@@ -347,26 +353,44 @@ class TxtRepository(BaseRepository):
                             break
 
                     # Execute type change
-                    if not self.change_field_type(form_path, current_spec, change.field_name, change.old_type, change.new_type):
-                        raise Exception(f"Failed to change type of field '{change.field_name}'")
+                    if not self.change_field_type(
+                        form_path,
+                        current_spec,
+                        change.field_name,
+                        change.old_type,
+                        change.new_type,
+                    ):
+                        raise Exception(
+                            f"Failed to change type of field '{change.field_name}'"
+                        )
 
             # 3. Process field removals (destructive)
             for change in schema_change.changes:
                 if change.change_type == ChangeType.REMOVE_FIELD:
-                    logger.warning(f"Removing field '{change.field_name}' (data will be lost)")
+                    logger.warning(
+                        f"Removing field '{change.field_name}' (data will be lost)"
+                    )
 
                     # Remove from current_spec
-                    current_spec["fields"] = [f for f in current_spec["fields"] if f["name"] != change.field_name]
+                    current_spec["fields"] = [
+                        f
+                        for f in current_spec["fields"]
+                        if f["name"] != change.field_name
+                    ]
 
                     # Execute removal
-                    if not self.remove_field(form_path, current_spec, change.field_name):
+                    if not self.remove_field(
+                        form_path, current_spec, change.field_name
+                    ):
                         raise Exception(f"Failed to remove field '{change.field_name}'")
 
             # 4. Process field additions (safe)
             added_fields = []
             for change in schema_change.changes:
                 if change.change_type == ChangeType.ADD_FIELD:
-                    logger.info(f"Adding new field '{change.field_name}' with type {change.field_type}")
+                    logger.info(
+                        f"Adding new field '{change.field_name}' with type {change.field_type}"
+                    )
                     added_fields.append(change)
 
             # Add new fields by reading all data and writing with new spec
@@ -375,15 +399,16 @@ class TxtRepository(BaseRepository):
 
                 # Add new fields to current_spec
                 for change in added_fields:
-                    current_spec["fields"].append({
-                        "name": change.field_name,
-                        "type": change.field_type
-                    })
+                    current_spec["fields"].append(
+                        {"name": change.field_name, "type": change.field_type}
+                    )
 
                 # Add default values for new fields in each record
                 for form in forms:
                     for change in added_fields:
-                        form[change.field_name] = self._get_default_value(change.field_type)
+                        form[change.field_name] = self._get_default_value(
+                            change.field_type
+                        )
 
                 # Write with new spec
                 if not self._write_all(form_path, current_spec, forms):
@@ -408,7 +433,9 @@ class TxtRepository(BaseRepository):
         logger.debug(f"create_index is no-op for TxtRepository")
         return True
 
-    def rename_field(self, form_path: str, spec: Dict[str, Any], old_name: str, new_name: str) -> bool:
+    def rename_field(
+        self, form_path: str, spec: Dict[str, Any], old_name: str, new_name: str
+    ) -> bool:
         """
         Rename a field in the text file, preserving all data.
 
@@ -460,7 +487,9 @@ class TxtRepository(BaseRepository):
             success = self._write_all(form_path, spec, forms)
 
             if success:
-                logger.info(f"Successfully renamed field '{old_name}' to '{new_name}' in {form_path}")
+                logger.info(
+                    f"Successfully renamed field '{old_name}' to '{new_name}' in {form_path}"
+                )
             else:
                 # Restore from backup
                 shutil.copy2(backup_path, file_path)
@@ -481,7 +510,7 @@ class TxtRepository(BaseRepository):
         spec: Dict[str, Any],
         field_name: str,
         old_type: str,
-        new_type: str
+        new_type: str,
     ) -> bool:
         """
         Change the type of a field, attempting to convert existing data.
@@ -538,7 +567,12 @@ class TxtRepository(BaseRepository):
                             elif isinstance(old_value, (int, float)):
                                 new_value = old_value != 0
                             elif isinstance(old_value, str):
-                                new_value = old_value.lower() in ('true', '1', 'yes', 'sim')
+                                new_value = old_value.lower() in (
+                                    "true",
+                                    "1",
+                                    "yes",
+                                    "sim",
+                                )
                             else:
                                 new_value = False
 
@@ -588,7 +622,9 @@ class TxtRepository(BaseRepository):
             logger.error(f"Type change error: {e}, restored from backup")
             return False
 
-    def remove_field(self, form_path: str, spec: Dict[str, Any], field_name: str) -> bool:
+    def remove_field(
+        self, form_path: str, spec: Dict[str, Any], field_name: str
+    ) -> bool:
         """
         Remove a field from the text file (destructive operation).
 

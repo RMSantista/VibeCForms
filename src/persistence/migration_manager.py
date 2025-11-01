@@ -38,7 +38,7 @@ class MigrationManager:
         spec: Dict[str, Any],
         old_backend: str,
         new_backend: str,
-        record_count: int = 0
+        record_count: int = 0,
     ) -> bool:
         """
         Migrate data from one backend to another.
@@ -85,14 +85,14 @@ class MigrationManager:
 
         # Check if old backend has storage
         if not old_repo.exists(form_path):
-            logger.info(f"No existing data in {old_backend} backend, nothing to migrate")
+            logger.info(
+                f"No existing data in {old_backend} backend, nothing to migrate"
+            )
             return True
 
         # Create backup of old backend
         backup_info = MigrationManager._create_cross_backend_backup(
-            form_path=form_path,
-            old_backend=old_backend,
-            old_repo=old_repo
+            form_path=form_path, old_backend=old_backend, old_repo=old_repo
         )
 
         if not backup_info:
@@ -115,7 +115,9 @@ class MigrationManager:
             if not new_repo.exists(form_path):
                 logger.info(f"Creating storage in {new_backend} backend...")
                 if not new_repo.create_storage(form_path, spec):
-                    raise Exception(f"Failed to create storage in {new_backend} backend")
+                    raise Exception(
+                        f"Failed to create storage in {new_backend} backend"
+                    )
 
             # Step 3: Migrate each record to new backend
             logger.info(f"Migrating records to {new_backend} backend...")
@@ -170,7 +172,7 @@ class MigrationManager:
                 form_path=form_path,
                 new_backend=new_backend,
                 new_repo=new_repo,
-                backup_info=backup_info
+                backup_info=backup_info,
             )
 
             return False
@@ -189,7 +191,7 @@ class MigrationManager:
         config = get_config()
 
         # Get backend configuration
-        backend_config = config.config.get('backends', {}).get(backend_type)
+        backend_config = config.config.get("backends", {}).get(backend_type)
         if not backend_config:
             logger.error(f"No configuration found for backend type: {backend_type}")
             return None
@@ -199,9 +201,11 @@ class MigrationManager:
         try:
             if backend_type == "txt":
                 from persistence.adapters.txt_adapter import TxtRepository
+
                 return TxtRepository(backend_config)
             elif backend_type == "sqlite":
                 from persistence.adapters.sqlite_adapter import SQLiteRepository
+
                 return SQLiteRepository(backend_config)
             else:
                 logger.error(f"Unsupported backend type: {backend_type}")
@@ -212,9 +216,7 @@ class MigrationManager:
 
     @staticmethod
     def _create_cross_backend_backup(
-        form_path: str,
-        old_backend: str,
-        old_repo: BaseRepository
+        form_path: str, old_backend: str, old_repo: BaseRepository
     ) -> Optional[Dict[str, Any]]:
         """
         Create a backup before cross-backend migration.
@@ -232,14 +234,16 @@ class MigrationManager:
         backup_dir.mkdir(parents=True, exist_ok=True)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_name = f"{form_path.replace('/', '_')}_{old_backend}_to_migration_{timestamp}"
+        backup_name = (
+            f"{form_path.replace('/', '_')}_{old_backend}_to_migration_{timestamp}"
+        )
 
         backup_info = {
             "form_path": form_path,
             "old_backend": old_backend,
             "timestamp": timestamp,
             "backup_dir": str(backup_dir),
-            "backup_name": backup_name
+            "backup_name": backup_name,
         }
 
         try:
@@ -247,6 +251,7 @@ class MigrationManager:
             if old_backend == "txt":
                 # Copy .txt file
                 from persistence.adapters.txt_adapter import TxtRepository
+
                 if isinstance(old_repo, TxtRepository):
                     source_file = old_repo._get_file_path(form_path)
                     if os.path.exists(source_file):
@@ -258,6 +263,7 @@ class MigrationManager:
             elif old_backend == "sqlite":
                 # Copy entire database
                 from persistence.adapters.sqlite_adapter import SQLiteRepository
+
                 if isinstance(old_repo, SQLiteRepository):
                     source_db = old_repo.database
                     if os.path.exists(source_db):
@@ -277,7 +283,7 @@ class MigrationManager:
         form_path: str,
         new_backend: str,
         new_repo: BaseRepository,
-        backup_info: Dict[str, Any]
+        backup_info: Dict[str, Any],
     ) -> bool:
         """
         Rollback a failed migration.
@@ -314,7 +320,7 @@ def migrate_form_backend(
     spec: Dict[str, Any],
     old_backend: str,
     new_backend: str,
-    record_count: int = 0
+    record_count: int = 0,
 ) -> bool:
     """
     Convenience function to migrate a form's backend.
@@ -334,5 +340,5 @@ def migrate_form_backend(
         spec=spec,
         old_backend=old_backend,
         new_backend=new_backend,
-        record_count=record_count
+        record_count=record_count,
     )

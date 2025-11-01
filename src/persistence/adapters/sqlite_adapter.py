@@ -34,25 +34,25 @@ class SQLiteRepository(BaseRepository):
 
     # Type mapping: VibeCForms field type -> SQLite type
     TYPE_MAPPING = {
-        'text': 'TEXT',
-        'tel': 'TEXT',
-        'email': 'TEXT',
-        'password': 'TEXT',
-        'url': 'TEXT',
-        'search': 'TEXT',
-        'textarea': 'TEXT',
-        'number': 'INTEGER',
-        'checkbox': 'BOOLEAN',
-        'date': 'DATE',
-        'time': 'TEXT',
-        'datetime-local': 'TEXT',
-        'month': 'TEXT',
-        'week': 'TEXT',
-        'select': 'TEXT',
-        'radio': 'TEXT',
-        'color': 'TEXT',
-        'range': 'INTEGER',
-        'hidden': 'TEXT',
+        "text": "TEXT",
+        "tel": "TEXT",
+        "email": "TEXT",
+        "password": "TEXT",
+        "url": "TEXT",
+        "search": "TEXT",
+        "textarea": "TEXT",
+        "number": "INTEGER",
+        "checkbox": "BOOLEAN",
+        "date": "DATE",
+        "time": "TEXT",
+        "datetime-local": "TEXT",
+        "month": "TEXT",
+        "week": "TEXT",
+        "select": "TEXT",
+        "radio": "TEXT",
+        "color": "TEXT",
+        "range": "INTEGER",
+        "hidden": "TEXT",
     }
 
     def __init__(self, config: Dict[str, Any]):
@@ -65,9 +65,9 @@ class SQLiteRepository(BaseRepository):
                 - timeout: Connection timeout in seconds (default: 10)
                 - check_same_thread: SQLite check_same_thread parameter
         """
-        self.database = config.get('database', 'src/vibecforms.db')
-        self.timeout = config.get('timeout', 10)
-        self.check_same_thread = config.get('check_same_thread', False)
+        self.database = config.get("database", "src/vibecforms.db")
+        self.timeout = config.get("timeout", 10)
+        self.check_same_thread = config.get("check_same_thread", False)
 
         # Ensure database directory exists
         db_dir = os.path.dirname(self.database)
@@ -86,7 +86,7 @@ class SQLiteRepository(BaseRepository):
         conn = sqlite3.connect(
             self.database,
             timeout=self.timeout,
-            check_same_thread=self.check_same_thread
+            check_same_thread=self.check_same_thread,
         )
         # Return rows as dictionaries
         conn.row_factory = sqlite3.Row
@@ -119,7 +119,7 @@ class SQLiteRepository(BaseRepository):
         for field in spec["fields"]:
             field_name = field["name"]
             field_type = field["type"]
-            sql_type = self.TYPE_MAPPING.get(field_type, 'TEXT')
+            sql_type = self.TYPE_MAPPING.get(field_type, "TEXT")
 
             # Add NOT NULL constraint for required fields (except checkbox)
             required = field.get("required", False)
@@ -170,7 +170,9 @@ class SQLiteRepository(BaseRepository):
 
                     # Convert based on field type
                     if field_type == "checkbox":
-                        form_data[field_name] = bool(value) if value is not None else False
+                        form_data[field_name] = (
+                            bool(value) if value is not None else False
+                        )
                     elif field_type == "number" or field_type == "range":
                         form_data[field_name] = int(value) if value is not None else 0
                     else:
@@ -185,7 +187,9 @@ class SQLiteRepository(BaseRepository):
             logger.error(f"Failed to read from {table_name}: {e}")
             return []
 
-    def read_one(self, form_path: str, spec: Dict[str, Any], idx: int) -> Optional[Dict[str, Any]]:
+    def read_one(
+        self, form_path: str, spec: Dict[str, Any], idx: int
+    ) -> Optional[Dict[str, Any]]:
         """Read a single record by index."""
         # For SQLite, we read all and return by index
         # (since we're using index-based addressing, not ID-based)
@@ -197,7 +201,9 @@ class SQLiteRepository(BaseRepository):
 
         return forms[idx]
 
-    def create(self, form_path: str, spec: Dict[str, Any], data: Dict[str, Any]) -> bool:
+    def create(
+        self, form_path: str, spec: Dict[str, Any], data: Dict[str, Any]
+    ) -> bool:
         """Insert a new record into the table."""
         table_name = self._get_table_name(form_path)
 
@@ -243,7 +249,9 @@ class SQLiteRepository(BaseRepository):
             logger.error(f"Failed to insert into {table_name}: {e}")
             return False
 
-    def update(self, form_path: str, spec: Dict[str, Any], idx: int, data: Dict[str, Any]) -> bool:
+    def update(
+        self, form_path: str, spec: Dict[str, Any], idx: int, data: Dict[str, Any]
+    ) -> bool:
         """Update an existing record."""
         table_name = self._get_table_name(form_path)
 
@@ -266,7 +274,7 @@ class SQLiteRepository(BaseRepository):
                 conn.close()
                 return False
 
-            record_id = row['id']
+            record_id = row["id"]
 
             # Build UPDATE statement
             set_clauses = []
@@ -292,7 +300,9 @@ class SQLiteRepository(BaseRepository):
 
             values.append(record_id)  # For WHERE clause
 
-            update_sql = f"UPDATE {table_name} SET {', '.join(set_clauses)} WHERE id = ?"
+            update_sql = (
+                f"UPDATE {table_name} SET {', '.join(set_clauses)} WHERE id = ?"
+            )
 
             cursor.execute(update_sql, values)
             conn.commit()
@@ -321,7 +331,7 @@ class SQLiteRepository(BaseRepository):
                 conn.close()
                 return False
 
-            record_id = row['id']
+            record_id = row["id"]
 
             # Delete the record
             delete_sql = f"DELETE FROM {table_name} WHERE id = ?"
@@ -346,9 +356,7 @@ class SQLiteRepository(BaseRepository):
 
         # Check if table has data and force is False
         if not force and self.has_data(form_path):
-            logger.warning(
-                f"Cannot drop {table_name}: table has data and force=False"
-            )
+            logger.warning(f"Cannot drop {table_name}: table has data and force=False")
             return False
 
         try:
@@ -374,7 +382,7 @@ class SQLiteRepository(BaseRepository):
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-                (table_name,)
+                (table_name,),
             )
             result = cursor.fetchone()
             conn.close()
@@ -399,17 +407,14 @@ class SQLiteRepository(BaseRepository):
             row = cursor.fetchone()
             conn.close()
 
-            return row['count'] > 0
+            return row["count"] > 0
 
         except Exception as e:
             logger.error(f"Failed to check if table has data: {e}")
             return False
 
     def migrate_schema(
-        self,
-        form_path: str,
-        old_spec: Dict[str, Any],
-        new_spec: Dict[str, Any]
+        self, form_path: str, old_spec: Dict[str, Any], new_spec: Dict[str, Any]
     ) -> bool:
         """
         Migrate schema when form specification changes.
@@ -431,10 +436,7 @@ class SQLiteRepository(BaseRepository):
         # Detect schema changes
         has_data = self.has_data(form_path)
         schema_change = SchemaChangeDetector.detect_changes(
-            form_path=form_path,
-            old_spec=old_spec,
-            new_spec=new_spec,
-            has_data=has_data
+            form_path=form_path, old_spec=old_spec, new_spec=new_spec, has_data=has_data
         )
 
         if not schema_change.has_changes():
@@ -456,7 +458,9 @@ class SQLiteRepository(BaseRepository):
             # 1. Process field renames first (preserves data)
             for change in schema_change.changes:
                 if change.change_type == ChangeType.RENAME_FIELD:
-                    logger.info(f"Renaming field '{change.old_name}' to '{change.new_name}'")
+                    logger.info(
+                        f"Renaming field '{change.old_name}' to '{change.new_name}'"
+                    )
 
                     # Update current_spec to reflect the rename
                     for field in current_spec["fields"]:
@@ -465,13 +469,17 @@ class SQLiteRepository(BaseRepository):
                             break
 
                     # Execute rename
-                    if not self.rename_field(form_path, current_spec, change.old_name, change.new_name):
+                    if not self.rename_field(
+                        form_path, current_spec, change.old_name, change.new_name
+                    ):
                         raise Exception(f"Failed to rename field '{change.old_name}'")
 
             # 2. Process type changes
             for change in schema_change.changes:
                 if change.change_type == ChangeType.CHANGE_TYPE:
-                    logger.info(f"Changing type of '{change.field_name}' from {change.old_type} to {change.new_type}")
+                    logger.info(
+                        f"Changing type of '{change.field_name}' from {change.old_type} to {change.new_type}"
+                    )
 
                     # Update current_spec to reflect the type change
                     for field in current_spec["fields"]:
@@ -480,19 +488,35 @@ class SQLiteRepository(BaseRepository):
                             break
 
                     # Execute type change
-                    if not self.change_field_type(form_path, current_spec, change.field_name, change.old_type, change.new_type):
-                        raise Exception(f"Failed to change type of field '{change.field_name}'")
+                    if not self.change_field_type(
+                        form_path,
+                        current_spec,
+                        change.field_name,
+                        change.old_type,
+                        change.new_type,
+                    ):
+                        raise Exception(
+                            f"Failed to change type of field '{change.field_name}'"
+                        )
 
             # 3. Process field removals (destructive)
             for change in schema_change.changes:
                 if change.change_type == ChangeType.REMOVE_FIELD:
-                    logger.warning(f"Removing field '{change.field_name}' (data will be lost)")
+                    logger.warning(
+                        f"Removing field '{change.field_name}' (data will be lost)"
+                    )
 
                     # Remove from current_spec
-                    current_spec["fields"] = [f for f in current_spec["fields"] if f["name"] != change.field_name]
+                    current_spec["fields"] = [
+                        f
+                        for f in current_spec["fields"]
+                        if f["name"] != change.field_name
+                    ]
 
                     # Execute removal
-                    if not self.remove_field(form_path, current_spec, change.field_name):
+                    if not self.remove_field(
+                        form_path, current_spec, change.field_name
+                    ):
                         raise Exception(f"Failed to remove field '{change.field_name}'")
 
             # 4. Process field additions (safe)
@@ -501,11 +525,13 @@ class SQLiteRepository(BaseRepository):
 
             for change in schema_change.changes:
                 if change.change_type == ChangeType.ADD_FIELD:
-                    logger.info(f"Adding new field '{change.field_name}' with type {change.field_type}")
+                    logger.info(
+                        f"Adding new field '{change.field_name}' with type {change.field_type}"
+                    )
 
                     field_name = change.field_name
                     field_type = change.field_type
-                    sql_type = self.TYPE_MAPPING.get(field_type, 'TEXT')
+                    sql_type = self.TYPE_MAPPING.get(field_type, "TEXT")
 
                     # Get default value for the field type
                     default_value = self._get_default_value_sql(field_type)
@@ -514,10 +540,9 @@ class SQLiteRepository(BaseRepository):
                     cursor.execute(alter_sql)
 
                     # Update current_spec
-                    current_spec["fields"].append({
-                        "name": field_name,
-                        "type": field_type
-                    })
+                    current_spec["fields"].append(
+                        {"name": field_name, "type": field_type}
+                    )
 
             conn.commit()
             conn.close()
@@ -541,7 +566,9 @@ class SQLiteRepository(BaseRepository):
             return False
 
         index_name = f"idx_{table_name}_{field_name}"
-        create_index_sql = f"CREATE INDEX IF NOT EXISTS {index_name} ON {table_name}({field_name})"
+        create_index_sql = (
+            f"CREATE INDEX IF NOT EXISTS {index_name} ON {table_name}({field_name})"
+        )
 
         try:
             conn = self._get_connection()
@@ -575,11 +602,7 @@ class SQLiteRepository(BaseRepository):
             return "''"
 
     def rename_field(
-        self,
-        form_path: str,
-        spec: Dict[str, Any],
-        old_name: str,
-        new_name: str
+        self, form_path: str, spec: Dict[str, Any], old_name: str, new_name: str
     ) -> bool:
         """
         Rename a field in the table, preserving all data.
@@ -620,10 +643,12 @@ class SQLiteRepository(BaseRepository):
             for field in spec["fields"]:
                 field_name = field["name"]
                 field_type = field["type"]
-                sql_type = self.TYPE_MAPPING.get(field_type, 'TEXT')
+                sql_type = self.TYPE_MAPPING.get(field_type, "TEXT")
 
                 required = field.get("required", False)
-                constraint = " NOT NULL" if required and field_type != "checkbox" else ""
+                constraint = (
+                    " NOT NULL" if required and field_type != "checkbox" else ""
+                )
 
                 columns.append(f"{field_name} {sql_type}{constraint}")
 
@@ -634,7 +659,9 @@ class SQLiteRepository(BaseRepository):
 
             # Copy data from old table to new table
             # Build field list with old_name -> new_name mapping
-            old_fields = [old_name if f["name"] == new_name else f["name"] for f in spec["fields"]]
+            old_fields = [
+                old_name if f["name"] == new_name else f["name"] for f in spec["fields"]
+            ]
             new_fields = [f["name"] for f in spec["fields"]]
 
             old_fields_sql = ", ".join(old_fields)
@@ -670,7 +697,7 @@ class SQLiteRepository(BaseRepository):
         spec: Dict[str, Any],
         field_name: str,
         old_type: str,
-        new_type: str
+        new_type: str,
     ) -> bool:
         """
         Change the type of a field, attempting to convert existing data.
@@ -715,7 +742,7 @@ class SQLiteRepository(BaseRepository):
             for field in spec["fields"]:
                 fname = field["name"]
                 ftype = field["type"]
-                sql_type = self.TYPE_MAPPING.get(ftype, 'TEXT')
+                sql_type = self.TYPE_MAPPING.get(ftype, "TEXT")
 
                 required = field.get("required", False)
                 constraint = " NOT NULL" if required and ftype != "checkbox" else ""
@@ -732,7 +759,9 @@ class SQLiteRepository(BaseRepository):
             placeholders = ", ".join(["?" for _ in field_names])
             columns_insert = ", ".join(field_names)
 
-            insert_sql = f"INSERT INTO {temp_table} ({columns_insert}) VALUES ({placeholders})"
+            insert_sql = (
+                f"INSERT INTO {temp_table} ({columns_insert}) VALUES ({placeholders})"
+            )
 
             conversion_errors = 0
             for row in rows:
@@ -767,7 +796,9 @@ class SQLiteRepository(BaseRepository):
             # Check if too many conversions failed
             total_rows = len(rows)
             if total_rows > 0 and conversion_errors / total_rows > 0.5:
-                raise Exception(f"Too many conversion errors: {conversion_errors}/{total_rows}")
+                raise Exception(
+                    f"Too many conversion errors: {conversion_errors}/{total_rows}"
+                )
 
             # Drop old table and rename new table
             cursor.execute(f"DROP TABLE {table_name}")
@@ -790,10 +821,7 @@ class SQLiteRepository(BaseRepository):
             return False
 
     def remove_field(
-        self,
-        form_path: str,
-        spec: Dict[str, Any],
-        field_name: str
+        self, form_path: str, spec: Dict[str, Any], field_name: str
     ) -> bool:
         """
         Remove a field from the table (destructive operation).
@@ -832,7 +860,7 @@ class SQLiteRepository(BaseRepository):
             for field in spec["fields"]:
                 fname = field["name"]
                 ftype = field["type"]
-                sql_type = self.TYPE_MAPPING.get(ftype, 'TEXT')
+                sql_type = self.TYPE_MAPPING.get(ftype, "TEXT")
 
                 required = field.get("required", False)
                 constraint = " NOT NULL" if required and ftype != "checkbox" else ""
@@ -892,19 +920,37 @@ class SQLiteRepository(BaseRepository):
             return self._get_default_value(new_type)
 
         # text -> number
-        if old_type in ["text", "email", "tel", "url", "search"] and new_type in ["number", "range"]:
+        if old_type in ["text", "email", "tel", "url", "search"] and new_type in [
+            "number",
+            "range",
+        ]:
             return int(value)
 
         # number -> text
-        if old_type in ["number", "range"] and new_type in ["text", "email", "tel", "url", "search"]:
+        if old_type in ["number", "range"] and new_type in [
+            "text",
+            "email",
+            "tel",
+            "url",
+            "search",
+        ]:
             return str(value)
 
         # text -> checkbox
-        if old_type in ["text", "email", "tel", "url", "search"] and new_type == "checkbox":
+        if (
+            old_type in ["text", "email", "tel", "url", "search"]
+            and new_type == "checkbox"
+        ):
             return value.lower() in ["true", "1", "yes", "sim"]
 
         # checkbox -> text
-        if old_type == "checkbox" and new_type in ["text", "email", "tel", "url", "search"]:
+        if old_type == "checkbox" and new_type in [
+            "text",
+            "email",
+            "tel",
+            "url",
+            "search",
+        ]:
             return "true" if value else "false"
 
         # Any type -> text (always safe)

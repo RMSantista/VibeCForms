@@ -1,13 +1,14 @@
 """
 Tests for backend migration (TXT → SQLite, etc).
 """
+
 import pytest
 import os
 import sys
 from pathlib import Path
 
 # Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from persistence.migration_manager import MigrationManager
 from persistence.adapters.txt_adapter import TxtRepository
@@ -22,7 +23,7 @@ def txt_config(tmp_path):
         "path": str(tmp_path),
         "delimiter": ";",
         "encoding": "utf-8",
-        "extension": ".txt"
+        "extension": ".txt",
     }
 
 
@@ -34,7 +35,7 @@ def sqlite_config(tmp_path):
         "type": "sqlite",
         "database": str(db_path),
         "timeout": 10,
-        "check_same_thread": False
+        "check_same_thread": False,
     }
 
 
@@ -46,8 +47,8 @@ def sample_spec():
         "fields": [
             {"name": "nome", "label": "Nome", "type": "text", "required": True},
             {"name": "telefone", "label": "Telefone", "type": "tel", "required": False},
-            {"name": "ativo", "label": "Ativo", "type": "checkbox", "required": False}
-        ]
+            {"name": "ativo", "label": "Ativo", "type": "checkbox", "required": False},
+        ],
     }
 
 
@@ -63,23 +64,39 @@ def test_migrate_txt_to_sqlite_empty(tmp_path, txt_config, sqlite_config, sample
         spec=sample_spec,
         old_backend="txt",
         new_backend="sqlite",
-        record_count=0
+        record_count=0,
     )
 
     assert success
 
 
-@pytest.mark.skip(reason="MigrationManager uses global config, needs architecture refactor for isolated testing")
-def test_migrate_txt_to_sqlite_with_data(tmp_path, txt_config, sqlite_config, sample_spec):
+@pytest.mark.skip(
+    reason="MigrationManager uses global config, needs architecture refactor for isolated testing"
+)
+def test_migrate_txt_to_sqlite_with_data(
+    tmp_path, txt_config, sqlite_config, sample_spec
+):
     """Test migrating TXT storage with data to SQLite."""
     # Create TXT storage with data
     txt_repo = TxtRepository(txt_config)
     txt_repo.create_storage("test_form", sample_spec)
 
     # Add sample data
-    txt_repo.create("test_form", sample_spec, {"nome": "João Silva", "telefone": "11-9999-8888", "ativo": True})
-    txt_repo.create("test_form", sample_spec, {"nome": "Maria Santos", "telefone": "21-8888-7777", "ativo": False})
-    txt_repo.create("test_form", sample_spec, {"nome": "Pedro Costa", "telefone": "31-7777-6666", "ativo": True})
+    txt_repo.create(
+        "test_form",
+        sample_spec,
+        {"nome": "João Silva", "telefone": "11-9999-8888", "ativo": True},
+    )
+    txt_repo.create(
+        "test_form",
+        sample_spec,
+        {"nome": "Maria Santos", "telefone": "21-8888-7777", "ativo": False},
+    )
+    txt_repo.create(
+        "test_form",
+        sample_spec,
+        {"nome": "Pedro Costa", "telefone": "31-7777-6666", "ativo": True},
+    )
 
     # Verify data in TXT
     txt_data = txt_repo.read_all("test_form", sample_spec)
@@ -91,7 +108,7 @@ def test_migrate_txt_to_sqlite_with_data(tmp_path, txt_config, sqlite_config, sa
         spec=sample_spec,
         old_backend="txt",
         new_backend="sqlite",
-        record_count=3
+        record_count=3,
     )
 
     assert success
@@ -106,13 +123,19 @@ def test_migrate_txt_to_sqlite_with_data(tmp_path, txt_config, sqlite_config, sa
     assert sqlite_data[2]["nome"] == "Pedro Costa"
 
 
-@pytest.mark.skip(reason="MigrationManager uses global config, needs architecture refactor for isolated testing")
+@pytest.mark.skip(
+    reason="MigrationManager uses global config, needs architecture refactor for isolated testing"
+)
 def test_migration_creates_backup(tmp_path, txt_config, sqlite_config, sample_spec):
     """Test that migration creates a backup before migrating."""
     # Create TXT storage with data
     txt_repo = TxtRepository(txt_config)
     txt_repo.create_storage("test_form", sample_spec)
-    txt_repo.create("test_form", sample_spec, {"nome": "João Silva", "telefone": "11-9999-8888", "ativo": True})
+    txt_repo.create(
+        "test_form",
+        sample_spec,
+        {"nome": "João Silva", "telefone": "11-9999-8888", "ativo": True},
+    )
 
     # Migrate
     MigrationManager.migrate_backend(
@@ -120,7 +143,7 @@ def test_migration_creates_backup(tmp_path, txt_config, sqlite_config, sample_sp
         spec=sample_spec,
         old_backend="txt",
         new_backend="sqlite",
-        record_count=1
+        record_count=1,
     )
 
     # Check if backup was created
@@ -132,8 +155,12 @@ def test_migration_creates_backup(tmp_path, txt_config, sqlite_config, sample_sp
     assert len(backup_files) > 0
 
 
-@pytest.mark.skip(reason="MigrationManager uses global config, needs architecture refactor for isolated testing")
-def test_migration_preserves_data_integrity(tmp_path, txt_config, sqlite_config, sample_spec):
+@pytest.mark.skip(
+    reason="MigrationManager uses global config, needs architecture refactor for isolated testing"
+)
+def test_migration_preserves_data_integrity(
+    tmp_path, txt_config, sqlite_config, sample_spec
+):
     """Test that migration preserves all data fields correctly."""
     txt_repo = TxtRepository(txt_config)
     txt_repo.create_storage("test_form", sample_spec)
@@ -154,7 +181,7 @@ def test_migration_preserves_data_integrity(tmp_path, txt_config, sqlite_config,
         spec=sample_spec,
         old_backend="txt",
         new_backend="sqlite",
-        record_count=len(original_data)
+        record_count=len(original_data),
     )
 
     assert success
@@ -171,27 +198,36 @@ def test_migration_preserves_data_integrity(tmp_path, txt_config, sqlite_config,
         assert migrated_data[i]["ativo"] == original["ativo"]
 
 
-@pytest.mark.skip(reason="MigrationManager uses global config, needs architecture refactor for isolated testing")
+@pytest.mark.skip(
+    reason="MigrationManager uses global config, needs architecture refactor for isolated testing"
+)
 def test_migration_with_nested_form_path(tmp_path, txt_config, sqlite_config):
     """Test migration with nested form paths (e.g., 'financeiro/contas')."""
     spec = {
         "title": "Contas",
         "fields": [
-            {"name": "descricao", "label": "Descrição", "type": "text", "required": True},
-            {"name": "valor", "label": "Valor", "type": "number", "required": True}
-        ]
+            {
+                "name": "descricao",
+                "label": "Descrição",
+                "type": "text",
+                "required": True,
+            },
+            {"name": "valor", "label": "Valor", "type": "number", "required": True},
+        ],
     }
 
     txt_repo = TxtRepository(txt_config)
     txt_repo.create_storage("financeiro_contas", spec)
-    txt_repo.create("financeiro_contas", spec, {"descricao": "Conta de Luz", "valor": 150})
+    txt_repo.create(
+        "financeiro_contas", spec, {"descricao": "Conta de Luz", "valor": 150}
+    )
 
     success = MigrationManager.migrate_backend(
         form_path="financeiro_contas",
         spec=spec,
         old_backend="txt",
         new_backend="sqlite",
-        record_count=1
+        record_count=1,
     )
 
     assert success
@@ -206,7 +242,11 @@ def test_migration_rollback_on_failure(tmp_path, txt_config, sample_spec):
     """Test that migration rolls back on failure."""
     txt_repo = TxtRepository(txt_config)
     txt_repo.create_storage("test_form", sample_spec)
-    txt_repo.create("test_form", sample_spec, {"nome": "João", "telefone": "11-9999-8888", "ativo": True})
+    txt_repo.create(
+        "test_form",
+        sample_spec,
+        {"nome": "João", "telefone": "11-9999-8888", "ativo": True},
+    )
 
     # Try to migrate to an invalid backend (should fail)
     success = MigrationManager.migrate_backend(
@@ -214,7 +254,7 @@ def test_migration_rollback_on_failure(tmp_path, txt_config, sample_spec):
         spec=sample_spec,
         old_backend="txt",
         new_backend="invalid_backend",
-        record_count=1
+        record_count=1,
     )
 
     assert not success

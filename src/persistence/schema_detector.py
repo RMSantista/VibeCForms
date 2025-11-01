@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 class ChangeType(Enum):
     """Types of schema changes."""
+
     ADD_FIELD = "add_field"
     REMOVE_FIELD = "remove_field"
     RENAME_FIELD = "rename_field"
@@ -29,6 +30,7 @@ class ChangeType(Enum):
 @dataclass
 class FieldChange:
     """Represents a change to a single field."""
+
     change_type: ChangeType
     field_name: str
     old_value: Optional[Any] = None
@@ -41,6 +43,7 @@ class FieldChange:
 @dataclass
 class SchemaChange:
     """Represents a complete schema change with all field modifications."""
+
     form_path: str
     changes: List[FieldChange] = field(default_factory=list)
     has_data: bool = False
@@ -68,6 +71,7 @@ class SchemaChange:
 @dataclass
 class BackendChange:
     """Represents a change in persistence backend."""
+
     form_path: str
     old_backend: str
     new_backend: str
@@ -116,7 +120,7 @@ class SchemaChangeDetector:
         form_path: str,
         old_spec: Dict[str, Any],
         new_spec: Dict[str, Any],
-        has_data: bool = False
+        has_data: bool = False,
     ) -> SchemaChange:
         """
         Detect all changes between two specifications.
@@ -147,7 +151,7 @@ class SchemaChangeDetector:
                 new_value=new_fields[name],
                 requires_confirmation=False,
                 data_loss_risk=False,
-                details=f"Campo '{name}' foi adicionado"
+                details=f"Campo '{name}' foi adicionado",
             )
             schema_change.add_change(change)
 
@@ -160,8 +164,8 @@ class SchemaChangeDetector:
                 old_value=old_fields[name],
                 requires_confirmation=has_data,
                 data_loss_risk=has_data,
-                details=f"Campo '{name}' será removido" +
-                       (" (DADOS SERÃO PERDIDOS!)" if has_data else "")
+                details=f"Campo '{name}' será removido"
+                + (" (DADOS SERÃO PERDIDOS!)" if has_data else ""),
             )
             schema_change.add_change(change)
 
@@ -183,7 +187,7 @@ class SchemaChangeDetector:
                         old_field.get("type"), new_field.get("type")
                     ),
                     details=f"Campo '{name}': tipo mudou de '{old_field.get('type')}' "
-                           f"para '{new_field.get('type')}'"
+                    f"para '{new_field.get('type')}'",
                 )
                 schema_change.add_change(change)
 
@@ -196,10 +200,12 @@ class SchemaChangeDetector:
                     field_name=name,
                     old_value=old_required,
                     new_value=new_required,
-                    requires_confirmation=has_data and new_required and not old_required,
+                    requires_confirmation=has_data
+                    and new_required
+                    and not old_required,
                     data_loss_risk=False,
                     details=f"Campo '{name}': obrigatoriedade mudou de "
-                           f"{old_required} para {new_required}"
+                    f"{old_required} para {new_required}",
                 )
                 schema_change.add_change(change)
 
@@ -211,9 +217,13 @@ class SchemaChangeDetector:
             for old_name, new_name in renames:
                 # Remove the ADD and REMOVE changes for these fields
                 schema_change.changes = [
-                    c for c in schema_change.changes
-                    if not (c.field_name in [old_name, new_name] and
-                           c.change_type in [ChangeType.ADD_FIELD, ChangeType.REMOVE_FIELD])
+                    c
+                    for c in schema_change.changes
+                    if not (
+                        c.field_name in [old_name, new_name]
+                        and c.change_type
+                        in [ChangeType.ADD_FIELD, ChangeType.REMOVE_FIELD]
+                    )
                 ]
 
                 # Add a RENAME change instead
@@ -224,7 +234,7 @@ class SchemaChangeDetector:
                     new_value=new_name,
                     requires_confirmation=has_data,
                     data_loss_risk=False,
-                    details=f"Campo '{old_name}' será renomeado para '{new_name}'"
+                    details=f"Campo '{old_name}' será renomeado para '{new_name}'",
                 )
                 schema_change.add_change(change)
 
@@ -232,10 +242,7 @@ class SchemaChangeDetector:
 
     @staticmethod
     def _detect_renames(
-        old_spec: Dict[str, Any],
-        new_spec: Dict[str, Any],
-        removed: set,
-        added: set
+        old_spec: Dict[str, Any], new_spec: Dict[str, Any], removed: set, added: set
     ) -> List[Tuple[str, str]]:
         """
         Heuristically detect field renames.
@@ -328,10 +335,7 @@ class SchemaChangeDetector:
 
     @staticmethod
     def detect_backend_change(
-        form_path: str,
-        old_backend: str,
-        new_backend: str,
-        record_count: int = 0
+        form_path: str, old_backend: str, new_backend: str, record_count: int = 0
     ) -> Optional[BackendChange]:
         """
         Detect a change in persistence backend.
@@ -356,12 +360,16 @@ class SchemaChangeDetector:
             new_backend=new_backend,
             has_data=has_data,
             record_count=record_count,
-            requires_confirmation=has_data
+            requires_confirmation=has_data,
         )
 
-        logger.info(f"Backend change detected for '{form_path}': {old_backend} -> {new_backend}")
+        logger.info(
+            f"Backend change detected for '{form_path}': {old_backend} -> {new_backend}"
+        )
         if has_data:
-            logger.warning(f"Form has {record_count} existing records, migration required")
+            logger.warning(
+                f"Form has {record_count} existing records, migration required"
+            )
 
         return backend_change
 
@@ -399,7 +407,9 @@ class SchemaChangeDetector:
 
             has_data_loss = any(c.data_loss_risk for c in schema_change.changes)
             if has_data_loss:
-                lines.append("🔴 ATENÇÃO: Algumas alterações podem causar PERDA DE DADOS!")
+                lines.append(
+                    "🔴 ATENÇÃO: Algumas alterações podem causar PERDA DE DADOS!"
+                )
 
         lines.append("\nDeseja continuar?")
         return "\n".join(lines)
@@ -418,11 +428,13 @@ class SchemaChangeDetector:
         lines = [
             f"Mudança de backend detectada no formulário '{backend_change.form_path}':",
             f"  • Origem: {backend_change.old_backend}",
-            f"  • Destino: {backend_change.new_backend}"
+            f"  • Destino: {backend_change.new_backend}",
         ]
 
         if backend_change.has_data:
-            lines.append(f"\n⚠️ O formulário possui {backend_change.record_count} registro(s) existente(s).")
+            lines.append(
+                f"\n⚠️ O formulário possui {backend_change.record_count} registro(s) existente(s)."
+            )
             lines.append("Os dados serão migrados automaticamente para o novo backend.")
             lines.append("\n✅ Um backup será criado antes da migração.")
 

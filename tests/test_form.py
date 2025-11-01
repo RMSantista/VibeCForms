@@ -312,14 +312,18 @@ def test_icon_in_menu_items():
 
     # Find contatos form
     contatos_forms = [
-        item for item in menu_items if item["type"] == "form" and item["name"] == "contatos"
+        item
+        for item in menu_items
+        if item["type"] == "form" and item["name"] == "contatos"
     ]
     assert len(contatos_forms) == 1
     assert contatos_forms[0]["icon"] == "fa-address-book"
 
     # Find produtos form
     produtos_forms = [
-        item for item in menu_items if item["type"] == "form" and item["name"] == "produtos"
+        item
+        for item in menu_items
+        if item["type"] == "form" and item["name"] == "produtos"
     ]
     assert len(produtos_forms) == 1
     assert produtos_forms[0]["icon"] == "fa-box"
@@ -365,7 +369,9 @@ def test_folder_items_use_config():
 
     # Find financeiro folder
     financeiro_folders = [
-        item for item in menu_items if item["type"] == "folder" and item["path"] == "financeiro"
+        item
+        for item in menu_items
+        if item["type"] == "folder" and item["path"] == "financeiro"
     ]
     assert len(financeiro_folders) == 1
     financeiro = financeiro_folders[0]

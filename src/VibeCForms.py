@@ -2,14 +2,26 @@ import os
 import sys
 import json
 import logging
-from flask import Flask, render_template, render_template_string, request, redirect, abort, jsonify
+from flask import (
+    Flask,
+    render_template,
+    render_template_string,
+    request,
+    redirect,
+    abort,
+    jsonify,
+)
 from dotenv import load_dotenv
 
 # Add src directory to Python path for imports
 sys.path.insert(0, os.path.dirname(__file__))
 
 from persistence.factory import RepositoryFactory
-from persistence.change_manager import check_form_changes, update_form_tracking, ChangeManager
+from persistence.change_manager import (
+    check_form_changes,
+    update_form_tracking,
+    ChangeManager,
+)
 from persistence.migration_manager import MigrationManager
 
 load_dotenv()
@@ -112,7 +124,9 @@ def scan_specs_directory(base_path=SPECS_DIR, relative_path=""):
             continue
 
         entry_path = os.path.join(full_path, entry)
-        relative_entry_path = os.path.join(relative_path, entry) if relative_path else entry
+        relative_entry_path = (
+            os.path.join(relative_path, entry) if relative_path else entry
+        )
 
         if os.path.isdir(entry_path):
             # It's a folder - recursively scan it
@@ -128,7 +142,7 @@ def scan_specs_directory(base_path=SPECS_DIR, relative_path=""):
                         "name": folder_config.get("name", entry.capitalize()),
                         "path": relative_entry_path,
                         "icon": folder_config.get("icon", get_folder_icon(entry)),
-                        "children": children
+                        "children": children,
                     }
                     # Add description if present
                     if "description" in folder_config:
@@ -143,7 +157,7 @@ def scan_specs_directory(base_path=SPECS_DIR, relative_path=""):
                         "name": entry.capitalize(),
                         "path": relative_entry_path,
                         "icon": get_folder_icon(entry),
-                        "children": children
+                        "children": children,
                     }
 
                 items.append(folder_item)
@@ -151,7 +165,9 @@ def scan_specs_directory(base_path=SPECS_DIR, relative_path=""):
         elif entry.endswith(".json"):
             # It's a form spec file
             form_name = entry[:-5]  # Remove .json extension
-            form_path = os.path.join(relative_path, form_name) if relative_path else form_name
+            form_path = (
+                os.path.join(relative_path, form_name) if relative_path else form_name
+            )
 
             try:
                 spec = load_spec(form_path)
@@ -162,13 +178,15 @@ def scan_specs_directory(base_path=SPECS_DIR, relative_path=""):
                 if not icon and not relative_path:
                     icon = "fa-file-alt"
 
-                items.append({
-                    "type": "form",
-                    "name": form_name,
-                    "path": form_path,
-                    "title": spec.get("title", form_name.capitalize()),
-                    "icon": icon
-                })
+                items.append(
+                    {
+                        "type": "form",
+                        "name": form_name,
+                        "path": form_path,
+                        "title": spec.get("title", form_name.capitalize()),
+                        "icon": icon,
+                    }
+                )
             except Exception:
                 # Skip invalid spec files
                 continue
@@ -197,12 +215,14 @@ def get_all_forms_flat(menu_items=None, prefix=""):
             # Get icon from item (already resolved in scan_specs_directory)
             icon = item.get("icon", "fa-file-alt")
 
-            forms.append({
-                "title": item["title"],
-                "path": item["path"],
-                "icon": icon,
-                "category": category
-            })
+            forms.append(
+                {
+                    "title": item["title"],
+                    "path": item["path"],
+                    "icon": icon,
+                    "category": category,
+                }
+            )
         elif item["type"] == "folder":
             # Recursively get forms from folder
             folder_name = item["name"]
@@ -245,9 +265,11 @@ def read_forms(spec, form_path):
 
     if backend_changed and form_history:
         # Backend changed: use record count from history (reflects data in old backend)
-        record_count = form_history.get('record_count', 0)
+        record_count = form_history.get("record_count", 0)
         has_data = record_count > 0
-        logger.info(f"Backend changed for '{form_path}', using historical record count: {record_count}")
+        logger.info(
+            f"Backend changed for '{form_path}', using historical record count: {record_count}"
+        )
     else:
         # No backend change: check current backend for data
         has_data = repo.exists(form_path) and repo.has_data(form_path)
@@ -262,28 +284,32 @@ def read_forms(spec, form_path):
 
     # Check for schema or backend changes
     schema_change, backend_change = check_form_changes(
-        form_path=form_path,
-        spec=spec,
-        has_data=has_data,
-        record_count=record_count
+        form_path=form_path, spec=spec, has_data=has_data, record_count=record_count
     )
 
     # Check if changes require user confirmation
     if schema_change or backend_change:
         if schema_change and schema_change.has_changes():
-            logger.info(f"Schema changes detected for '{form_path}': "
-                       f"{schema_change.get_summary()}")
+            logger.info(
+                f"Schema changes detected for '{form_path}': "
+                f"{schema_change.get_summary()}"
+            )
 
         if backend_change:
-            logger.info(f"Backend change detected for '{form_path}': "
-                       f"{backend_change.old_backend} -> {backend_change.new_backend}")
+            logger.info(
+                f"Backend change detected for '{form_path}': "
+                f"{backend_change.old_backend} -> {backend_change.new_backend}"
+            )
 
         # Redirect to confirmation UI if changes require confirmation
-        requires_confirmation = ChangeManager.requires_confirmation(schema_change, backend_change)
+        requires_confirmation = ChangeManager.requires_confirmation(
+            schema_change, backend_change
+        )
         if requires_confirmation:
             logger.info(f"Redirecting to migration confirmation for '{form_path}'")
             # Use Flask's redirect - this will be caught by the caller
             from flask import redirect as flask_redirect
+
             raise Exception(f"MIGRATION_REQUIRED:{form_path}")
 
     # Auto-create storage if it doesn't exist
@@ -347,7 +373,7 @@ def generate_form_field(field, form_data=None):
             template_content,
             field_name=field_name,
             field_label=field_label,
-            checked=checked
+            checked=checked,
         )
 
     elif field_type == "textarea":
@@ -360,7 +386,7 @@ def generate_form_field(field, form_data=None):
             field_name=field_name,
             field_label=field_label,
             required=required,
-            value=value
+            value=value,
         )
 
     elif field_type == "select":
@@ -375,7 +401,7 @@ def generate_form_field(field, form_data=None):
             field_label=field_label,
             required=required,
             value=value,
-            options=options
+            options=options,
         )
 
     elif field_type == "radio":
@@ -390,7 +416,7 @@ def generate_form_field(field, form_data=None):
             field_label=field_label,
             required=required,
             value=value,
-            options=options
+            options=options,
         )
 
     elif field_type == "color":
@@ -403,7 +429,7 @@ def generate_form_field(field, form_data=None):
             field_name=field_name,
             field_label=field_label,
             required=required,
-            value=value
+            value=value,
         )
 
     elif field_type == "range":
@@ -423,7 +449,7 @@ def generate_form_field(field, form_data=None):
             value=value,
             min_value=min_value,
             max_value=max_value,
-            step_value=step_value
+            step_value=step_value,
         )
 
     elif field_type == "search" and field.get("datasource"):
@@ -437,7 +463,7 @@ def generate_form_field(field, form_data=None):
             field_name=field_name,
             field_label=field_label,
             required=required,
-            value=value
+            value=value,
         )
 
     else:
@@ -447,11 +473,24 @@ def generate_form_field(field, form_data=None):
             template_content = f.read()
 
         input_type = (
-            field_type if field_type in [
-                "text", "tel", "email", "number", "password", "date",
-                "url", "search", "datetime-local", "time",
-                "month", "week", "hidden"
-            ] else "text"
+            field_type
+            if field_type
+            in [
+                "text",
+                "tel",
+                "email",
+                "number",
+                "password",
+                "date",
+                "url",
+                "search",
+                "datetime-local",
+                "time",
+                "month",
+                "week",
+                "hidden",
+            ]
+            else "text"
         )
 
         return render_template_string(
@@ -460,7 +499,7 @@ def generate_form_field(field, form_data=None):
             field_label=field_label,
             input_type=input_type,
             required=required,
-            value=value
+            value=value,
         )
 
 
@@ -568,7 +607,7 @@ def generate_menu_html(menu_items, current_form_path="", level=0):
     for item in menu_items:
         if item["type"] == "form":
             # Form item
-            is_active = (item["path"] == current_form_path)
+            is_active = item["path"] == current_form_path
             active_class = "active" if is_active else ""
             icon_html = f'<i class="fa {item["icon"]}"></i> ' if item["icon"] else ""
 
@@ -580,7 +619,7 @@ def generate_menu_html(menu_items, current_form_path="", level=0):
             is_path_active = current_form_path.startswith(item["path"])
             icon_html = f'<i class="fa {item["icon"]}"></i> '
 
-            html += f'''<li class="has-submenu">
+            html += f"""<li class="has-submenu">
                 <a href="javascript:void(0)" class="folder-item {'active-path' if is_path_active else ''}">
                     {icon_html}{item["name"]}
                     <i class="fa fa-chevron-right submenu-arrow"></i>
@@ -588,7 +627,7 @@ def generate_menu_html(menu_items, current_form_path="", level=0):
                 <ul class="submenu level-{level + 1}">
                     {generate_menu_html(item["children"], current_form_path, level + 1)}
                 </ul>
-            </li>\n'''
+            </li>\n"""
 
     return html
 
@@ -596,7 +635,7 @@ def generate_menu_html(menu_items, current_form_path="", level=0):
 @app.route("/api/search/contatos")
 def api_search_contatos():
     """API endpoint to search contacts by name."""
-    query = request.args.get('q', '').strip().lower()
+    query = request.args.get("q", "").strip().lower()
 
     if not query:
         return jsonify([])
@@ -622,7 +661,7 @@ def api_search_contatos():
 def main_page():
     """Display the main landing page."""
     forms = get_all_forms_flat()
-    return render_template('index.html', forms=forms)
+    return render_template("index.html", forms=forms)
 
 
 @app.route("/<path:form_name>", methods=["GET", "POST"])
@@ -672,7 +711,7 @@ def index(form_name):
             )
 
             return render_template(
-                'form.html',
+                "form.html",
                 title=spec["title"],
                 form_name=form_name,
                 menu_html=menu_html,
@@ -713,7 +752,7 @@ def index(form_name):
     )
 
     return render_template(
-        'form.html',
+        "form.html",
         title=spec["title"],
         form_name=form_name,
         menu_html=menu_html,
@@ -722,8 +761,6 @@ def index(form_name):
         table_headers=table_headers,
         table_rows=table_rows,
     )
-
-
 
 
 @app.route("/migrate/confirm/<path:form_path>")
@@ -754,9 +791,11 @@ def migrate_confirm(form_path):
 
     if backend_changed and form_history:
         # Backend changed: use record count from history (reflects data in old backend)
-        record_count = form_history.get('record_count', 0)
+        record_count = form_history.get("record_count", 0)
         has_data = record_count > 0
-        logger.info(f"Migration confirmation: Backend changed for '{form_path}', using historical record count: {record_count}")
+        logger.info(
+            f"Migration confirmation: Backend changed for '{form_path}', using historical record count: {record_count}"
+        )
     else:
         # No backend change: check current backend for data
         has_data = repo.exists(form_path) and repo.has_data(form_path)
@@ -771,10 +810,7 @@ def migrate_confirm(form_path):
 
     # Check for schema or backend changes
     schema_change, backend_change = check_form_changes(
-        form_path=form_path,
-        spec=spec,
-        has_data=has_data,
-        record_count=record_count
+        form_path=form_path, spec=spec, has_data=has_data, record_count=record_count
     )
 
     # Check if there are any changes requiring confirmation
@@ -783,7 +819,9 @@ def migrate_confirm(form_path):
         return redirect(f"/{form_path}")
 
     # Check if confirmation is required
-    requires_confirmation = ChangeManager.requires_confirmation(schema_change, backend_change)
+    requires_confirmation = ChangeManager.requires_confirmation(
+        schema_change, backend_change
+    )
 
     if not requires_confirmation:
         # No confirmation needed, redirect back to form
@@ -795,6 +833,7 @@ def migrate_confirm(form_path):
 
     if schema_change:
         from persistence.schema_detector import ChangeType
+
         for change in schema_change.changes:
             if change.change_type == ChangeType.REMOVE_FIELD:
                 has_destructive_changes = True
@@ -806,14 +845,14 @@ def migrate_confirm(form_path):
 
     # Render confirmation page
     return render_template(
-        'migration_confirm.html',
+        "migration_confirm.html",
         form_path=form_path,
         form_title=spec.get("title", form_path),
         record_count=record_count,
         schema_change=schema_change,
         backend_change=backend_change,
         has_destructive_changes=has_destructive_changes,
-        has_warnings=has_warnings
+        has_warnings=has_warnings,
     )
 
 
@@ -845,9 +884,11 @@ def migrate_execute(form_path):
 
     if backend_changed and form_history:
         # Backend changed: use record count from history (reflects data in old backend)
-        record_count = form_history.get('record_count', 0)
+        record_count = form_history.get("record_count", 0)
         has_data = record_count > 0
-        logger.info(f"Backend changed for '{form_path}', using historical record count for migration: {record_count}")
+        logger.info(
+            f"Backend changed for '{form_path}', using historical record count for migration: {record_count}"
+        )
     else:
         # No backend change: check current backend for data
         has_data = repo.exists(form_path) and repo.has_data(form_path)
@@ -862,10 +903,7 @@ def migrate_execute(form_path):
 
     # Check for schema or backend changes
     schema_change, backend_change = check_form_changes(
-        form_path=form_path,
-        spec=spec,
-        has_data=has_data,
-        record_count=record_count
+        form_path=form_path, spec=spec, has_data=has_data, record_count=record_count
     )
 
     success = True
@@ -880,7 +918,7 @@ def migrate_execute(form_path):
                 spec=spec,
                 old_backend=backend_change.old_backend,
                 new_backend=backend_change.new_backend,
-                record_count=record_count
+                record_count=record_count,
             )
 
             if not success:
@@ -892,6 +930,7 @@ def migrate_execute(form_path):
 
             # Get old spec from history to perform migration
             from persistence.schema_history import get_history
+
             history = get_history()
             form_history = history.get_form_history(form_path)
 
@@ -899,7 +938,9 @@ def migrate_execute(form_path):
                 # We need the old spec, but we don't have it stored
                 # For now, we'll let migrate_schema handle it without old spec
                 # The individual operations (rename, change_type, remove) will work
-                logger.info(f"Schema changes will be applied: {schema_change.get_summary()}")
+                logger.info(
+                    f"Schema changes will be applied: {schema_change.get_summary()}"
+                )
 
                 # Note: The actual migration will happen automatically on next read_forms call
                 # because the spec has changed and change_manager will detect it
@@ -958,7 +999,7 @@ def edit(form_name, idx):
                 [generate_form_field(f, form_data) for f in spec["fields"]]
             )
             return render_template(
-                'edit.html',
+                "edit.html",
                 title=spec["title"],
                 form_name=form_name,
                 menu_html=menu_html,
@@ -975,7 +1016,7 @@ def edit(form_name, idx):
     form_fields = "".join([generate_form_field(f, forms[idx]) for f in spec["fields"]])
 
     return render_template(
-        'edit.html',
+        "edit.html",
         title=spec["title"],
         form_name=form_name,
         menu_html=menu_html,

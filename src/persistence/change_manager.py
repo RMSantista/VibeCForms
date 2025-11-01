@@ -31,7 +31,7 @@ class ChangeManager:
         spec: Dict[str, Any],
         backend: str,
         has_data: bool = False,
-        record_count: int = 0
+        record_count: int = 0,
     ) -> Tuple[Optional[SchemaChange], Optional[BackendChange]]:
         """
         Check if a form has schema or backend changes.
@@ -69,7 +69,7 @@ class ChangeManager:
                 schema_change = SchemaChange(
                     form_path=form_path,
                     has_data=has_data,
-                    requires_confirmation=False  # Will be updated when we detect details
+                    requires_confirmation=False,  # Will be updated when we detect details
                 )
             else:
                 # First time seeing this form - no change to detect
@@ -82,17 +82,14 @@ class ChangeManager:
                 form_path=form_path,
                 old_backend=last_backend,
                 new_backend=backend,
-                record_count=record_count
+                record_count=record_count,
             )
 
         return schema_change, backend_change
 
     @staticmethod
     def update_tracking(
-        form_path: str,
-        spec: Dict[str, Any],
-        backend: str,
-        record_count: int = 0
+        form_path: str, spec: Dict[str, Any], backend: str, record_count: int = 0
     ) -> bool:
         """
         Update tracking information after successful operations.
@@ -113,13 +110,12 @@ class ChangeManager:
             form_path=form_path,
             spec_hash=spec_hash,
             backend=backend,
-            record_count=record_count
+            record_count=record_count,
         )
 
     @staticmethod
     def requires_confirmation(
-        schema_change: Optional[SchemaChange],
-        backend_change: Optional[BackendChange]
+        schema_change: Optional[SchemaChange], backend_change: Optional[BackendChange]
     ) -> bool:
         """
         Check if any detected changes require user confirmation.
@@ -141,8 +137,7 @@ class ChangeManager:
 
     @staticmethod
     def get_change_summary(
-        schema_change: Optional[SchemaChange],
-        backend_change: Optional[BackendChange]
+        schema_change: Optional[SchemaChange], backend_change: Optional[BackendChange]
     ) -> str:
         """
         Get a human-readable summary of detected changes.
@@ -160,7 +155,9 @@ class ChangeManager:
             parts.append(SchemaChangeDetector.get_confirmation_message(schema_change))
 
         if backend_change:
-            parts.append(SchemaChangeDetector.get_backend_confirmation_message(backend_change))
+            parts.append(
+                SchemaChangeDetector.get_backend_confirmation_message(backend_change)
+            )
 
         if not parts:
             return "Nenhuma alteração detectada."
@@ -169,10 +166,7 @@ class ChangeManager:
 
 
 def check_form_changes(
-    form_path: str,
-    spec: Dict[str, Any],
-    has_data: bool = False,
-    record_count: int = 0
+    form_path: str, spec: Dict[str, Any], has_data: bool = False, record_count: int = 0
 ) -> Tuple[Optional[SchemaChange], Optional[BackendChange]]:
     """
     Convenience function to check for form changes.
@@ -197,14 +191,12 @@ def check_form_changes(
         spec=spec,
         backend=backend,
         has_data=has_data,
-        record_count=record_count
+        record_count=record_count,
     )
 
 
 def update_form_tracking(
-    form_path: str,
-    spec: Dict[str, Any],
-    record_count: int = 0
+    form_path: str, spec: Dict[str, Any], record_count: int = 0
 ) -> bool:
     """
     Convenience function to update form tracking.
@@ -222,8 +214,5 @@ def update_form_tracking(
     backend = backend_config.get("type")
 
     return ChangeManager.update_tracking(
-        form_path=form_path,
-        spec=spec,
-        backend=backend,
-        record_count=record_count
+        form_path=form_path, spec=spec, backend=backend, record_count=record_count
     )

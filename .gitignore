@@ -19,8 +19,12 @@ __pycache__/
 # Arquivos de dados gerados
 registros.txt
 
+# Arquivos de configuração gerados em runtime
+src/config/schema_history.json
+
 # Testes temporários
 *.tmp
+_private_*
 
 # Pasta de testes do pytest
 htmlcov/

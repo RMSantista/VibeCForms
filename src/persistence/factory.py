@@ -52,7 +52,7 @@ class RepositoryFactory:
         # Get configuration
         config = get_config()
         backend_config = config.get_backend_config(form_path)
-        backend_type = backend_config['type']
+        backend_type = backend_config["type"]
 
         # Check cache first
         if backend_type in _repository_cache:
@@ -90,15 +90,15 @@ class RepositoryFactory:
         """
         # Map backend types to adapter classes
         adapter_map = {
-            'txt': ('persistence.adapters.txt_adapter', 'TxtRepository'),
-            'sqlite': ('persistence.adapters.sqlite_adapter', 'SQLiteRepository'),
-            'mysql': ('persistence.adapters.mysql_adapter', 'MySQLRepository'),
-            'postgres': ('persistence.adapters.postgres_adapter', 'PostgresRepository'),
-            'mongodb': ('persistence.adapters.mongodb_adapter', 'MongoDBRepository'),
-            'redis': ('persistence.adapters.redis_adapter', 'RedisRepository'),
-            'csv': ('persistence.adapters.csv_adapter', 'CSVRepository'),
-            'json': ('persistence.adapters.json_adapter', 'JSONRepository'),
-            'xml': ('persistence.adapters.xml_adapter', 'XMLRepository'),
+            "txt": ("persistence.adapters.txt_adapter", "TxtRepository"),
+            "sqlite": ("persistence.adapters.sqlite_adapter", "SQLiteRepository"),
+            "mysql": ("persistence.adapters.mysql_adapter", "MySQLRepository"),
+            "postgres": ("persistence.adapters.postgres_adapter", "PostgresRepository"),
+            "mongodb": ("persistence.adapters.mongodb_adapter", "MongoDBRepository"),
+            "redis": ("persistence.adapters.redis_adapter", "RedisRepository"),
+            "csv": ("persistence.adapters.csv_adapter", "CSVRepository"),
+            "json": ("persistence.adapters.json_adapter", "JSONRepository"),
+            "xml": ("persistence.adapters.xml_adapter", "XMLRepository"),
         }
 
         if backend_type not in adapter_map:
@@ -158,7 +158,7 @@ class RepositoryFactory:
 
         # Get backend configuration
         config = get_config()
-        backends = config.config.get('backends', {})
+        backends = config.config.get("backends", {})
 
         if backend_type not in backends:
             raise ValueError(

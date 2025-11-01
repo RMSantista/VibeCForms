@@ -69,7 +69,9 @@ class BaseRepository(ABC):
         pass
 
     @abstractmethod
-    def read_one(self, form_path: str, spec: Dict[str, Any], idx: int) -> Optional[Dict[str, Any]]:
+    def read_one(
+        self, form_path: str, spec: Dict[str, Any], idx: int
+    ) -> Optional[Dict[str, Any]]:
         """
         Read a single record by its index.
 
@@ -88,7 +90,9 @@ class BaseRepository(ABC):
         pass
 
     @abstractmethod
-    def create(self, form_path: str, spec: Dict[str, Any], data: Dict[str, Any]) -> bool:
+    def create(
+        self, form_path: str, spec: Dict[str, Any], data: Dict[str, Any]
+    ) -> bool:
         """
         Insert a new record into the form storage.
 
@@ -107,7 +111,9 @@ class BaseRepository(ABC):
         pass
 
     @abstractmethod
-    def update(self, form_path: str, spec: Dict[str, Any], idx: int, data: Dict[str, Any]) -> bool:
+    def update(
+        self, form_path: str, spec: Dict[str, Any], idx: int, data: Dict[str, Any]
+    ) -> bool:
         """
         Update an existing record.
 
@@ -193,7 +199,9 @@ class BaseRepository(ABC):
         pass
 
     @abstractmethod
-    def migrate_schema(self, form_path: str, old_spec: Dict[str, Any], new_spec: Dict[str, Any]) -> bool:
+    def migrate_schema(
+        self, form_path: str, old_spec: Dict[str, Any], new_spec: Dict[str, Any]
+    ) -> bool:
         """
         Migrate storage schema when form specification changes.
 
@@ -244,7 +252,9 @@ class BaseRepository(ABC):
         pass
 
     @abstractmethod
-    def rename_field(self, form_path: str, spec: Dict[str, Any], old_name: str, new_name: str) -> bool:
+    def rename_field(
+        self, form_path: str, spec: Dict[str, Any], old_name: str, new_name: str
+    ) -> bool:
         """
         Rename a field in the storage, preserving all data.
 
@@ -280,7 +290,7 @@ class BaseRepository(ABC):
         spec: Dict[str, Any],
         field_name: str,
         old_type: str,
-        new_type: str
+        new_type: str,
     ) -> bool:
         """
         Change the type of a field, attempting to convert existing data.
@@ -311,7 +321,9 @@ class BaseRepository(ABC):
         pass
 
     @abstractmethod
-    def remove_field(self, form_path: str, spec: Dict[str, Any], field_name: str) -> bool:
+    def remove_field(
+        self, form_path: str, spec: Dict[str, Any], field_name: str
+    ) -> bool:
         """
         Remove a field from the storage structure.
 

@@ -1,14 +1,20 @@
 """
 Tests for schema and backend change detection.
 """
+
 import pytest
 import os
 import sys
 
 # Add src directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from persistence.schema_detector import SchemaChangeDetector, SchemaChange, BackendChange, ChangeType
+from persistence.schema_detector import (
+    SchemaChangeDetector,
+    SchemaChange,
+    BackendChange,
+    ChangeType,
+)
 
 
 @pytest.fixture
@@ -18,8 +24,8 @@ def sample_spec_v1():
         "title": "Test Form",
         "fields": [
             {"name": "nome", "label": "Nome", "type": "text", "required": True},
-            {"name": "email", "label": "Email", "type": "email", "required": False}
-        ]
+            {"name": "email", "label": "Email", "type": "email", "required": False},
+        ],
     }
 
 
@@ -31,8 +37,8 @@ def sample_spec_v2_add_field():
         "fields": [
             {"name": "nome", "label": "Nome", "type": "text", "required": True},
             {"name": "email", "label": "Email", "type": "email", "required": False},
-            {"name": "telefone", "label": "Telefone", "type": "tel", "required": False}
-        ]
+            {"name": "telefone", "label": "Telefone", "type": "tel", "required": False},
+        ],
     }
 
 
@@ -41,9 +47,7 @@ def sample_spec_v2_remove_field():
     """Specification with removed field."""
     return {
         "title": "Test Form",
-        "fields": [
-            {"name": "nome", "label": "Nome", "type": "text", "required": True}
-        ]
+        "fields": [{"name": "nome", "label": "Nome", "type": "text", "required": True}],
     }
 
 
@@ -54,8 +58,13 @@ def sample_spec_v2_change_type():
         "title": "Test Form",
         "fields": [
             {"name": "nome", "label": "Nome", "type": "text", "required": True},
-            {"name": "email", "label": "Email", "type": "text", "required": False}  # Changed from email to text
-        ]
+            {
+                "name": "email",
+                "label": "Email",
+                "type": "text",
+                "required": False,
+            },  # Changed from email to text
+        ],
     }
 
 
@@ -82,7 +91,7 @@ def test_detect_added_field(sample_spec_v1, sample_spec_v2_add_field):
         form_path="test_form",
         old_spec=sample_spec_v1,
         new_spec=sample_spec_v2_add_field,
-        has_data=False
+        has_data=False,
     )
 
     assert change.has_changes()
@@ -98,7 +107,7 @@ def test_detect_removed_field_no_data(sample_spec_v1, sample_spec_v2_remove_fiel
         form_path="test_form",
         old_spec=sample_spec_v1,
         new_spec=sample_spec_v2_remove_field,
-        has_data=False
+        has_data=False,
     )
 
     assert change.has_changes()
@@ -114,7 +123,7 @@ def test_detect_removed_field_with_data(sample_spec_v1, sample_spec_v2_remove_fi
         form_path="test_form",
         old_spec=sample_spec_v1,
         new_spec=sample_spec_v2_remove_field,
-        has_data=True
+        has_data=True,
     )
 
     assert change.has_changes()
@@ -130,7 +139,7 @@ def test_detect_type_change(sample_spec_v1, sample_spec_v2_change_type):
         form_path="test_form",
         old_spec=sample_spec_v1,
         new_spec=sample_spec_v2_change_type,
-        has_data=True
+        has_data=True,
     )
 
     assert change.has_changes()
@@ -143,18 +152,11 @@ def test_detect_type_change(sample_spec_v1, sample_spec_v2_change_type):
 
 def test_detect_required_change():
     """Test detecting required flag change."""
-    old_spec = {
-        "fields": [{"name": "nome", "type": "text", "required": False}]
-    }
-    new_spec = {
-        "fields": [{"name": "nome", "type": "text", "required": True}]
-    }
+    old_spec = {"fields": [{"name": "nome", "type": "text", "required": False}]}
+    new_spec = {"fields": [{"name": "nome", "type": "text", "required": True}]}
 
     change = SchemaChangeDetector.detect_changes(
-        form_path="test_form",
-        old_spec=old_spec,
-        new_spec=new_spec,
-        has_data=True
+        form_path="test_form", old_spec=old_spec, new_spec=new_spec, has_data=True
     )
 
     assert change.has_changes()
@@ -164,10 +166,7 @@ def test_detect_required_change():
 def test_detect_backend_change():
     """Test detecting backend change."""
     change = SchemaChangeDetector.detect_backend_change(
-        form_path="contatos",
-        old_backend="txt",
-        new_backend="sqlite",
-        record_count=23
+        form_path="contatos", old_backend="txt", new_backend="sqlite", record_count=23
     )
 
     assert change is not None
@@ -182,10 +181,7 @@ def test_detect_backend_change():
 def test_detect_backend_change_no_data():
     """Test detecting backend change with no data."""
     change = SchemaChangeDetector.detect_backend_change(
-        form_path="contatos",
-        old_backend="txt",
-        new_backend="sqlite",
-        record_count=0
+        form_path="contatos", old_backend="txt", new_backend="sqlite", record_count=0
     )
 
     assert change is not None
@@ -196,10 +192,7 @@ def test_detect_backend_change_no_data():
 def test_no_backend_change():
     """Test when backend hasn't changed."""
     change = SchemaChangeDetector.detect_backend_change(
-        form_path="contatos",
-        old_backend="txt",
-        new_backend="txt",
-        record_count=10
+        form_path="contatos", old_backend="txt", new_backend="txt", record_count=10
     )
 
     assert change is None
@@ -211,7 +204,7 @@ def test_schema_change_summary(sample_spec_v1, sample_spec_v2_add_field):
         form_path="test_form",
         old_spec=sample_spec_v1,
         new_spec=sample_spec_v2_add_field,
-        has_data=False
+        has_data=False,
     )
 
     summary = change.get_summary()

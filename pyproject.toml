@@ -42,3 +42,12 @@ test = "pytest"
 format = "black src/ tests/"
 lint = "black --check src/ tests/"
 check = "pre-commit run --all-files"
+
+[tool.pytest.ini_options]
+# Allow skipped tests - they should not cause test failures
+addopts = [
+    "-v",
+    "--tb=short",
+]
+# Pytest exit codes: 0 (all passed), 1 (tests failed), 5 (no tests collected)
+# Skipped tests will still result in exit code 0

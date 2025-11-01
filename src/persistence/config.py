@@ -60,15 +60,13 @@ class PersistenceConfig:
             )
 
         try:
-            with open(self.config_path, 'r', encoding='utf-8') as f:
+            with open(self.config_path, "r", encoding="utf-8") as f:
                 config = json.load(f)
             logger.info(f"Loaded persistence configuration from {self.config_path}")
             return config
         except json.JSONDecodeError as e:
             raise json.JSONDecodeError(
-                f"Invalid JSON in persistence configuration: {e.msg}",
-                e.doc,
-                e.pos
+                f"Invalid JSON in persistence configuration: {e.msg}", e.doc, e.pos
             )
 
     def _validate_config(self) -> None:
@@ -79,7 +77,7 @@ class PersistenceConfig:
             ValueError: If configuration is invalid
         """
         # Check required top-level keys
-        required_keys = ['version', 'default_backend', 'backends']
+        required_keys = ["version", "default_backend", "backends"]
         for key in required_keys:
             if key not in self.config:
                 raise ValueError(
@@ -87,8 +85,8 @@ class PersistenceConfig:
                 )
 
         # Validate default_backend exists in backends
-        default_backend = self.config['default_backend']
-        backends = self.config['backends']
+        default_backend = self.config["default_backend"]
+        backends = self.config["backends"]
 
         if default_backend not in backends:
             raise ValueError(
@@ -97,7 +95,7 @@ class PersistenceConfig:
 
         # Validate each backend has a 'type' field
         for backend_name, backend_config in backends.items():
-            if 'type' not in backend_config:
+            if "type" not in backend_config:
                 raise ValueError(
                     f"Backend '{backend_name}' missing required 'type' field"
                 )
@@ -122,27 +120,31 @@ class PersistenceConfig:
             >>> config.get_backend_for_form('financeiro/contas')
             'mysql'  # if 'financeiro/*' is mapped to mysql
         """
-        form_mappings = self.config.get('form_mappings', {})
+        form_mappings = self.config.get("form_mappings", {})
 
         # First: Try exact match
         if form_path in form_mappings:
             backend = form_mappings[form_path]
             # If backend is "default_backend", use the actual default
             if backend == "default_backend":
-                backend = self.config['default_backend']
-            logger.debug(f"Form '{form_path}' mapped to backend '{backend}' (exact match)")
+                backend = self.config["default_backend"]
+            logger.debug(
+                f"Form '{form_path}' mapped to backend '{backend}' (exact match)"
+            )
             return backend
 
         # Second: Try wildcard patterns
         for pattern, backend in form_mappings.items():
-            if '*' in pattern:
+            if "*" in pattern:
                 # Convert glob pattern to regex
                 # 'financeiro/*' becomes '^financeiro/.*$'
-                regex_pattern = '^' + pattern.replace('/', r'\/').replace('*', '.*') + '$'
+                regex_pattern = (
+                    "^" + pattern.replace("/", r"\/").replace("*", ".*") + "$"
+                )
                 if re.match(regex_pattern, form_path):
                     # If backend is "default_backend", use the actual default
                     if backend == "default_backend":
-                        backend = self.config['default_backend']
+                        backend = self.config["default_backend"]
                     logger.debug(
                         f"Form '{form_path}' matched pattern '{pattern}', "
                         f"using backend '{backend}'"
@@ -150,7 +152,7 @@ class PersistenceConfig:
                     return backend
 
         # Third: Use default backend
-        default_backend = self.config['default_backend']
+        default_backend = self.config["default_backend"]
         logger.debug(f"Form '{form_path}' using default backend '{default_backend}'")
         return default_backend
 
@@ -174,7 +176,7 @@ class PersistenceConfig:
             }
         """
         backend_name = self.get_backend_for_form(form_path)
-        backend_config = self.config['backends'][backend_name].copy()
+        backend_config = self.config["backends"][backend_name].copy()
 
         # Substitute environment variables
         backend_config = self._substitute_env_vars(backend_config)
@@ -224,11 +226,11 @@ class PersistenceConfig:
             "mysql://${DB_HOST}:3306" -> "mysql://localhost:3306"
         """
         # Pattern to match ${VAR_NAME}
-        pattern = r'\$\{([A-Za-z_][A-Za-z0-9_]*)\}'
+        pattern = r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}"
 
         def replace_var(match):
             var_name = match.group(1)
-            var_value = os.environ.get(var_name, '')
+            var_value = os.environ.get(var_name, "")
             if not var_value:
                 logger.warning(
                     f"Environment variable '{var_name}' not set, using empty string"
