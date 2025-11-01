@@ -283,6 +283,7 @@ All operations use the index position in the forms list (not a unique ID) to ide
 ### Install dependencies
 ```bash
 uv sync
+uv run pre-commit install  # Install git hooks for code quality checks
 ```
 
 ### Run the application (development mode)

@@ -195,6 +195,7 @@ Clone the repository and install dependencies:
 git clone https://github.com/<your-username>/VibeCForms.git
 cd VibeCForms
 uv sync
+uv run pre-commit install  # Install git hooks for code quality checks
 ```
 
 ### Run the application (development mode)
