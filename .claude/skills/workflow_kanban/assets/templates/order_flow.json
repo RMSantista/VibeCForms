@@ -1,0 +1,113 @@
+{
+  "id": "order_flow",
+  "name": "Fluxo de Pedidos",
+  "description": "Workflow completo para gestão de pedidos: orçamento → pedido → entrega → concluído",
+  "states": [
+    {
+      "id": "orcamento",
+      "name": "Orçamento",
+      "description": "Solicitação inicial de orçamento",
+      "color": "#FFA500",
+      "is_initial": true
+    },
+    {
+      "id": "orcamento_aprovado",
+      "name": "Orçamento Aprovado",
+      "description": "Orçamento aprovado pelo cliente",
+      "color": "#4169E1"
+    },
+    {
+      "id": "pedido",
+      "name": "Pedido Confirmado",
+      "description": "Pedido confirmado e em produção",
+      "color": "#9370DB",
+      "auto_transition_to": "em_entrega",
+      "timeout_hours": 48
+    },
+    {
+      "id": "em_entrega",
+      "name": "Em Entrega",
+      "description": "Pedido em processo de entrega",
+      "color": "#20B2AA"
+    },
+    {
+      "id": "concluido",
+      "name": "Concluído",
+      "description": "Pedido entregue e finalizado",
+      "color": "#32CD32",
+      "is_final": true
+    },
+    {
+      "id": "cancelado",
+      "name": "Cancelado",
+      "description": "Pedido cancelado",
+      "color": "#DC143C",
+      "is_final": true
+    }
+  ],
+  "transitions": [
+    {
+      "from": "orcamento",
+      "to": "orcamento_aprovado",
+      "type": "manual",
+      "label": "Aprovar Orçamento",
+      "prerequisites": [
+        {
+          "type": "field_check",
+          "field": "valor_total",
+          "condition": "not_empty",
+          "message": "Valor total deve estar preenchido"
+        }
+      ]
+    },
+    {
+      "from": "orcamento_aprovado",
+      "to": "pedido",
+      "type": "manual",
+      "label": "Confirmar Pedido",
+      "prerequisites": [
+        {
+          "type": "field_check",
+          "field": "forma_pagamento",
+          "condition": "not_empty",
+          "message": "Forma de pagamento deve estar definida"
+        }
+      ]
+    },
+    {
+      "from": "pedido",
+      "to": "em_entrega",
+      "type": "system",
+      "label": "Iniciar Entrega",
+      "auto_trigger": true
+    },
+    {
+      "from": "em_entrega",
+      "to": "concluido",
+      "type": "manual",
+      "label": "Finalizar Entrega"
+    },
+    {
+      "from": "orcamento",
+      "to": "cancelado",
+      "type": "manual",
+      "label": "Cancelar"
+    },
+    {
+      "from": "orcamento_aprovado",
+      "to": "cancelado",
+      "type": "manual",
+      "label": "Cancelar"
+    },
+    {
+      "from": "pedido",
+      "to": "cancelado",
+      "type": "manual",
+      "label": "Cancelar"
+    }
+  ],
+  "linked_forms": [
+    "pedidos",
+    "orcamentos"
+  ]
+}

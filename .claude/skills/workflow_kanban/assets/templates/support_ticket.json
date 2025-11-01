@@ -1,0 +1,86 @@
+{
+  "id": "support_ticket",
+  "name": "Tickets de Suporte",
+  "description": "Workflow para gerenciamento de tickets de suporte técnico",
+  "states": [
+    {
+      "id": "novo",
+      "name": "Novo",
+      "description": "Ticket recém-criado",
+      "color": "#FFD700",
+      "is_initial": true,
+      "auto_transition_to": "em_analise",
+      "timeout_hours": 1
+    },
+    {
+      "id": "em_analise",
+      "name": "Em Análise",
+      "description": "Ticket sendo analisado",
+      "color": "#4169E1"
+    },
+    {
+      "id": "aguardando_cliente",
+      "name": "Aguardando Cliente",
+      "description": "Aguardando resposta do cliente",
+      "color": "#FF8C00",
+      "timeout_hours": 72
+    },
+    {
+      "id": "resolvido",
+      "name": "Resolvido",
+      "description": "Problema resolvido",
+      "color": "#32CD32",
+      "is_final": true
+    },
+    {
+      "id": "fechado",
+      "name": "Fechado",
+      "description": "Ticket fechado sem solução",
+      "color": "#808080",
+      "is_final": true
+    }
+  ],
+  "transitions": [
+    {
+      "from": "novo",
+      "to": "em_analise",
+      "type": "system",
+      "label": "Iniciar Análise",
+      "auto_trigger": true
+    },
+    {
+      "from": "em_analise",
+      "to": "aguardando_cliente",
+      "type": "manual",
+      "label": "Solicitar Informações"
+    },
+    {
+      "from": "em_analise",
+      "to": "resolvido",
+      "type": "manual",
+      "label": "Resolver"
+    },
+    {
+      "from": "aguardando_cliente",
+      "to": "em_analise",
+      "type": "manual",
+      "label": "Cliente Respondeu"
+    },
+    {
+      "from": "aguardando_cliente",
+      "to": "fechado",
+      "type": "system",
+      "label": "Timeout - Sem Resposta"
+    },
+    {
+      "from": "novo",
+      "to": "fechado",
+      "type": "manual",
+      "label": "Fechar Ticket"
+    }
+  ],
+  "linked_forms": [
+    "tickets",
+    "chamados"
+  ]
+}
