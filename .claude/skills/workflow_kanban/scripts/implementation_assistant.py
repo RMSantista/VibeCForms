@@ -19,7 +19,7 @@ PHASES = {
             "FormTriggerManager (hook em form saves)",
             "ProcessFactory (criação de processos)",
             "Kanban Board básico (visualização)",
-            "Transições manuais funcionando",
+            "Transições manuais funcionando"
         ],
         "tasks": [
             {
@@ -28,8 +28,8 @@ PHASES = {
                 "checklist": [
                     "Criar estrutura de diretórios src/workflow/",
                     "Criar src/config/kanbans/",
-                    "Implementar WorkflowRepository (BaseRepository extension)",
-                ],
+                    "Implementar WorkflowRepository (BaseRepository extension)"
+                ]
             },
             {
                 "day": "3-4",
@@ -37,8 +37,8 @@ PHASES = {
                 "checklist": [
                     "Implementar src/workflow/kanban_registry.py",
                     "Implementar src/workflow/form_trigger_manager.py",
-                    "Criar testes unitários (14 tests)",
-                ],
+                    "Criar testes unitários (14 tests)"
+                ]
             },
             {
                 "day": "5-6",
@@ -46,8 +46,8 @@ PHASES = {
                 "checklist": [
                     "Implementar src/workflow/process_factory.py",
                     "Implementar field_mapping",
-                    "Testar criação de processos (8 tests)",
-                ],
+                    "Testar criação de processos (8 tests)"
+                ]
             },
             {
                 "day": "7-8",
@@ -55,8 +55,8 @@ PHASES = {
                 "checklist": [
                     "Criar template src/templates/workflow_board.html",
                     "Implementar drag & drop básico (JS)",
-                    "CSS/JS para quadro kanban",
-                ],
+                    "CSS/JS para quadro kanban"
+                ]
             },
             {
                 "day": "9-10",
@@ -64,11 +64,11 @@ PHASES = {
                 "checklist": [
                     "Implementar endpoint POST /workflow/transition",
                     "Registrar histórico de transições",
-                    "Testes end-to-end (3 tests)",
-                ],
-            },
+                    "Testes end-to-end (3 tests)"
+                ]
+            }
         ],
-        "tests_count": 30,
+        "tests_count": 30
     },
     2: {
         "name": "AutoTransitionEngine",
@@ -79,7 +79,7 @@ PHASES = {
             "PrerequisiteChecker (4 tipos)",
             "Cascade progression (max 3 níveis)",
             "Timeout handlers",
-            "Transições forçadas com justificativa",
+            "Transições forçadas com justificativa"
         ],
         "tasks": [
             {
@@ -88,8 +88,8 @@ PHASES = {
                 "checklist": [
                     "Implementar src/workflow/auto_transition_engine.py",
                     "Lógica de check_auto_progression()",
-                    "Cascade detection (max 3 níveis)",
-                ],
+                    "Cascade detection (max 3 níveis)"
+                ]
             },
             {
                 "day": "13-15",
@@ -99,8 +99,8 @@ PHASES = {
                     "Tipo 1: field_check (5 condições)",
                     "Tipo 2: external_api",
                     "Tipo 3: time_elapsed",
-                    "Tipo 4: custom_script",
-                ],
+                    "Tipo 4: custom_script"
+                ]
             },
             {
                 "day": "16-17",
@@ -108,8 +108,8 @@ PHASES = {
                 "checklist": [
                     "Implementar timeout detection",
                     "Timeout handlers (4 tipos: notification, transition, agent, escalation)",
-                    "Scheduler para verificação periódica",
-                ],
+                    "Scheduler para verificação periódica"
+                ]
             },
             {
                 "day": "18-20",
@@ -117,11 +117,11 @@ PHASES = {
                 "checklist": [
                     "Modal de aviso de pré-requisitos (UI)",
                     "Justification system",
-                    "Audit logging de transições forçadas",
-                ],
-            },
+                    "Audit logging de transições forçadas"
+                ]
+            }
         ],
-        "tests_count": 40,
+        "tests_count": 40
     },
     3: {
         "name": "Basic AI",
@@ -132,7 +132,7 @@ PHASES = {
             "AnomalyDetector (processos travados)",
             "BaseAgent + 3 agentes concretos",
             "AgentOrchestrator",
-            "UI de sugestões de IA",
+            "UI de sugestões de IA"
         ],
         "tasks": [
             {
@@ -142,8 +142,8 @@ PHASES = {
                     "Implementar src/analytics/pattern_analyzer.py",
                     "Algoritmo de frequent pattern mining",
                     "Sequential pattern analysis",
-                    "Testes (10 tests)",
-                ],
+                    "Testes (10 tests)"
+                ]
             },
             {
                 "day": "24-25",
@@ -152,8 +152,8 @@ PHASES = {
                     "Implementar src/analytics/anomaly_detector.py",
                     "Detecção de processos travados",
                     "Statistical outliers",
-                    "Testes (8 tests)",
-                ],
+                    "Testes (8 tests)"
+                ]
             },
             {
                 "day": "26-28",
@@ -162,8 +162,8 @@ PHASES = {
                     "Implementar src/workflow/agents/base_agent.py (abstract)",
                     "Implementar 3 agentes concretos (orcamento, pedido, entrega)",
                     "Implementar src/workflow/agents/agent_orchestrator.py",
-                    "Implementar src/workflow/agents/context_loader.py",
-                ],
+                    "Implementar src/workflow/agents/context_loader.py"
+                ]
             },
             {
                 "day": "29-30",
@@ -172,11 +172,11 @@ PHASES = {
                     "Badge de sugestão em kanban board",
                     "Modal com análise do agente",
                     "Botão 'Aceitar Sugestão'",
-                    "Testes UI (8 tests)",
-                ],
-            },
+                    "Testes UI (8 tests)"
+                ]
+            }
         ],
-        "tests_count": 40,
+        "tests_count": 40
     },
     4: {
         "name": "Visual Editor + Dashboard",
@@ -186,7 +186,7 @@ PHASES = {
             "Visual Kanban Editor (admin)",
             "Analytics Dashboard",
             "Export básico (CSV)",
-            "Gráficos e KPIs",
+            "Gráficos e KPIs"
         ],
         "tasks": [
             {
@@ -199,8 +199,8 @@ PHASES = {
                     "Modal de pré-requisitos",
                     "Preview de kanban",
                     "Salvamento como JSON",
-                    "Testes (15 tests)",
-                ],
+                    "Testes (15 tests)"
+                ]
             },
             {
                 "day": "36-40",
@@ -212,11 +212,11 @@ PHASES = {
                     "Gráfico de tempo médio",
                     "Bottleneck identification",
                     "Export CSV básico",
-                    "Testes (10 tests)",
-                ],
-            },
+                    "Testes (10 tests)"
+                ]
+            }
         ],
-        "tests_count": 30,
+        "tests_count": 30
     },
     5: {
         "name": "Advanced Features",
@@ -227,7 +227,7 @@ PHASES = {
             "Export PDF/Excel",
             "ML models (duration predictor)",
             "Notification system",
-            "Report scheduling",
+            "Report scheduling"
         ],
         "tasks": [
             {
@@ -237,8 +237,8 @@ PHASES = {
                     "Template src/templates/workflow_audit.html",
                     "Timeline visual de transições",
                     "Filtros por usuário/data/ação",
-                    "Detalhes de transições forçadas",
-                ],
+                    "Detalhes de transições forçadas"
+                ]
             },
             {
                 "day": "44-46",
@@ -246,8 +246,8 @@ PHASES = {
                 "checklist": [
                     "Implementar src/exports/pdf_exporter.py",
                     "Implementar src/exports/excel_exporter.py",
-                    "Report scheduling system",
-                ],
+                    "Report scheduling system"
+                ]
             },
             {
                 "day": "47-50",
@@ -256,12 +256,12 @@ PHASES = {
                     "Implementar src/analytics/ml_models/duration_predictor.py",
                     "Notification system (email/webhook)",
                     "Polimento geral e bugfixes",
-                    "Documentação final",
-                ],
-            },
+                    "Documentação final"
+                ]
+            }
         ],
-        "tests_count": 10,
-    },
+        "tests_count": 10
+    }
 }
 
 
@@ -281,13 +281,13 @@ def show_phase_details(phase_num: int):
     print(f"✅ Testes: {phase['tests_count']} tests")
 
     print(f"\n📦 ENTREGAS:")
-    for i, deliverable in enumerate(phase["deliverables"], 1):
+    for i, deliverable in enumerate(phase['deliverables'], 1):
         print(f"  {i}. {deliverable}")
 
     print(f"\n📋 TAREFAS:")
-    for task in phase["tasks"]:
+    for task in phase['tasks']:
         print(f"\n  Dias {task['day']}: {task['title']}")
-        for item in task["checklist"]:
+        for item in task['checklist']:
             print(f"    [ ] {item}")
 
     print(f"\n{'=' * 70}\n")
@@ -295,8 +295,8 @@ def show_phase_details(phase_num: int):
 
 def show_progress_overview():
     """Show overview of all phases with progress bar."""
-    total_days = sum(p["duration_days"] for p in PHASES.values())
-    total_tests = sum(p["tests_count"] for p in PHASES.values())
+    total_days = sum(p['duration_days'] for p in PHASES.values())
+    total_tests = sum(p['tests_count'] for p in PHASES.values())
 
     print(f"\n{'=' * 70}")
     print(f"OVERVIEW: Implementação Sistema Kanban-Workflow")
@@ -358,16 +358,14 @@ def check_project_files():
     progress_pct = (created / len(expected_files)) * 100
 
     print(f"\n{'=' * 70}")
-    print(
-        f"Progresso: {created}/{len(expected_files)} arquivos criados ({progress_pct:.1f}%)"
-    )
+    print(f"Progresso: {created}/{len(expected_files)} arquivos criados ({progress_pct:.1f}%)")
     print(f"{'=' * 70}\n")
 
 
 def main():
     """CLI entry point."""
     parser = argparse.ArgumentParser(
-        description="Implementation Assistant - Guia implementação do Sistema Kanban-Workflow",
+        description='Implementation Assistant - Guia implementação do Sistema Kanban-Workflow',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Exemplos:
@@ -379,20 +377,20 @@ Exemplos:
 
   # Ver overview de todas as fases
   %(prog)s
-        """,
+        """
     )
 
     parser.add_argument(
-        "--phase",
+        '--phase',
         type=int,
         choices=[1, 2, 3, 4, 5],
-        help="Exibir checklist detalhado de uma fase específica",
+        help='Exibir checklist detalhado de uma fase específica'
     )
 
     parser.add_argument(
-        "--check",
-        action="store_true",
-        help="Verificar progresso da implementação (quais arquivos foram criados)",
+        '--check',
+        action='store_true',
+        help='Verificar progresso da implementação (quais arquivos foram criados)'
     )
 
     args = parser.parse_args()
@@ -405,5 +403,5 @@ Exemplos:
         show_progress_overview()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

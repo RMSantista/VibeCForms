@@ -1,6 +1,6 @@
 ---
-name: workflow-kanban
-description: Provides comprehensive knowledge and practical tools for developing the Kanban-Workflow system in VibeCForms v4.0. This skill covers complete workflow architecture, implementation phases, AI agents, pattern analysis, and visual editors. Use when working on any aspect of the Kanban-Workflow project including kanbans, forms integration, auto-transitions, analytics, or visual editors.
+name: workflow_kanban
+description: AUTO-ACTIVATE on keywords (workflow, kanban, regras de negócio, transição, processo, estado, automação, patterns, agents, dashboard). Provides comprehensive knowledge and practical tools for developing the Kanban-Workflow system in VibeCForms v4.0. Covers workflow architecture, implementation phases, AI agents, pattern analysis, visual editors, business rules, auto-transitions, and analytics. Use when user mentions workflow-related concepts or business logic.
 ---
 
 # Workflow Kanban - Sistema de Workflow para VibeCForms
@@ -13,6 +13,37 @@ This skill provides five progressive knowledge levels (fundamentals → implemen
 
 ## When to Use This Skill
 
+**AUTOMATIC ACTIVATION**: This skill should be automatically invoked when the user mentions ANY of these keywords or related concepts:
+
+**Primary Keywords:**
+- `workflow` / `workflows` / `fluxo` / `fluxos`
+- `kanban` / `kanbans` / `quadro kanban`
+- `regras de negócio` / `business rules` / `lógica de negócio`
+- `transição` / `transições` / `transitions` / `auto-transition`
+- `processo` / `processos` / `process` / `workflow process`
+- `estado` / `estados` / `state` / `states` / `status`
+
+**Secondary Keywords:**
+- `pré-requisito` / `prerequisite` / `prerequisites`
+- `automação` / `automation` / `automatic`
+- `padrões de workflow` / `workflow patterns`
+- `agente` / `agentes` / `AI agents` / `workflow agents`
+- `análise de padrões` / `pattern analysis`
+- `anomalia` / `anomaly detection`
+- `editor visual` / `visual editor` / `kanban editor`
+- `dashboard` / `analytics` / `métricas de workflow`
+- `audit` / `auditoria` / `timeline`
+- `forced transition` / `transição forçada`
+- `cascade` / `cascata` / `progressão em cascata`
+
+**Context-Based Activation:**
+- Questions about "como implementar" + any workflow-related term
+- References to workflow architecture or design
+- Discussion of business logic tied to form states
+- Planning or reviewing workflow features
+- Troubleshooting workflow issues
+- Creating or validating kanban configurations
+
 Use this skill when:
 - Planning or implementing kanban workflows in VibeCForms
 - Creating kanban JSON definitions
@@ -22,11 +53,16 @@ Use this skill when:
 - Building visual editors or analytics dashboards
 - Reviewing workflow architecture decisions
 - Planning implementation phases and testing strategy
+- Discussing business rules and workflow automation
+- Analyzing workflow patterns or anomalies
+- Designing state machines or process flows
 
 Do NOT use for:
 - General form management (not related to workflows)
 - Basic CRUD operations without workflow
 - Non-workflow VibeCForms features
+- Simple data persistence questions
+- UI/UX improvements unrelated to kanban boards
 
 ## Progressive Disclosure Knowledge Levels
 
