@@ -85,6 +85,13 @@
         construída com o conceito de <strong>Vibe Coding</strong>, programação assistida por IA.
     </p>
     <div class="forms-grid">
+        <!-- Administração Workflow-Kanban Card -->
+        <a href="/admin/workflow/" class="form-card" style="background: #27ae60;">
+            <i class="fa fa-cogs"></i>
+            <div class="form-title">Administração Workflow-Kanban</div>
+            <div class="form-category">Sistema de Workflows</div>
+        </a>
+
         {% for form in forms %}
         <a href="/{{ form.path }}" class="form-card">
             <i class="fa {{ form.icon }}"></i>

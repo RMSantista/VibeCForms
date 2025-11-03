@@ -70,9 +70,6 @@ def test_migrate_txt_to_sqlite_empty(tmp_path, txt_config, sqlite_config, sample
     assert success
 
 
-@pytest.mark.skip(
-    reason="MigrationManager uses global config, needs architecture refactor for isolated testing"
-)
 def test_migrate_txt_to_sqlite_with_data(
     tmp_path, txt_config, sqlite_config, sample_spec
 ):
@@ -102,13 +99,15 @@ def test_migrate_txt_to_sqlite_with_data(
     txt_data = txt_repo.read_all("test_form", sample_spec)
     assert len(txt_data) == 3
 
-    # Migrate to SQLite
+    # Migrate to SQLite with custom configs
     success = MigrationManager.migrate_backend(
         form_path="test_form",
         spec=sample_spec,
         old_backend="txt",
         new_backend="sqlite",
         record_count=3,
+        old_config=txt_config,
+        new_config=sqlite_config,
     )
 
     assert success
@@ -123,9 +122,6 @@ def test_migrate_txt_to_sqlite_with_data(
     assert sqlite_data[2]["nome"] == "Pedro Costa"
 
 
-@pytest.mark.skip(
-    reason="MigrationManager uses global config, needs architecture refactor for isolated testing"
-)
 def test_migration_creates_backup(tmp_path, txt_config, sqlite_config, sample_spec):
     """Test that migration creates a backup before migrating."""
     # Create TXT storage with data
@@ -137,13 +133,15 @@ def test_migration_creates_backup(tmp_path, txt_config, sqlite_config, sample_sp
         {"nome": "João Silva", "telefone": "11-9999-8888", "ativo": True},
     )
 
-    # Migrate
+    # Migrate with custom configs
     MigrationManager.migrate_backend(
         form_path="test_form",
         spec=sample_spec,
         old_backend="txt",
         new_backend="sqlite",
         record_count=1,
+        old_config=txt_config,
+        new_config=sqlite_config,
     )
 
     # Check if backup was created
@@ -155,9 +153,6 @@ def test_migration_creates_backup(tmp_path, txt_config, sqlite_config, sample_sp
     assert len(backup_files) > 0
 
 
-@pytest.mark.skip(
-    reason="MigrationManager uses global config, needs architecture refactor for isolated testing"
-)
 def test_migration_preserves_data_integrity(
     tmp_path, txt_config, sqlite_config, sample_spec
 ):
@@ -182,6 +177,8 @@ def test_migration_preserves_data_integrity(
         old_backend="txt",
         new_backend="sqlite",
         record_count=len(original_data),
+        old_config=txt_config,
+        new_config=sqlite_config,
     )
 
     assert success
@@ -198,9 +195,6 @@ def test_migration_preserves_data_integrity(
         assert migrated_data[i]["ativo"] == original["ativo"]
 
 
-@pytest.mark.skip(
-    reason="MigrationManager uses global config, needs architecture refactor for isolated testing"
-)
 def test_migration_with_nested_form_path(tmp_path, txt_config, sqlite_config):
     """Test migration with nested form paths (e.g., 'financeiro/contas')."""
     spec = {
@@ -228,6 +222,8 @@ def test_migration_with_nested_form_path(tmp_path, txt_config, sqlite_config):
         old_backend="txt",
         new_backend="sqlite",
         record_count=1,
+        old_config=txt_config,
+        new_config=sqlite_config,
     )
 
     assert success

@@ -42,7 +42,7 @@ O Editor Visual permite criar/editar Kanbans através de interface drag-and-drop
 |  |                                                            |  |
 |  |  +-------------+  +-------------+  +-------------+         |  |
 |  |  | Orçamento   |  | Pedido      |  | Entrega     |         |  |
-|  |  | 🟧 Laranja  |  | 🟦 Azul     |  | 🟨 Amarelo  |         |  |
+|  |  | 🟧 Laranja  |  | 🟦 Azul    |  | 🟨 Amarelo |          |  |
 |  |  | [Edit] [Del]|  | [Edit] [Del]|  | [Edit] [Del]|         |  |
 |  |  +-------------+  +-------------+  +-------------+         |  |
 |  |                                                            |  |
@@ -52,17 +52,17 @@ O Editor Visual permite criar/editar Kanbans através de interface drag-and-drop
 |  |                     TRANSIÇÕES                             |  |
 |  +------------------------------------------------------------+  |
 |  |                                                            |  |
-|  |  Orçamento → Pedido          [Manual]   [Editar]          |  |
-|  |    └─ Pré-req: valor_total not_empty                      |  |
+|  |  Orçamento → Pedido          [Manual]   [Editar]           |  |
+|  |    └─ Pré-req: valor_total not_empty                       |  |
 |  |                                                            |  |
-|  |  Pedido → Entrega            [System]   [Editar]          |  |
-|  |    └─ Auto-transition após 2h                             |  |
+|  |  Pedido → Entrega            [System]   [Editar]           |  |
+|  |    └─ Auto-transition após 2h                              |  |
 |  |                                                            |  |
 |  |  [+ Adicionar Transição]                                   |  |
 |  |                                                            |  |
 |  +------------------------------------------------------------+  |
 |                                                                  |
-|  [Salvar Kanban] [Visualizar JSON] [Cancelar]                   |
+|  [Salvar Kanban] [Visualizar JSON] [Cancelar]                    |
 |                                                                  |
 +------------------------------------------------------------------+
 ```

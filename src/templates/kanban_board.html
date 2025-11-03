@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ kanban.name }} - Kanban Board</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .board-container {
+            display: flex;
+            gap: 20px;
+            overflow-x: auto;
+            padding-bottom: 20px;
+        }
+
+        .column {
+            background: white;
+            border-radius: 8px;
+            min-width: 300px;
+            max-width: 300px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .column-header {
+            padding: 15px;
+            border-bottom: 2px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .column-title {
+            font-weight: bold;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .column-badge {
+            background-color: #e0e0e0;
+            color: #333;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .column-body {
+            padding: 15px;
+            min-height: 200px;
+            flex: 1;
+            overflow-y: auto;
+            max-height: calc(100vh - 300px);
+        }
+
+        .column-body.drag-over {
+            background-color: #f0f0f0;
+        }
+
+        .card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 10px;
+            cursor: move;
+            transition: all 0.2s;
+        }
+
+        .card:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            transform: translateY(-2px);
+        }
+
+        .card.dragging {
+            opacity: 0.5;
+        }
+
+        .card-id {
+            font-size: 11px;
+            color: #999;
+            margin-bottom: 5px;
+        }
+
+        .card-title {
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .card-meta {
+            display: flex;
+            gap: 10px;
+            font-size: 12px;
+            color: #666;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }
+
+        .card-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .card-tags {
+            display: flex;
+            gap: 5px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }
+
+        .card-tag {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+        }
+
+        .card-assigned {
+            background: #fff3e0;
+            color: #f57c00;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            margin-top: 8px;
+            display: inline-block;
+        }
+
+        .card-sla {
+            background: #ffebee;
+            color: #c62828;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            margin-top: 8px;
+            display: inline-block;
+        }
+
+        .card-sla.warning {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .card-sla.ok {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #007bff;
+            text-decoration: none;
+            padding: 8px 16px;
+            background: white;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .back-link:hover {
+            background: #f0f0f0;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        @media (max-width: 768px) {
+            .board-container {
+                flex-direction: column;
+            }
+
+            .column {
+                max-width: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <a href="/" class="back-link">
+        <i class="fas fa-arrow-left"></i> Voltar
+    </a>
+
+    <div class="header">
+        <h1>{{ kanban.name }}</h1>
+        <p>{{ kanban.description }}</p>
+    </div>
+
+    <div class="board-container" id="board">
+        {% for state in kanban.states %}
+        <div class="column">
+            <div class="column-header">
+                <div class="column-title" style="color: {{ state.color }};">
+                    {{ state.name }}
+                </div>
+                <span class="column-badge" id="badge-{{ state.id }}">0</span>
+            </div>
+            <div class="column-body" data-state="{{ state.id }}">
+                <div class="loading">Carregando...</div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <script>
+        const kanbanId = '{{ kanban.id }}';
+        const columns = {{ kanban.states | tojson }};
+        let processes = [];
+
+        // Load processes
+        async function loadProcesses() {
+            try {
+                const response = await fetch(`/api/workflow/processes?kanban_id=${kanbanId}`);
+                processes = await response.json();
+                renderBoard();
+            } catch (error) {
+                console.error('Error loading processes:', error);
+            }
+        }
+
+        // Render board
+        function renderBoard() {
+            columns.forEach(column => {
+                const columnBody = document.querySelector(`[data-state="${column.id}"]`);
+                const columnProcesses = processes.filter(p => p.current_state === column.id);
+
+                // Update badge count
+                document.getElementById(`badge-${column.id}`).textContent = columnProcesses.length;
+
+                // Render cards
+                if (columnProcesses.length === 0) {
+                    columnBody.innerHTML = '<div style="color: #999; text-align: center; padding: 20px;">Nenhum processo</div>';
+                } else {
+                    columnBody.innerHTML = columnProcesses.map(process => createCard(process)).join('');
+                }
+
+                // Add drag-drop listeners
+                setupDragDrop(columnBody);
+            });
+        }
+
+        // Create card HTML
+        function createCard(process) {
+            const createdAt = new Date(process.created_at);
+            const age = Math.floor((new Date() - createdAt) / (1000 * 60 * 60)); // hours
+
+            // Calculate SLA status
+            let slaHtml = '';
+            if (process.sla && process.sla.deadline) {
+                const deadline = new Date(process.sla.deadline);
+                const now = new Date();
+                const remaining = deadline - now;
+                const hoursRemaining = remaining / (1000 * 60 * 60);
+
+                if (hoursRemaining < 0) {
+                    slaHtml = `<span class="card-sla"><i class="fas fa-exclamation-triangle"></i> SLA excedido</span>`;
+                } else if (hoursRemaining < process.sla.warn_threshold_hours) {
+                    slaHtml = `<span class="card-sla warning"><i class="fas fa-clock"></i> ${Math.floor(hoursRemaining)}h restantes</span>`;
+                } else {
+                    slaHtml = `<span class="card-sla ok"><i class="fas fa-check"></i> SLA OK</span>`;
+                }
+            }
+
+            // Tags
+            let tagsHtml = '';
+            if (process.tags && process.tags.length > 0) {
+                tagsHtml = `<div class="card-tags">${process.tags.map(tag => `<span class="card-tag">${tag}</span>`).join('')}</div>`;
+            }
+
+            // Assigned to
+            let assignedHtml = '';
+            if (process.assigned_to) {
+                assignedHtml = `<span class="card-assigned"><i class="fas fa-user"></i> ${process.assigned_to}</span>`;
+            }
+
+            // Get first field value for title
+            const firstValue = Object.values(process.field_values)[0] || 'Sem título';
+
+            return `
+                <div class="card" draggable="true" data-process-id="${process.process_id}">
+                    <div class="card-id">#${process.process_id.substring(0, 12)}...</div>
+                    <div class="card-title">${firstValue}</div>
+                    <div class="card-meta">
+                        <span class="card-meta-item">
+                            <i class="fas fa-clock"></i> ${age}h atrás
+                        </span>
+                        <span class="card-meta-item">
+                            <i class="fas fa-file-alt"></i> ${process.source_form}
+                        </span>
+                    </div>
+                    ${tagsHtml}
+                    ${assignedHtml}
+                    ${slaHtml}
+                </div>
+            `;
+        }
+
+        // Setup drag and drop
+        function setupDragDrop(columnBody) {
+            columnBody.addEventListener('dragover', handleDragOver);
+            columnBody.addEventListener('drop', handleDrop);
+            columnBody.addEventListener('dragleave', handleDragLeave);
+
+            const cards = columnBody.querySelectorAll('.card');
+            cards.forEach(card => {
+                card.addEventListener('dragstart', handleDragStart);
+                card.addEventListener('dragend', handleDragEnd);
+            });
+        }
+
+        let draggedCard = null;
+
+        function handleDragStart(e) {
+            draggedCard = e.target;
+            e.target.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        }
+
+        function handleDragEnd(e) {
+            e.target.classList.remove('dragging');
+        }
+
+        function handleDragOver(e) {
+            if (e.preventDefault) {
+                e.preventDefault();
+            }
+            e.dataTransfer.dropEffect = 'move';
+            e.currentTarget.classList.add('drag-over');
+            return false;
+        }
+
+        function handleDragLeave(e) {
+            e.currentTarget.classList.remove('drag-over');
+        }
+
+        async function handleDrop(e) {
+            if (e.stopPropagation) {
+                e.stopPropagation();
+            }
+            e.currentTarget.classList.remove('drag-over');
+
+            if (!draggedCard) return false;
+
+            const processId = draggedCard.dataset.processId;
+            const newState = e.currentTarget.dataset.state;
+
+            // Update process state via API
+            try {
+                const response = await fetch(`/api/workflow/process/${processId}/transition`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        to_state: newState,
+                        type: 'manual',
+                        user: 'user',
+                        justification: 'Moved via kanban board'
+                    })
+                });
+
+                if (response.ok) {
+                    // Reload processes
+                    await loadProcesses();
+                } else {
+                    alert('Erro ao mover processo');
+                }
+            } catch (error) {
+                console.error('Error moving process:', error);
+                alert('Erro ao mover processo');
+            }
+
+            return false;
+        }
+
+        // Initialize
+        loadProcesses();
+
+        // Auto-refresh every 30 seconds
+        setInterval(loadProcesses, 30000);
+    </script>
+</body>
+</html>

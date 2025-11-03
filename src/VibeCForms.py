@@ -23,6 +23,26 @@ from persistence.change_manager import (
     ChangeManager,
 )
 from persistence.migration_manager import MigrationManager
+from persistence.workflow_repository import WorkflowRepository
+from workflow import (
+    get_registry,
+    ProcessFactory,
+    FormTriggerManager,
+    PrerequisiteChecker,
+    AutoTransitionEngine,
+    PatternAnalyzer,
+    AnomalyDetector,
+    AgentOrchestrator,
+    KanbanEditor,
+    WorkflowDashboard,
+    register_workflow_api,
+    WorkflowMLModel,
+    CSVExporter,
+    ExcelExporter,
+    PDFExporter,
+    AuditTrail,
+)
+from workflow.scheduler import start_scheduler, stop_scheduler
 
 load_dotenv()
 
@@ -35,6 +55,87 @@ SPECS_DIR = os.path.join(os.path.dirname(__file__), "specs")
 TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")
 
 app = Flask(__name__, template_folder=TEMPLATE_DIR)
+
+# ========== Initialize Workflow System ==========
+# Initialize workflow components
+kanban_registry = get_registry()
+process_factory = ProcessFactory(kanban_registry)
+
+# Setup workflow repository using RepositoryFactory (respects persistence.json configuration)
+factory = RepositoryFactory()
+workflow_base_repo = factory.get_repository("workflow_processes")
+workflow_repo = WorkflowRepository(workflow_base_repo, form_path="workflow_processes")
+
+# Create workflow storage if it doesn't exist
+if not workflow_repo.exists():
+    workflow_repo.create_storage()
+    logger.info("Created workflow_processes storage")
+
+# Create trigger manager
+form_trigger_manager = FormTriggerManager(
+    kanban_registry, process_factory, workflow_repo
+)
+
+# Initialize Phase 2 components (AutoTransitionEngine)
+prerequisite_checker = PrerequisiteChecker()
+auto_transition_engine = AutoTransitionEngine(kanban_registry, prerequisite_checker)
+logger.info(
+    "Initialized Phase 2 workflow components (AutoTransitionEngine, PrerequisiteChecker)"
+)
+
+# Initialize Phase 3 components (AI Agents)
+pattern_analyzer = PatternAnalyzer(workflow_repo)
+anomaly_detector = AnomalyDetector(workflow_repo)
+agent_orchestrator = AgentOrchestrator(
+    workflow_repo, kanban_registry, pattern_analyzer, prerequisite_checker
+)
+logger.info(
+    "Initialized Phase 3 workflow components (PatternAnalyzer, AnomalyDetector, AgentOrchestrator)"
+)
+
+# Initialize Phase 4 components (Visual Editor & Dashboard)
+kanban_editor = KanbanEditor(kanban_registry)
+workflow_dashboard = WorkflowDashboard(
+    workflow_repo,
+    kanban_registry,
+    pattern_analyzer,
+    anomaly_detector,
+    agent_orchestrator,
+)
+logger.info("Initialized Phase 4 workflow components (KanbanEditor, WorkflowDashboard)")
+
+# Initialize Phase 5 components (ML, Exporters, AuditTrail)
+workflow_ml_model = WorkflowMLModel(workflow_repo, pattern_analyzer)
+csv_exporter = CSVExporter(workflow_repo, kanban_registry)
+excel_exporter = ExcelExporter(workflow_repo, kanban_registry)
+pdf_exporter = PDFExporter(workflow_repo, kanban_registry)
+audit_trail = AuditTrail(workflow_repo)
+logger.info("Initialized Phase 5 workflow components (ML Model, Exporters, AuditTrail)")
+
+# Register Phase 4 & 5 REST API with all routes
+register_workflow_api(
+    app,
+    kanban_registry,
+    workflow_repo,
+    kanban_editor,
+    workflow_dashboard,
+    agent_orchestrator,
+    anomaly_detector,
+    pattern_analyzer,
+    csv_exporter=csv_exporter,
+    excel_exporter=excel_exporter,
+    pdf_exporter=pdf_exporter,
+    audit_trail=audit_trail,
+)
+logger.info("Registered Workflow API (Phases 4-5) at /api/workflow")
+
+# Register Workflow Admin Routes
+from workflow.admin_routes import register_admin_routes
+
+register_admin_routes(
+    app, kanban_registry, kanban_editor, workflow_repo, agent_orchestrator
+)
+logger.info("Registered Workflow Admin Routes at /admin/workflow")
 
 
 def load_spec(form_path):
@@ -657,6 +758,166 @@ def api_search_contatos():
     return jsonify(results)
 
 
+# ========== Workflow Routes ==========
+
+
+@app.route("/workflow/<kanban_id>")
+def workflow_board(kanban_id):
+    """Display Kanban workflow board."""
+    kanban = kanban_registry.get_kanban(kanban_id)
+    if not kanban:
+        abort(404, description=f"Kanban '{kanban_id}' not found")
+
+    # Get all processes for this kanban
+    processes = workflow_repo.get_processes_by_kanban(kanban_id)
+
+    # Group processes by state
+    processes_by_state = {}
+    state_counts = {}
+
+    for state in kanban["states"]:
+        state_id = state["id"]
+        processes_by_state[state_id] = []
+        state_counts[state_id] = 0
+
+    for process in processes:
+        current_state = process.get("current_state")
+        if current_state in processes_by_state:
+            processes_by_state[current_state].append(process)
+            state_counts[current_state] += 1
+
+    return render_template(
+        "workflow_board.html",
+        kanban=kanban,
+        processes_by_state=processes_by_state,
+        state_counts=state_counts,
+        total_processes=len(processes),
+    )
+
+
+@app.route("/kanban/<kanban_id>")
+def kanban_board(kanban_id):
+    """Display interactive Kanban board with drag-and-drop."""
+    kanban = kanban_registry.get_kanban(kanban_id)
+    if not kanban:
+        abort(404, description=f"Kanban '{kanban_id}' not found")
+
+    return render_template("kanban_board.html", kanban=kanban)
+
+
+@app.route("/kanban/editor")
+def kanban_editor_ui():
+    """Display visual Kanban editor with jsPlumb."""
+    return render_template("kanban_editor_ui.html")
+
+
+@app.route("/api/workflow/process/<process_id>")
+def api_get_process(process_id):
+    """API endpoint to get process details."""
+    process = workflow_repo.get_process_by_id(process_id)
+
+    if not process:
+        return jsonify({"error": "Process not found"}), 404
+
+    return jsonify(process)
+
+
+@app.route("/api/workflow/check_transition", methods=["POST"])
+def api_check_transition():
+    """API endpoint to check if a transition is allowed."""
+    data = request.get_json()
+    process_id = data.get("process_id")
+    from_state = data.get("from_state")
+    to_state = data.get("to_state")
+
+    process = workflow_repo.get_process_by_id(process_id)
+    if not process:
+        return jsonify({"allowed": False, "error": "Process not found"}), 404
+
+    kanban_id = process["kanban_id"]
+
+    # NEW PHILOSOPHY: All transitions are allowed by default, unless explicitly blocked
+    # Check if transition is explicitly blocked
+    if kanban_registry.is_transition_blocked(kanban_id, from_state, to_state):
+        blocked_transition = kanban_registry.get_blocked_transition(
+            kanban_id, from_state, to_state
+        )
+        reason = (
+            blocked_transition.get("reason", "This transition is not allowed")
+            if blocked_transition
+            else "This transition is not allowed"
+        )
+        return jsonify({"allowed": False, "error": reason, "blocked": True})
+
+    # Check if transition should warn user (abnormal flow)
+    warning = None
+    if kanban_registry.is_transition_warned(kanban_id, from_state, to_state):
+        warned_transition = kanban_registry.get_warned_transition(
+            kanban_id, from_state, to_state
+        )
+        if warned_transition:
+            warning = {
+                "message": warned_transition.get(
+                    "warning_message", "This is an unusual transition"
+                ),
+                "severity": warned_transition.get("severity", "medium"),
+                "require_justification": warned_transition.get(
+                    "require_justification", False
+                ),
+            }
+
+    # Get recommended transition definition (if exists)
+    transition = kanban_registry.get_transition(kanban_id, from_state, to_state)
+
+    # Check prerequisites (Phase 2 feature)
+    prerequisites = transition.get("prerequisites", []) if transition else []
+
+    response = {"allowed": True, "prerequisites": prerequisites}
+
+    if warning:
+        response["warning"] = warning
+
+    return jsonify(response)
+
+
+@app.route("/api/workflow/transition", methods=["POST"])
+def api_execute_transition():
+    """API endpoint to execute a workflow transition."""
+    data = request.get_json()
+    process_id = data.get("process_id")
+    new_state = data.get("new_state")
+    transition_type = data.get("transition_type", "manual")
+    justification = data.get("justification")
+
+    process = workflow_repo.get_process_by_id(process_id)
+    if not process:
+        return jsonify({"success": False, "error": "Process not found"}), 404
+
+    # Get current user (for now, use 'user' as default)
+    user = "user"
+
+    # Update process state
+    success = workflow_repo.update_process_state(
+        process_id,
+        new_state,
+        transition_type=transition_type,
+        user=user,
+        justification=justification,
+    )
+
+    if success:
+        return jsonify({"success": True})
+    else:
+        return jsonify({"success": False, "error": "Failed to update process"}), 500
+
+
+@app.route("/api/workflow/analytics/<kanban_id>")
+def api_workflow_analytics(kanban_id):
+    """API endpoint to get workflow analytics."""
+    analytics = workflow_repo.get_analytics_data(kanban_id)
+    return jsonify(analytics)
+
+
 @app.route("/")
 def main_page():
     """Display the main landing page."""
@@ -733,6 +994,15 @@ def index(form_name):
 
         forms.append(form_data)
         write_forms(forms, spec, form_name)
+
+        # Trigger workflow process creation if form is linked to kanban
+        record_idx = len(forms) - 1  # Index of newly created record
+        process_id = form_trigger_manager.on_form_created(
+            form_name, form_data, record_idx
+        )
+        if process_id:
+            logger.info(f"Created workflow process {process_id} for form {form_name}")
+
         return redirect(f"/{form_name}")
 
     # GET request - show the form
@@ -1010,6 +1280,12 @@ def edit(form_name, idx):
         # Update the form
         forms[idx] = form_data
         write_forms(forms, spec, form_name)
+
+        # Trigger workflow process update if form is linked to kanban
+        success = form_trigger_manager.on_form_updated(form_name, form_data, idx)
+        if success:
+            logger.info(f"Updated workflow process for form {form_name}, record {idx}")
+
         return redirect(f"/{form_name}")
 
     # GET request - show edit form
@@ -1035,6 +1311,14 @@ def delete(form_name, idx):
 
     forms.pop(idx)
     write_forms(forms, spec, form_name)
+
+    # Trigger workflow process deletion if form is linked to kanban
+    success = form_trigger_manager.on_form_deleted(form_name, idx)
+    if success:
+        logger.info(
+            f"Deleted/orphaned workflow process for form {form_name}, record {idx}"
+        )
+
     return redirect(f"/{form_name}")
 
 
@@ -1052,8 +1336,23 @@ def old_delete(idx):
 if __name__ == "__main__":
     print("Iniciando servidor Flask em http://0.0.0.0:5000 ...")
     print("Formulários disponíveis: http://0.0.0.0:5000/contatos")
+
+    # Start background workflow scheduler
+    print("Iniciando Background Scheduler para Workflow...")
+    start_scheduler(
+        auto_transition_engine,
+        workflow_repo,
+        anomaly_detector,
+        workflow_ml_model,
+        kanban_registry,
+    )
+
     try:
         app.run(debug=True, host="0.0.0.0", port=5000)
     except Exception as e:
         print(f"Erro ao iniciar o servidor: {e}")
         print("Verifique se a porta 5000 está livre ou se há outro serviço rodando.")
+    finally:
+        # Stop scheduler on shutdown
+        print("Parando Background Scheduler...")
+        stop_scheduler()

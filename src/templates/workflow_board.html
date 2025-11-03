@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ kanban.name }} - Workflow</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='workflow.css') }}">
+</head>
+<body>
+    <div class="workflow-container">
+        <header class="workflow-header">
+            <div class="header-left">
+                <a href="/" class="back-button">
+                    <i class="fas fa-arrow-left"></i> Voltar
+                </a>
+                <h1>
+                    <i class="fas fa-project-diagram"></i> {{ kanban.name }}
+                </h1>
+            </div>
+            <div class="header-right">
+                <button class="btn-refresh" onclick="refreshBoard()">
+                    <i class="fas fa-sync-alt"></i> Atualizar
+                </button>
+                <button class="btn-analytics" onclick="showAnalytics()">
+                    <i class="fas fa-chart-bar"></i> Analytics
+                </button>
+                <div class="process-count">
+                    <i class="fas fa-tasks"></i> {{ total_processes }} processos
+                </div>
+            </div>
+        </header>
+
+        <div class="kanban-board" id="kanbanBoard">
+            {% for state in kanban.states %}
+            <div class="kanban-column" data-state-id="{{ state.id }}">
+                <div class="column-header" style="border-left: 4px solid {{ state.color }}">
+                    <h2>{{ state.name }}</h2>
+                    <div class="column-count">
+                        {{ state_counts.get(state.id, 0) }}
+                    </div>
+                </div>
+
+                <div class="column-body" id="column-{{ state.id }}" data-state="{{ state.id }}">
+                    {% for process in processes_by_state.get(state.id, []) %}
+                    <div class="process-card"
+                         data-process-id="{{ process.process_id }}"
+                         data-kanban-id="{{ process.kanban_id }}"
+                         data-current-state="{{ process.current_state }}"
+                         draggable="true"
+                         ondragstart="handleDragStart(event)"
+                         ondragend="handleDragEnd(event)">
+
+                        <div class="card-header">
+                            <span class="process-id">
+                                <i class="fas fa-hashtag"></i> {{ process.process_id.split('_')[-1] }}
+                            </span>
+                            <div class="card-actions">
+                                <button class="btn-card-action" onclick="viewProcess('{{ process.process_id }}')" title="Ver detalhes">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn-card-action" onclick="editProcess('{{ process.process_id }}')" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="card-body">
+                            {% if process.field_values %}
+                                {% for key, value in process.field_values.items() %}
+                                    {% if loop.index <= 3 and value %}
+                                    <div class="field-item">
+                                        <span class="field-label">{{ key }}:</span>
+                                        <span class="field-value">{{ value }}</span>
+                                    </div>
+                                    {% endif %}
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+
+                        <div class="card-footer">
+                            <span class="card-date" title="Criado em {{ process.created_at }}">
+                                <i class="fas fa-calendar"></i> {{ process.created_at.split('T')[0] }}
+                            </span>
+                            {% if process.source_form %}
+                            <span class="card-source" title="Origem: {{ process.source_form }}">
+                                <i class="fas fa-file-alt"></i> {{ process.source_form.split('/')[-1] }}
+                            </span>
+                            {% endif %}
+                        </div>
+
+                        {% if process.history and process.history|length > 0 %}
+                        <div class="card-badge" title="{{ process.history|length }} transições">
+                            <i class="fas fa-history"></i> {{ process.history|length }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Modal: Detalhes do Processo -->
+    <div id="processModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Detalhes do Processo</h2>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Loaded dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Analytics -->
+    <div id="analyticsModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Analytics - {{ kanban.name }}</h2>
+                <button class="modal-close" onclick="closeAnalyticsModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="analyticsBody">
+                <!-- Loaded dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast" class="toast"></div>
+
+    <script src="{{ url_for('static', filename='workflow.js') }}"></script>
+</body>
+</html>

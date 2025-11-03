@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kanban Editor - Visual Workflow Designer</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsplumb/2.15.6/js/jsplumb.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            overflow: hidden;
+        }
+
+        .header {
+            background: white;
+            padding: 15px 20px;
+            border-bottom: 2px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            color: #333;
+        }
+
+        .header-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .main-container {
+            display: flex;
+            height: calc(100vh - 60px);
+        }
+
+        .sidebar {
+            width: 300px;
+            background: white;
+            border-right: 2px solid #e0e0e0;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .sidebar h3 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            margin-bottom: 5px;
+            color: #555;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 60px;
+        }
+
+        .canvas {
+            flex: 1;
+            position: relative;
+            background: linear-gradient(90deg, #f9f9f9 1px, transparent 1px),
+                        linear-gradient(#f9f9f9 1px, transparent 1px);
+            background-size: 20px 20px;
+            overflow: auto;
+        }
+
+        .state-node {
+            position: absolute;
+            width: 180px;
+            min-height: 100px;
+            background: white;
+            border: 2px solid #007bff;
+            border-radius: 8px;
+            padding: 12px;
+            cursor: move;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+        }
+
+        .state-node:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            transform: translateY(-2px);
+        }
+
+        .state-node.selected {
+            border-color: #28a745;
+            border-width: 3px;
+        }
+
+        .state-node.initial {
+            border-color: #28a745;
+        }
+
+        .state-node.final {
+            border-color: #dc3545;
+        }
+
+        .state-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .state-name {
+            font-weight: bold;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .state-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .state-icon-btn {
+            background: none;
+            border: none;
+            color: #666;
+            cursor: pointer;
+            padding: 2px 5px;
+            font-size: 12px;
+        }
+
+        .state-icon-btn:hover {
+            color: #007bff;
+        }
+
+        .state-icon-btn.delete:hover {
+            color: #dc3545;
+        }
+
+        .state-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            font-size: 10px;
+            border-radius: 3px;
+            margin-right: 4px;
+        }
+
+        .badge-initial {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge-final {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .state-description {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .toolbar {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            padding: 10px;
+            display: flex;
+            gap: 5px;
+        }
+
+        .toolbar-btn {
+            width: 40px;
+            height: 40px;
+            border: none;
+            background: #f8f9fa;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            color: #333;
+            transition: all 0.2s;
+        }
+
+        .toolbar-btn:hover {
+            background: #007bff;
+            color: white;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+        }
+
+        .modal-content {
+            background: white;
+            margin: 5% auto;
+            padding: 30px;
+            border-radius: 8px;
+            width: 500px;
+            max-width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .modal-header h2 {
+            font-size: 20px;
+            color: #333;
+        }
+
+        .modal-close {
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .modal-close:hover {
+            color: #333;
+        }
+
+        .modal-footer {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 100px 20px;
+            color: #999;
+        }
+
+        .empty-state i {
+            font-size: 64px;
+            margin-bottom: 20px;
+            color: #ddd;
+        }
+
+        .empty-state p {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+
+        .empty-state small {
+            font-size: 14px;
+        }
+
+        /* jsPlumb connector styles */
+        .jtk-connector {
+            z-index: 4;
+        }
+
+        .jtk-endpoint {
+            z-index: 5;
+        }
+
+        .jtk-overlay {
+            background: white;
+            padding: 4px 8px;
+            border: 1px solid #007bff;
+            border-radius: 4px;
+            font-size: 11px;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><i class="fas fa-project-diagram"></i> Editor Visual de Kanban</h1>
+        <div class="header-buttons">
+            <button class="btn btn-secondary" onclick="loadKanban()">
+                <i class="fas fa-folder-open"></i> Abrir
+            </button>
+            <button class="btn btn-success" onclick="saveKanban()">
+                <i class="fas fa-save"></i> Salvar
+            </button>
+            <button class="btn btn-primary" onclick="exportJSON()">
+                <i class="fas fa-file-export"></i> Exportar JSON
+            </button>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="sidebar">
+            <h3>Propriedades do Kanban</h3>
+            <div class="form-group">
+                <label>ID do Kanban *</label>
+                <input type="text" id="kanban-id" placeholder="ex: pedidos">
+            </div>
+            <div class="form-group">
+                <label>Nome *</label>
+                <input type="text" id="kanban-name" placeholder="ex: Fluxo de Pedidos">
+            </div>
+            <div class="form-group">
+                <label>Descrição</label>
+                <textarea id="kanban-description" placeholder="Descrição do workflow"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Formulário Vinculado</label>
+                <input type="text" id="kanban-form" placeholder="ex: pedidos">
+            </div>
+
+            <hr style="margin: 20px 0; border: none; border-top: 1px solid #e0e0e0;">
+
+            <h3>Estado Selecionado</h3>
+            <div id="state-properties" style="display: none;">
+                <div class="form-group">
+                    <label>ID do Estado *</label>
+                    <input type="text" id="state-id" placeholder="ex: novo">
+                </div>
+                <div class="form-group">
+                    <label>Nome *</label>
+                    <input type="text" id="state-name" placeholder="ex: Novo">
+                </div>
+                <div class="form-group">
+                    <label>Cor</label>
+                    <input type="color" id="state-color" value="#007bff">
+                </div>
+                <div class="form-group">
+                    <label>Descrição</label>
+                    <textarea id="state-description" placeholder="Descrição do estado"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="state-initial">
+                        Estado Inicial
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="state-final">
+                        Estado Final
+                    </label>
+                </div>
+                <button class="btn btn-primary" onclick="updateSelectedState()" style="width: 100%; margin-top: 10px;">
+                    <i class="fas fa-check"></i> Atualizar Estado
+                </button>
+            </div>
+            <div id="no-state-selected" style="color: #999; font-size: 14px; padding: 20px 0;">
+                Nenhum estado selecionado. Clique em um estado no canvas ou crie um novo.
+            </div>
+        </div>
+
+        <div class="canvas" id="canvas">
+            <div class="empty-state" id="empty-state">
+                <i class="fas fa-project-diagram"></i>
+                <p>Canvas Vazio</p>
+                <small>Clique em "Adicionar Estado" para começar</small>
+            </div>
+        </div>
+
+        <div class="toolbar">
+            <button class="toolbar-btn" onclick="addState()" title="Adicionar Estado">
+                <i class="fas fa-plus"></i>
+            </button>
+            <button class="toolbar-btn" onclick="addTransition()" title="Adicionar Transição">
+                <i class="fas fa-arrow-right"></i>
+            </button>
+            <button class="toolbar-btn" onclick="clearCanvas()" title="Limpar Canvas">
+                <i class="fas fa-trash"></i>
+            </button>
+            <button class="toolbar-btn" onclick="autoLayout()" title="Organizar Automaticamente">
+                <i class="fas fa-magic"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Transition Modal -->
+    <div id="transition-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Configurar Transição</h2>
+                <span class="modal-close" onclick="closeTransitionModal()">&times;</span>
+            </div>
+            <div class="form-group">
+                <label>De Estado</label>
+                <input type="text" id="transition-from" readonly>
+            </div>
+            <div class="form-group">
+                <label>Para Estado</label>
+                <input type="text" id="transition-to" readonly>
+            </div>
+            <div class="form-group">
+                <label>Nome da Transição *</label>
+                <input type="text" id="transition-name" placeholder="ex: Aprovar">
+            </div>
+            <div class="form-group">
+                <label>Label</label>
+                <input type="text" id="transition-label" placeholder="ex: Aprovar Pedido">
+            </div>
+            <div class="form-group">
+                <label>Tipo</label>
+                <select id="transition-type">
+                    <option value="manual">Manual</option>
+                    <option value="automatic">Automático</option>
+                    <option value="conditional">Condicional</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Ícone (FontAwesome)</label>
+                <input type="text" id="transition-icon" placeholder="ex: fa-check">
+            </div>
+            <div class="form-group">
+                <label>Cor</label>
+                <input type="color" id="transition-color" value="#007bff">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeTransitionModal()">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveTransition()">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        let jsPlumbInstance = null;
+        let states = [];
+        let transitions = [];
+        let selectedState = null;
+        let stateCounter = 0;
+
+        // Initialize jsPlumb
+        jsPlumb.ready(function() {
+            jsPlumbInstance = jsPlumb.getInstance({
+                Container: "canvas",
+                Connector: ["Flowchart", { stub: 30, gap: 5, cornerRadius: 5 }],
+                PaintStyle: { stroke: "#007bff", strokeWidth: 2 },
+                HoverPaintStyle: { stroke: "#0056b3", strokeWidth: 3 },
+                Endpoint: ["Dot", { radius: 5 }],
+                EndpointStyle: { fill: "#007bff" },
+                Anchor: ["Top", "Right", "Bottom", "Left"],
+                Overlays: [
+                    ["Arrow", { location: 1, width: 10, length: 10 }]
+                ]
+            });
+
+            // Enable connection dragging
+            jsPlumbInstance.bind("connection", function(info) {
+                const fromId = info.source.id;
+                const toId = info.target.id;
+
+                // Open transition modal
+                openTransitionModal(fromId, toId, info.connection);
+            });
+
+            // Make states draggable
+            jsPlumbInstance.draggable(document.querySelectorAll(".state-node"), {
+                containment: "parent"
+            });
+        });
+
+        function addState() {
+            const stateId = `state_${++stateCounter}`;
+            const x = 100 + (states.length * 50) % 500;
+            const y = 100 + Math.floor(states.length / 5) * 150;
+
+            const state = {
+                id: stateId,
+                name: `Estado ${stateCounter}`,
+                color: '#007bff',
+                description: '',
+                is_initial: states.length === 0,
+                is_final: false,
+                position: { x, y }
+            };
+
+            states.push(state);
+            renderState(state);
+            hideEmptyState();
+        }
+
+        function renderState(state) {
+            const node = document.createElement('div');
+            node.id = state.id;
+            node.className = 'state-node';
+            if (state.is_initial) node.classList.add('initial');
+            if (state.is_final) node.classList.add('final');
+
+            node.style.left = state.position.x + 'px';
+            node.style.top = state.position.y + 'px';
+            node.style.borderColor = state.color;
+
+            node.innerHTML = `
+                <div class="state-header">
+                    <div class="state-name">${state.name}</div>
+                    <div class="state-actions">
+                        <button class="state-icon-btn" onclick="selectState('${state.id}')">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="state-icon-btn delete" onclick="deleteState('${state.id}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+                ${state.is_initial ? '<span class="state-badge badge-initial">Inicial</span>' : ''}
+                ${state.is_final ? '<span class="state-badge badge-final">Final</span>' : ''}
+                ${state.description ? `<div class="state-description">${state.description}</div>` : ''}
+            `;
+
+            document.getElementById('canvas').appendChild(node);
+
+            // Make draggable and add endpoints
+            jsPlumbInstance.draggable(node, { containment: "parent" });
+            jsPlumbInstance.makeSource(node, {
+                filter: ".state-header",
+                anchor: "Continuous",
+                connector: ["Flowchart", { stub: 30, gap: 5, cornerRadius: 5 }],
+                connectorStyle: { stroke: "#007bff", strokeWidth: 2 }
+            });
+            jsPlumbInstance.makeTarget(node, {
+                anchor: "Continuous",
+                allowLoopback: false
+            });
+
+            // Click to select
+            node.addEventListener('click', () => selectState(state.id));
+        }
+
+        function selectState(stateId) {
+            // Deselect previous
+            document.querySelectorAll('.state-node').forEach(n => n.classList.remove('selected'));
+
+            // Select new
+            const node = document.getElementById(stateId);
+            if (node) {
+                node.classList.add('selected');
+                selectedState = states.find(s => s.id === stateId);
+
+                // Update sidebar
+                document.getElementById('state-properties').style.display = 'block';
+                document.getElementById('no-state-selected').style.display = 'none';
+
+                document.getElementById('state-id').value = selectedState.id;
+                document.getElementById('state-name').value = selectedState.name;
+                document.getElementById('state-color').value = selectedState.color;
+                document.getElementById('state-description').value = selectedState.description || '';
+                document.getElementById('state-initial').checked = selectedState.is_initial;
+                document.getElementById('state-final').checked = selectedState.is_final;
+            }
+        }
+
+        function updateSelectedState() {
+            if (!selectedState) return;
+
+            selectedState.name = document.getElementById('state-name').value;
+            selectedState.color = document.getElementById('state-color').value;
+            selectedState.description = document.getElementById('state-description').value;
+            selectedState.is_initial = document.getElementById('state-initial').checked;
+            selectedState.is_final = document.getElementById('state-final').checked;
+
+            // Re-render
+            const node = document.getElementById(selectedState.id);
+            if (node) {
+                node.remove();
+            }
+            renderState(selectedState);
+
+            // Reconnect transitions
+            reconnectTransitions();
+        }
+
+        function deleteState(stateId) {
+            if (!confirm('Tem certeza que deseja excluir este estado?')) return;
+
+            // Remove from array
+            states = states.filter(s => s.id !== stateId);
+
+            // Remove from DOM
+            const node = document.getElementById(stateId);
+            if (node) {
+                jsPlumbInstance.remove(node);
+            }
+
+            // Remove related transitions
+            transitions = transitions.filter(t => t.from !== stateId && t.to !== stateId);
+
+            // Clear selection
+            if (selectedState && selectedState.id === stateId) {
+                selectedState = null;
+                document.getElementById('state-properties').style.display = 'none';
+                document.getElementById('no-state-selected').style.display = 'block';
+            }
+
+            if (states.length === 0) {
+                showEmptyState();
+            }
+        }
+
+        function openTransitionModal(fromId, toId, connection) {
+            document.getElementById('transition-from').value = states.find(s => s.id === fromId)?.name || fromId;
+            document.getElementById('transition-to').value = states.find(s => s.id === toId)?.name || toId;
+            document.getElementById('transition-modal').style.display = 'block';
+
+            // Store connection reference
+            window.currentConnection = { fromId, toId, connection };
+        }
+
+        function closeTransitionModal() {
+            document.getElementById('transition-modal').style.display = 'none';
+
+            // Remove connection if not saved
+            if (window.currentConnection && window.currentConnection.connection) {
+                jsPlumbInstance.deleteConnection(window.currentConnection.connection);
+            }
+            window.currentConnection = null;
+        }
+
+        function saveTransition() {
+            if (!window.currentConnection) return;
+
+            const transition = {
+                from: window.currentConnection.fromId,
+                to: window.currentConnection.toId,
+                name: document.getElementById('transition-name').value,
+                label: document.getElementById('transition-label').value,
+                type: document.getElementById('transition-type').value,
+                icon: document.getElementById('transition-icon').value,
+                color: document.getElementById('transition-color').value
+            };
+
+            transitions.push(transition);
+
+            // Update connection style
+            if (window.currentConnection.connection) {
+                window.currentConnection.connection.setPaintStyle({ stroke: transition.color, strokeWidth: 2 });
+                window.currentConnection.connection.addOverlay([
+                    "Label",
+                    {
+                        label: transition.label || transition.name,
+                        cssClass: "jtk-overlay"
+                    }
+                ]);
+            }
+
+            closeTransitionModal();
+        }
+
+        function reconnectTransitions() {
+            // Remove all connections
+            jsPlumbInstance.deleteEveryConnection();
+
+            // Recreate connections
+            transitions.forEach(t => {
+                const conn = jsPlumbInstance.connect({
+                    source: t.from,
+                    target: t.to,
+                    paintStyle: { stroke: t.color, strokeWidth: 2 }
+                });
+
+                if (conn) {
+                    conn.addOverlay([
+                        "Label",
+                        {
+                            label: t.label || t.name,
+                            cssClass: "jtk-overlay"
+                        }
+                    ]);
+                }
+            });
+        }
+
+        function addTransition() {
+            alert('Arraste de um estado para outro para criar uma transição.');
+        }
+
+        function clearCanvas() {
+            if (!confirm('Tem certeza que deseja limpar o canvas?')) return;
+
+            states.forEach(s => {
+                const node = document.getElementById(s.id);
+                if (node) jsPlumbInstance.remove(node);
+            });
+
+            states = [];
+            transitions = [];
+            selectedState = null;
+            stateCounter = 0;
+
+            document.getElementById('state-properties').style.display = 'none';
+            document.getElementById('no-state-selected').style.display = 'block';
+            showEmptyState();
+        }
+
+        function autoLayout() {
+            const padding = 50;
+            const stateWidth = 200;
+            const stateHeight = 120;
+            const cols = Math.ceil(Math.sqrt(states.length));
+
+            states.forEach((state, idx) => {
+                const col = idx % cols;
+                const row = Math.floor(idx / cols);
+
+                state.position.x = padding + (col * stateWidth);
+                state.position.y = padding + (row * stateHeight);
+
+                const node = document.getElementById(state.id);
+                if (node) {
+                    node.style.left = state.position.x + 'px';
+                    node.style.top = state.position.y + 'px';
+                }
+            });
+
+            jsPlumbInstance.repaintEverything();
+        }
+
+        function saveKanban() {
+            const kanbanId = document.getElementById('kanban-id').value;
+            const kanbanName = document.getElementById('kanban-name').value;
+
+            if (!kanbanId || !kanbanName) {
+                alert('Preencha ID e Nome do Kanban');
+                return;
+            }
+
+            const kanban = {
+                id: kanbanId,
+                name: kanbanName,
+                description: document.getElementById('kanban-description').value,
+                linked_forms: [document.getElementById('kanban-form').value].filter(Boolean),
+                states: states.map(s => ({
+                    id: s.id,
+                    name: s.name,
+                    color: s.color,
+                    description: s.description,
+                    is_initial: s.is_initial,
+                    is_final: s.is_final
+                })),
+                transitions: transitions.map(t => ({
+                    from: t.from,
+                    to: t.to,
+                    name: t.name,
+                    label: t.label,
+                    type: t.type,
+                    icon: t.icon,
+                    color: t.color,
+                    prerequisites: [],
+                    actions: []
+                }))
+            };
+
+            // Send to server
+            fetch(`/api/workflow/kanbans`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(kanban)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Kanban salvo com sucesso!');
+                } else {
+                    alert('Erro ao salvar: ' + (data.error || 'Desconhecido'));
+                }
+            })
+            .catch(err => {
+                alert('Erro ao salvar: ' + err.message);
+            });
+        }
+
+        function exportJSON() {
+            const kanbanId = document.getElementById('kanban-id').value || 'kanban';
+
+            const kanban = {
+                id: kanbanId,
+                name: document.getElementById('kanban-name').value,
+                description: document.getElementById('kanban-description').value,
+                linked_forms: [document.getElementById('kanban-form').value].filter(Boolean),
+                states: states.map(s => ({
+                    id: s.id,
+                    name: s.name,
+                    color: s.color,
+                    description: s.description,
+                    is_initial: s.is_initial,
+                    is_final: s.is_final
+                })),
+                transitions: transitions.map(t => ({
+                    from: t.from,
+                    to: t.to,
+                    name: t.name,
+                    label: t.label,
+                    type: t.type,
+                    icon: t.icon,
+                    color: t.color,
+                    prerequisites: [],
+                    actions: []
+                }))
+            };
+
+            const json = JSON.stringify(kanban, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${kanbanId}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function loadKanban() {
+            const kanbanId = prompt('Digite o ID do Kanban para carregar:');
+            if (!kanbanId) return;
+
+            fetch(`/api/workflow/kanbans/${kanbanId}`)
+                .then(res => res.json())
+                .then(kanban => {
+                    // Clear canvas
+                    clearCanvas();
+
+                    // Load kanban properties
+                    document.getElementById('kanban-id').value = kanban.id;
+                    document.getElementById('kanban-name').value = kanban.name;
+                    document.getElementById('kanban-description').value = kanban.description || '';
+                    document.getElementById('kanban-form').value = kanban.linked_forms?.[0] || '';
+
+                    // Load states
+                    kanban.states.forEach((state, idx) => {
+                        states.push({
+                            id: state.id,
+                            name: state.name,
+                            color: state.color || '#007bff',
+                            description: state.description || '',
+                            is_initial: state.is_initial || false,
+                            is_final: state.is_final || false,
+                            position: state.position || { x: 100 + idx * 220, y: 100 }
+                        });
+                        renderState(states[states.length - 1]);
+                    });
+
+                    // Load transitions
+                    kanban.transitions.forEach(t => {
+                        transitions.push({
+                            from: t.from,
+                            to: t.to,
+                            name: t.name,
+                            label: t.label || t.name,
+                            type: t.type || 'manual',
+                            icon: t.icon || '',
+                            color: t.color || '#007bff'
+                        });
+                    });
+
+                    reconnectTransitions();
+                    hideEmptyState();
+                })
+                .catch(err => {
+                    alert('Erro ao carregar kanban: ' + err.message);
+                });
+        }
+
+        function hideEmptyState() {
+            document.getElementById('empty-state').style.display = 'none';
+        }
+
+        function showEmptyState() {
+            document.getElementById('empty-state').style.display = 'block';
+        }
+    </script>
+</body>
+</html>

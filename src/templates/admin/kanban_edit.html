@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editar Kanban - {{ kanban.name }}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/admin.css">
+</head>
+<body style="background: #2c3e50; margin: 0; padding: 0;">
+    <div class="admin-container">
+        <!-- Header -->
+        <div class="admin-header">
+            <h1><i class="fa fa-edit"></i> Editar Kanban</h1>
+            <a href="/admin/workflow/kanbans" class="back-link">
+                <i class="fa fa-arrow-left"></i> Voltar
+            </a>
+        </div>
+
+        <!-- Mensagens de Erro -->
+        {% if error %}
+        <div class="alert alert-error">
+            <i class="fa fa-exclamation-circle"></i> {{ error }}
+        </div>
+        {% endif %}
+
+        <!-- Formulário -->
+        <form method="POST" id="kanban-form" onsubmit="return validateForm('kanban-form')">
+            <div class="info-section">
+                <h2><i class="fa fa-info-circle"></i> Informações Básicas</h2>
+
+                <div class="form-group">
+                    <label>ID do Kanban</label>
+                    <input
+                        type="text"
+                        value="{{ kanban.id }}"
+                        disabled
+                        style="background: #34495e; cursor: not-allowed;"
+                    >
+                    <small style="color: #95a5a6;">
+                        <i class="fa fa-lock"></i> O ID não pode ser alterado após a criação.
+                    </small>
+                </div>
+
+                <div class="form-group">
+                    <label for="name">
+                        Nome do Kanban <span style="color: #e74c3c;">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        id="name"
+                        name="name"
+                        value="{{ kanban.name }}"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Descrição</label>
+                    <textarea
+                        id="description"
+                        name="description"
+                        rows="4"
+                    >{{ kanban.description }}</textarea>
+                </div>
+            </div>
+
+            <!-- Estados -->
+            <div class="info-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2><i class="fa fa-columns"></i> Estados ({{ kanban.states|length }})</h2>
+                    <button type="button" class="btn btn-success btn-sm" onclick="alert('Funcionalidade completa em desenvolvimento')">
+                        <i class="fa fa-plus"></i> Adicionar Estado
+                    </button>
+                </div>
+
+                {% if kanban.states %}
+                <div class="item-list">
+                    {% for state_id, state in kanban.states.items() %}
+                    <div class="item">
+                        <div>
+                            <span class="item-name">
+                                <span style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: {{ state.color }}; margin-right: 8px;"></span>
+                                {{ state.name }}
+                            </span>
+                            <small style="color: #95a5a6; margin-left: 25px;">
+                                ID: {{ state_id }} •
+                                Tipo: {{ state.type }}
+                                {% if state.transitions %}
+                                • {{ state.transitions|length }} transições
+                                {% endif %}
+                            </small>
+                        </div>
+                        <div class="item-actions">
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="alert('Edição de estados em desenvolvimento')">
+                                <i class="fa fa-edit"></i>
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p style="color: #95a5a6; text-align: center; padding: 20px;">
+                    Nenhum estado configurado
+                </p>
+                {% endif %}
+            </div>
+
+            <!-- Formulários Vinculados -->
+            <div class="info-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2><i class="fa fa-link"></i> Formulários Vinculados</h2>
+                    <a href="/admin/workflow/mappings" class="btn btn-primary btn-sm">
+                        <i class="fa fa-cog"></i> Gerenciar
+                    </a>
+                </div>
+
+                {% if kanban.linked_forms %}
+                <div class="item-list">
+                    {% for form in kanban.linked_forms %}
+                    <div class="item">
+                        <span class="item-name">
+                            <i class="fa fa-file-alt"></i> {{ form }}
+                        </span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p style="color: #95a5a6; text-align: center; padding: 20px;">
+                    <i class="fa fa-unlink"></i> Nenhum formulário vinculado.
+                    <a href="/admin/workflow/mappings" style="color: #3498db;">Vincular agora</a>
+                </p>
+                {% endif %}
+            </div>
+
+            <!-- Configurações Avançadas -->
+            <div class="info-section">
+                <h2><i class="fa fa-sliders-h"></i> Configurações Avançadas</h2>
+                <div class="item-list">
+                    <div class="item">
+                        <span class="item-name">
+                            <i class="fa fa-check-circle"></i> Pré-requisitos
+                        </span>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="alert('Funcionalidade em desenvolvimento')">
+                            <i class="fa fa-cog"></i> Configurar
+                        </button>
+                    </div>
+                    <div class="item">
+                        <span class="item-name">
+                            <i class="fa fa-bell"></i> Notificações
+                        </span>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="alert('Funcionalidade em desenvolvimento')">
+                            <i class="fa fa-cog"></i> Configurar
+                        </button>
+                    </div>
+                    <div class="item">
+                        <span class="item-name">
+                            <i class="fa fa-code"></i> Exportar JSON
+                        </span>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="alert('Funcionalidade em desenvolvimento')">
+                            <i class="fa fa-download"></i> Download
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botões de Ação -->
+            <div style="display: flex; gap: 10px; margin-top: 30px;">
+                <button type="submit" class="btn btn-success">
+                    <i class="fa fa-save"></i> Salvar Alterações
+                </button>
+                <a href="/admin/workflow/kanbans" class="btn btn-secondary">
+                    <i class="fa fa-times"></i> Cancelar
+                </a>
+                <a href="/admin/workflow/kanbans/{{ kanban.id }}/delete" class="btn btn-danger" style="margin-left: auto;">
+                    <i class="fa fa-trash"></i> Excluir Kanban
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <script src="/static/admin.js"></script>
+</body>
+</html>

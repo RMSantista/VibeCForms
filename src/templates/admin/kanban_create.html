@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Criar Novo Kanban</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/admin.css">
+</head>
+<body style="background: #2c3e50; margin: 0; padding: 0;">
+    <div class="admin-container">
+        <!-- Header -->
+        <div class="admin-header">
+            <h1><i class="fa fa-plus"></i> Criar Novo Kanban</h1>
+            <a href="/admin/workflow/kanbans" class="back-link">
+                <i class="fa fa-arrow-left"></i> Voltar
+            </a>
+        </div>
+
+        <!-- Mensagens de Erro -->
+        {% if error %}
+        <div class="alert alert-error">
+            <i class="fa fa-exclamation-circle"></i> {{ error }}
+        </div>
+        {% endif %}
+
+        <!-- Formulário -->
+        <form method="POST" id="kanban-form" onsubmit="return validateForm('kanban-form')">
+            <div class="info-section">
+                <h2><i class="fa fa-info-circle"></i> Informações Básicas</h2>
+
+                <div class="form-group">
+                    <label for="kanban_id">
+                        ID do Kanban <span style="color: #e74c3c;">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        id="kanban_id"
+                        name="kanban_id"
+                        placeholder="ex: fluxo_vendas"
+                        pattern="[a-z0-9_]+"
+                        required
+                    >
+                    <small>
+                        Use apenas letras minúsculas, números e underscore (_).
+                        Este ID será usado para identificar o kanban no sistema.
+                    </small>
+                </div>
+
+                <div class="form-group">
+                    <label for="name">
+                        Nome do Kanban <span style="color: #e74c3c;">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        id="name"
+                        name="name"
+                        placeholder="ex: Fluxo de Vendas"
+                        required
+                    >
+                    <small>
+                        Nome descritivo que será exibido na interface.
+                    </small>
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Descrição (opcional)</label>
+                    <textarea
+                        id="description"
+                        name="description"
+                        placeholder="Descreva o propósito deste workflow..."
+                        rows="4"
+                    ></textarea>
+                    <small>
+                        Informação adicional sobre o workflow e seu uso.
+                    </small>
+                </div>
+            </div>
+
+            <div class="info-section">
+                <h2><i class="fa fa-lightbulb"></i> Próximos Passos</h2>
+                <p style="color: #ecf0f1; line-height: 1.8;">
+                    Após criar o kanban, você será redirecionado para a página de edição onde poderá:
+                </p>
+                <ul style="color: #95a5a6; line-height: 2;">
+                    <li><i class="fa fa-check" style="color: #27ae60;"></i> Adicionar e configurar estados</li>
+                    <li><i class="fa fa-check" style="color: #27ae60;"></i> Definir transições entre estados</li>
+                    <li><i class="fa fa-check" style="color: #27ae60;"></i> Configurar pré-requisitos</li>
+                    <li><i class="fa fa-check" style="color: #27ae60;"></i> Vincular formulários</li>
+                    <li><i class="fa fa-check" style="color: #27ae60;"></i> Configurar notificações</li>
+                </ul>
+                <p style="color: #95a5a6; font-size: 14px; margin-top: 15px;">
+                    <i class="fa fa-info-circle"></i>
+                    Por padrão, o kanban será criado com dois estados básicos conectados: "Novo" (inicial) → "Concluído" (final).
+                </p>
+            </div>
+
+            <!-- Botões de Ação -->
+            <div style="display: flex; gap: 10px; margin-top: 30px;">
+                <button type="submit" class="btn btn-success">
+                    <i class="fa fa-save"></i> Criar Kanban
+                </button>
+                <a href="/admin/workflow/kanbans" class="btn btn-secondary">
+                    <i class="fa fa-times"></i> Cancelar
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <script src="/static/admin.js"></script>
+</body>
+</html>

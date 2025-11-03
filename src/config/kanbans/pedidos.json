@@ -1,0 +1,210 @@
+{
+  "id": "pedidos",
+  "name": "Fluxo de Pedidos",
+  "description": "Workflow para gerenciamento de pedidos desde orçamento até entrega",
+  "states": [
+    {
+      "id": "orcamento",
+      "name": "Orçamento",
+      "color": "#FFA500",
+      "is_initial": true,
+      "auto_transition_to": null,
+      "description": "Pedido em fase de orçamento"
+    },
+    {
+      "id": "pedido",
+      "name": "Pedido Confirmado",
+      "color": "#9370DB",
+      "auto_transition_to": null,
+      "description": "Pedido confirmado pelo cliente"
+    },
+    {
+      "id": "em_entrega",
+      "name": "Em Entrega",
+      "color": "#4169E1",
+      "auto_transition_to": null,
+      "description": "Pedido em processo de entrega"
+    },
+    {
+      "id": "concluido",
+      "name": "Concluído",
+      "color": "#32CD32",
+      "is_final": true,
+      "description": "Pedido entregue e concluído"
+    },
+    {
+      "id": "cancelado",
+      "name": "Cancelado",
+      "color": "#DC143C",
+      "is_final": true,
+      "description": "Pedido cancelado"
+    }
+  ],
+  "recommended_transitions": [
+    {
+      "from": "orcamento",
+      "to": "pedido",
+      "type": "manual",
+      "name": "Confirmar Pedido",
+      "label": "Confirmar Pedido",
+      "description": "Cliente confirmou o orçamento",
+      "icon": "fa-check-circle",
+      "color": "#28a745",
+      "prerequisites": [],
+      "actions": []
+    },
+    {
+      "from": "orcamento",
+      "to": "cancelado",
+      "type": "manual",
+      "name": "Cancelar Orçamento",
+      "label": "Cancelar Orçamento",
+      "description": "Cliente não aceitou o orçamento",
+      "icon": "fa-times-circle",
+      "color": "#dc3545",
+      "prerequisites": [],
+      "actions": []
+    },
+    {
+      "from": "pedido",
+      "to": "em_entrega",
+      "type": "manual",
+      "name": "Iniciar Entrega",
+      "label": "Iniciar Entrega",
+      "description": "Pedido saiu para entrega",
+      "icon": "fa-truck",
+      "color": "#007bff",
+      "prerequisites": [],
+      "actions": [
+        {
+          "type": "webhook",
+          "url": "https://api.example.com/notify-delivery",
+          "method": "POST"
+        }
+      ]
+    },
+    {
+      "from": "pedido",
+      "to": "cancelado",
+      "type": "manual",
+      "name": "Cancelar Pedido",
+      "label": "Cancelar Pedido",
+      "description": "Pedido cancelado antes da entrega",
+      "icon": "fa-ban",
+      "color": "#dc3545",
+      "prerequisites": [],
+      "actions": []
+    },
+    {
+      "from": "em_entrega",
+      "to": "concluido",
+      "type": "manual",
+      "name": "Concluir Entrega",
+      "label": "Concluir Entrega",
+      "description": "Pedido foi entregue com sucesso",
+      "icon": "fa-check-double",
+      "color": "#28a745",
+      "prerequisites": [],
+      "actions": [
+        {
+          "type": "email",
+          "to": "{cliente_email}",
+          "subject": "Pedido Entregue",
+          "template": "delivery_confirmation"
+        }
+      ]
+    },
+    {
+      "from": "em_entrega",
+      "to": "pedido",
+      "type": "manual",
+      "name": "Retornar ao Pedido",
+      "label": "Retornar ao Pedido",
+      "description": "Entrega não pôde ser completada",
+      "icon": "fa-undo",
+      "color": "#ffc107",
+      "prerequisites": [],
+      "actions": []
+    }
+  ],
+  "blocked_transitions": [
+    {
+      "from": "concluido",
+      "to": "orcamento",
+      "reason": "Não é possível retornar um pedido concluído para orçamento",
+      "description": "Esta transição está permanentemente bloqueada por regras de negócio"
+    },
+    {
+      "from": "concluido",
+      "to": "pedido",
+      "reason": "Não é possível retornar um pedido concluído para pedido confirmado",
+      "description": "Pedidos concluídos são finais e não podem ser reabertos"
+    },
+    {
+      "from": "cancelado",
+      "to": "em_entrega",
+      "reason": "Não é possível enviar um pedido cancelado para entrega",
+      "description": "Pedidos cancelados não podem ser processados"
+    }
+  ],
+  "warned_transitions": [
+    {
+      "from": "em_entrega",
+      "to": "orcamento",
+      "warning": "Esta é uma transição anormal. Um pedido em entrega geralmente não volta para orçamento.",
+      "warning_message": "Você tem certeza que deseja retornar este pedido em entrega para orçamento?",
+      "require_justification": false,
+      "severity": "high"
+    },
+    {
+      "from": "concluido",
+      "to": "em_entrega",
+      "warning": "Esta é uma transição anormal. Um pedido concluído raramente volta para entrega.",
+      "warning_message": "Retornar um pedido concluído para entrega pode indicar um problema. Deseja continuar?",
+      "require_justification": true,
+      "severity": "high"
+    },
+    {
+      "from": "pedido",
+      "to": "orcamento",
+      "warning": "Retornar para orçamento após confirmar pedido é incomum.",
+      "warning_message": "Deseja realmente retornar este pedido confirmado para orçamento?",
+      "require_justification": false,
+      "severity": "medium"
+    }
+  ],
+  "linked_forms": ["pedidos"],
+  "field_mapping": {
+    "cliente": "cliente",
+    "valor_total": "valor",
+    "data_pedido": "data",
+    "descricao": "descricao"
+  },
+  "required_fields": ["cliente", "valor_total"],
+  "sla_hours": 72,
+  "notifications": {
+    "enabled": true,
+    "channels": ["email", "webhook"],
+    "events": {
+      "process_created": true,
+      "state_changed": true,
+      "sla_warning": true,
+      "sla_exceeded": true
+    },
+    "email_config": {
+      "recipients": ["admin@example.com"],
+      "template": "workflow_notification"
+    },
+    "webhook_config": {
+      "url": "https://api.example.com/workflow-events",
+      "headers": {
+        "Authorization": "Bearer ${WEBHOOK_TOKEN}"
+      }
+    }
+  },
+  "metadata": {
+    "department": "Sales",
+    "priority": "high",
+    "version": "1.0"
+  }
+}

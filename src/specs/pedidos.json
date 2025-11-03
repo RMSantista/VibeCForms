@@ -1,0 +1,43 @@
+{
+  "title": "Pedidos",
+  "icon": "fa-shopping-cart",
+  "fields": [
+    {
+      "name": "cliente",
+      "label": "Cliente",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "descricao",
+      "label": "Descrição do Pedido",
+      "type": "textarea",
+      "required": true
+    },
+    {
+      "name": "valor_total",
+      "label": "Valor Total (R$)",
+      "type": "number",
+      "required": true
+    },
+    {
+      "name": "data_pedido",
+      "label": "Data do Pedido",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "observacoes",
+      "label": "Observações",
+      "type": "textarea",
+      "required": false
+    }
+  ],
+  "validation_messages": {
+    "all_empty": "Preencha pelo menos um campo obrigatório",
+    "cliente": "O campo Cliente é obrigatório",
+    "descricao": "O campo Descrição é obrigatório",
+    "valor_total": "O campo Valor Total é obrigatório",
+    "data_pedido": "O campo Data do Pedido é obrigatório"
+  }
+}

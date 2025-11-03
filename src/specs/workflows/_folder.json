@@ -1,0 +1,6 @@
+{
+  "name": "Fluxos de Trabalho",
+  "description": "Workflows e processos gerenciados pelo sistema Kanban",
+  "icon": "fa-project-diagram",
+  "order": 999
+}
