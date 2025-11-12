@@ -2,16 +2,255 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
+## Framework Overview
 
-VibeCForms is a Flask-based dynamic form management system built as an exploration of "Vibe Coding" - AI-assisted development. The project serves as both a functional CRUD application and a learning journey documenting how to build software with AI assistance.
+VibeCForms is an **AI-first framework for building process tracking systems** with seamless collaboration between humans, AI agents, and code. Unlike traditional CRUD frameworks, VibeCForms is designed for systems that track multi-step processes (sales pipelines, laboratory workflows, legal cases) where objects move through states and multiple actors (human, AI, or code) can observe and act on those transitions.
 
-The system generates forms dynamically from JSON specification files, supports hierarchical navigation, and requires no code changes to add new forms.
+**Core Philosophy: Convention over Configuration, Configuration over Code**
 
-## Core Architecture
+This creates a clear development hierarchy:
+1. **Convention** - Use well-defined conventions that require no setup
+2. **Configuration** - When customization is needed, use JSON configuration files
+3. **Code** - Write code only for truly unique business logic
+
+When building with VibeCForms, always prefer conventions first, fall back to configuration when needed, and only write code when neither convention nor configuration can solve the problem.
+
+---
+
+## Building with VibeCForms
+
+### The Eight Core Conventions
+
+VibeCForms provides eight well-defined conventions that enable rapid development:
+
+#### 1. 1:1 CRUD-to-Table Mapping
+**Convention:** Every form maps directly to exactly one table/storage backend.
+
+**Implementation:**
+- Form path determines storage location: `contatos` → `contatos.txt` or `contatos` table in SQLite
+- Nested forms flatten to underscores: `financeiro/contas` → `financeiro_contas.txt`
+- No hidden abstractions or complex ORM mappings
+- Each form is independent and self-contained
+
+**When to Use:**
+- Default behavior, no action required
+- Create a JSON spec file in `src/specs/` and you get automatic storage
+
+**Example:**
+```python
+# In VibeCForms.py, the mapping is automatic:
+data_file = os.path.join('src', form_path.replace('/', '_') + '.txt')
+```
+
+#### 2. Shared Metadata
+**Convention:** UI and database definitions come from the same source (the form spec JSON), ensuring they're always in sync.
+
+**Implementation:**
+- Form spec defines both UI rendering AND data structure
+- Template system reads spec to generate HTML forms
+- Persistence system reads spec to create/validate database schema
+- Single source of truth eliminates sync issues
+
+**When to Use:**
+- Always - this is fundamental to VibeCForms
+- Add a field to the spec → it appears in UI AND storage automatically
+
+**Example spec** (`src/specs/contatos.json`):
+```json
+{
+  "title": "Contatos",
+  "icon": "fa-address-book",
+  "fields": [
+    {"name": "nome", "label": "Nome", "type": "text", "required": true},
+    {"name": "telefone", "label": "Telefone", "type": "tel", "required": true},
+    {"name": "email", "label": "Email", "type": "email", "required": false}
+  ]
+}
+```
+
+This single spec drives both the HTML form and the database schema.
+
+#### 3. Relationship Tables for All Cardinality
+**Convention:** All relationships use relationship tables, regardless of whether they're 1:1, 1:N, or N:N.
+
+**Implementation:**
+- Even 1:1 and 1:N relationships use intermediate tables
+- Consistent pattern simplifies queries and migrations
+- No foreign keys embedded in entity tables
+- Relationship tables always have: `entity1_id`, `entity2_id`, optional metadata
+
+**When to Use:**
+- Whenever you need to relate two entities
+- Example: `customer_orders` table relates `customers` to `orders` (even though it's 1:N)
+
+**Why This Matters:**
+- Uniform interface for AI agents to understand relationships
+- Easy to upgrade 1:N to N:N without schema changes
+- Simplified audit trails and history tracking
+
+#### 4. Tags as State
+**Convention:** Object states are represented by tags, making state explicit and queryable.
+
+**Implementation:**
+- Create a `tags` table: `object_name`, `object_id`, `tag`, `applied_at`, `applied_by`
+- Tags represent states: "lead", "qualified", "proposal", "negotiation", "closed"
+- Objects can have multiple tags simultaneously
+- State transitions = tag operations (remove old tag, add new tag)
+
+**When to Use:**
+- Any system where objects move through states
+- Sales pipelines, case management, workflow systems
+- When multiple actors need to monitor state changes
+
+**Example:**
+```python
+# Checking state
+def has_tag(object_id, tag_name):
+    return tag_exists(object_id, tag_name)
+
+# Transitioning state
+def move_to_proposal(deal_id, user_id):
+    remove_tag(deal_id, "qualified")
+    add_tag(deal_id, "proposal", user_id)
+```
+
+#### 5. Kanbans for State Transitions
+**Convention:** Visual Kanban boards control how objects move between states (tags).
+
+**Implementation:**
+- Kanban columns represent states (tags)
+- Dragging cards between columns = tag transitions
+- Board configuration defines allowed transitions
+- Each board is a view of objects filtered by relevant tags
+
+**When to Use:**
+- User-facing interface for state management
+- Workflow systems where humans control progression
+- Visual representation of process flow
+
+**Configuration Example:**
+```json
+{
+  "board_name": "Sales Pipeline",
+  "columns": [
+    {"tag": "lead", "label": "Leads"},
+    {"tag": "qualified", "label": "Qualified"},
+    {"tag": "proposal", "label": "Proposal Sent"},
+    {"tag": "closed", "label": "Closed Won"}
+  ],
+  "object_type": "deals"
+}
+```
+
+#### 6. Uniform Actor Interface
+**Convention:** Humans, AI agents, and subsystems use the same interface to monitor tags and trigger actions.
+
+**Implementation:**
+- All actors query the same `tags` table
+- All actors use the same functions: `add_tag()`, `remove_tag()`, `has_tag()`
+- Tag changes trigger events that any actor can subscribe to
+- No special APIs for different actor types
+
+**When to Use:**
+- Always, when building process tracking systems
+- Enables seamless collaboration between humans, AI, and code
+
+**Example:**
+```python
+# Human via Kanban board
+kanban.move_card(deal_id, from_column="qualified", to_column="proposal")
+  # → calls remove_tag(deal_id, "qualified")
+  # → calls add_tag(deal_id, "proposal", user_id)
+
+# AI agent monitoring
+def ai_agent_check():
+    qualified_deals = get_objects_with_tag("qualified")
+    for deal in qualified_deals:
+        if ai_recommends_proposal(deal):
+            add_tag(deal.id, "ready_for_proposal", "ai_agent")
+
+# Email subsystem
+def email_monitor():
+    proposal_deals = get_objects_with_tag("proposal")
+    for deal in proposal_deals:
+        if needs_followup(deal):
+            send_followup_email(deal)
+```
+
+#### 7. Tag-Based Notifications
+**Convention:** Simple notification system where any actor can monitor tag changes and react.
+
+**Implementation:**
+- Tag changes are events: `tag_added(object_name, object_id, tag, actor)`
+- Actors subscribe to specific tags they care about
+- Notifications trigger on tag operations
+- No complex event bus - just watch the tags table
+
+**When to Use:**
+- When actors need to react to state changes
+- Alerting managers when deals reach certain stages
+- Triggering automated actions on state transitions
+
+**Example:**
+```python
+# Manager notification on high-value deals
+def notify_manager(object_id, tag_name, actor):
+    if tag_name == "negotiation":
+        deal = get_deal(object_id)
+        if deal.value > 100000:
+            send_notification(manager_email, f"High-value deal {deal.id} in negotiation")
+
+# Subscribe to tag events
+subscribe_to_tag("negotiation", notify_manager)
+```
+
+#### 8. Convention over Configuration, Configuration over Code
+**Convention:** Use the hierarchy: conventions → configuration → code.
+
+**Implementation:**
+- **Use Convention When:** Standard CRUD, common field types, typical workflows
+- **Use Configuration When:** Custom field layouts, specific backend selection, workflow definitions
+- **Use Code When:** Complex business rules, external integrations, unique AI behaviors
+
+**Decision Tree:**
+1. Can convention handle it? → Use convention (no work required)
+2. Can configuration handle it? → Create JSON config (no code required)
+3. Neither works? → Write code (only when necessary)
+
+**Examples:**
+
+*Convention (no setup):*
+- Directory structure becomes UI hierarchy
+
+*Configuration (JSON only):*
+```json
+{
+  "backend": "sqlite",
+  "validation_messages": {
+    "email": "Must be a valid email address"
+  },
+  "icon": "fa-users"
+}
+```
+
+*Code (when needed):*
+```python
+def custom_validation(data):
+    # Complex business rule that can't be expressed in config
+    if data['age'] < 18 and data['type'] == 'unrestricted':
+        return False, "Minors cannot have unrestricted access"
+    return True, None
+```
+
+---
+
+## Technical Implementation
+
+Now that you understand the conventions, here's how to implement them using VibeCForms' existing infrastructure.
 
 ### Persistence System (Version 3.0)
-The application uses a pluggable persistence system that supports multiple storage backends, allowing different forms to use different storage technologies without code changes.
+
+The application uses a pluggable persistence system implementing the **1:1 CRUD-to-Table Mapping** convention.
 
 #### Multi-Backend Architecture
 The system implements three design patterns:
@@ -60,7 +299,7 @@ class BaseRepository(ABC):
 - Full configurations in `persistence.json`
 - Architecture ready for implementation
 
-#### Configuration
+#### Configuration (Convention → Configuration)
 Backend selection is configured in `src/config/persistence.json`:
 ```json
 {
@@ -74,6 +313,8 @@ Backend selection is configured in `src/config/persistence.json`:
 }
 ```
 
+This demonstrates **Configuration over Code**: changing backends requires only JSON edits, no code changes.
+
 #### Migration System
 The system includes automatic backend migration with:
 1. **Change Detection**: Compares `persistence.json` with `schema_history.json`
@@ -86,8 +327,8 @@ Successfully migrated 40 records:
 - contatos: 23 records (TXT → SQLite)
 - produtos: 17 records (TXT → SQLite)
 
-#### Schema Change Detection
-The system tracks schema changes using MD5 hashes:
+#### Schema Change Detection (Shared Metadata Convention)
+The system tracks schema changes using MD5 hashes, ensuring **UI and database stay in sync**:
 - **ADD_FIELD**: Field added (automatic, no confirmation)
 - **REMOVE_FIELD**: Field removed (requires confirmation if data exists)
 - **CHANGE_TYPE**: Field type changed (requires confirmation)
@@ -133,32 +374,36 @@ Schema history is tracked automatically in `src/config/schema_history.json`:
 
 ---
 
-### Template System (Version 2.2 - Improvement #4)
-The application uses Flask's standard template system with Jinja2 templates separated into dedicated files in `src/templates/`:
+### Template System (Shared Metadata Implementation)
+
+The application uses Flask's Jinja2 templates, implementing the **Shared Metadata** convention by reading the same spec for both UI and data operations.
+
+**Main Templates** (`src/templates/`):
 - `index.html` - Landing page with form cards grid (99 lines)
 - `form.html` - Main CRUD form page with sidebar navigation (124 lines)
 - `edit.html` - Edit form page (101 lines)
 
-**Field Templates (Version 2.3 - Expanded in Improvement #6):**
-Form fields are now rendered using individual templates in `src/templates/fields/`:
-- `input.html` - Template for simple input types (text, tel, email, number, password, date, url, search, datetime-local, time, month, week, hidden)
-- `textarea.html` - Template for textarea fields
-- `checkbox.html` - Template for checkbox fields
-- `select.html` - Template for dropdown selection fields
-- `radio.html` - Template for radio button groups
-- `color.html` - Template for color picker with live hex display
-- `range.html` - Template for slider with live value display
+**Field Templates** (`src/templates/fields/`):
+Form fields are rendered using individual templates:
+- `input.html` - Simple input types (text, tel, email, number, password, date, url, search, datetime-local, time, month, week, hidden)
+- `textarea.html` - Textarea fields
+- `checkbox.html` - Checkbox fields
+- `select.html` - Dropdown selection fields
+- `radio.html` - Radio button groups
+- `color.html` - Color picker with live hex display
+- `range.html` - Slider with live value display
 
-The `generate_form_field()` function loads the appropriate template based on field type and renders it using `render_template_string()`. This provides:
+The `generate_form_field()` function loads the appropriate template based on field type from the **spec** and renders it using `render_template_string()`. This provides:
 - Complete separation of HTML from Python code
-- Easy customization of field appearance per type
+- UI automatically reflects spec changes
 - Consistent field rendering across all forms
 - Better maintainability and testability
 
-This separation improves maintainability and follows Flask best practices by keeping HTML/CSS/JavaScript separate from Python logic in `src/VibeCForms.py`.
+---
 
-### Dynamic Form Generation
-Forms are defined by JSON specification files in `src/specs/`:
+### Dynamic Form Generation (Convention Implementation)
+
+Forms are defined by JSON specification files in `src/specs/`, implementing **Convention over Configuration**.
 
 **Form Specification Format:**
 ```json
@@ -175,8 +420,7 @@ Forms are defined by JSON specification files in `src/specs/`:
 }
 ```
 
-**Supported Field Types (Version 2.3 - Complete HTML5 Support):**
-The system now supports all 20 HTML5 input types and form elements:
+**Supported Field Types (20 HTML5 types):**
 
 **Basic Input Types:**
 - `text` - Single-line text input
@@ -230,13 +474,25 @@ The system now supports all 20 HTML5 input types and form elements:
 }
 ```
 
-**Icon Support (Version 2.1 - Improvement #1):**
+**Search with Datasource Format:**
+```json
+{
+  "name": "field_name",
+  "type": "search",
+  "datasource": "contatos"
+}
+```
+
+**Icon Support:**
 - Optional `icon` field in spec files (e.g., "fa-address-book")
 - Icons display in menu and landing page cards
 - Falls back to "fa-file-alt" if not specified
 
-### Folder Configuration System (Version 2.1 - Improvement #2)
-Folders can be customized via `_folder.json` files:
+---
+
+### Folder Configuration System (Configuration over Code)
+
+Folders can be customized via `_folder.json` files - demonstrating **Configuration over Code**:
 
 ```json
 {
@@ -253,19 +509,10 @@ Folders can be customized via `_folder.json` files:
 - Custom icons override default mappings
 - Order field for sorting menu items
 
-### Data Persistence
-Data is stored in semicolon-delimited text files, one per form:
-- `src/contatos.txt` - Contact data
-- `src/financeiro_contas.txt` - Financial accounts data
-- etc.
-
-File names are derived from form paths with slashes replaced by underscores.
-
-The application uses spec-aware functions for data operations:
-- `read_forms(spec, data_file)`: Reads and parses data based on spec
-- `write_forms(forms, spec, data_file)`: Writes data according to spec
+---
 
 ### Route Structure
+
 - `/` (GET): Main landing page with all forms as cards
 - `/<path:form_name>` (GET/POST): Dynamic form page (supports nested paths)
 - `/<path:form_name>/edit/<int:idx>` (GET/POST): Edit form entry
@@ -277,6 +524,8 @@ The application uses spec-aware functions for data operations:
 - `/rh/departamentos/areas` - Multi-level nested form
 
 All operations use the index position in the forms list (not a unique ID) to identify records.
+
+---
 
 ## Development Commands
 
@@ -328,6 +577,8 @@ uv run hatch run lint
 uv run hatch run check
 ```
 
+---
+
 ## Testing Approach
 
 Tests in `tests/test_form.py` (16 total) import functions directly from `VibeCForms.py` and use pytest's `tmp_path` fixture to create temporary data files.
@@ -345,7 +596,75 @@ Tests in `tests/test_form.py` (16 total) import functions directly from `VibeCFo
 
 All tests pass without functional regressions.
 
-## Important Constraints
+---
+
+## Extension Patterns
+
+When extending VibeCForms, follow the convention hierarchy:
+
+### 1. Start with Convention
+Ask: "Can this be solved by existing conventions?"
+- Adding a new form? → Just create a spec file (convention handles it)
+- Need a relationship? → Use relationship table pattern (convention)
+- Tracking states? → Use tags (convention)
+
+### 2. Move to Configuration if Needed
+Ask: "Can this be configured in JSON?"
+- Custom backend? → Edit `persistence.json`
+- Specific validation messages? → Add to spec
+- Custom icons? → Add to spec or `_folder.json`
+
+### 3. Write Code as Last Resort
+Ask: "Is this truly unique logic?"
+- Complex business rules → Write code
+- External API integrations → Write code
+- Custom AI agent behaviors → Write code
+
+### Adding New Features
+
+When working on new features:
+- **Maintain backward compatibility** with existing spec format
+- **Document all AI prompts** and interactions in `docs/prompts.md` (in Portuguese)
+- **Add tests** for new functionality
+- **Update relevant documentation** files
+- **Follow the convention hierarchy** - don't write code when configuration would work
+
+### Examples of Good Extensions
+
+**Good (Uses Convention):**
+```bash
+# Adding a new form for products
+# Just create the spec file - convention handles the rest
+cat > src/specs/products.json << EOF
+{
+  "title": "Products",
+  "fields": [...]
+}
+EOF
+```
+
+**Good (Uses Configuration):**
+```json
+// Need MySQL backend? Configure it, don't code it
+{
+  "form_mappings": {
+    "products": "mysql"
+  }
+}
+```
+
+**Good (Code When Necessary):**
+```python
+# Complex business rule that can't be configured
+def validate_discount(product, discount):
+    if product.category == "premium" and discount > 0.15:
+        return False, "Premium products cannot have >15% discount"
+    return True, None
+```
+
+---
+
+## Implementation Constraints
 
 ### Validation Rules
 Validation messages are defined in each form's spec file under `validation_messages`:
@@ -357,18 +676,24 @@ The `validate_form_data(spec, form_data)` function processes validation dynamica
 ### Data Integrity
 Since records are identified by index position rather than unique IDs, concurrent edits or deletions can cause race conditions. The application is designed for single-user local use.
 
-### Adding New Forms
+### Adding New Forms (Pure Convention)
 To add a new form, simply:
 1. Create a JSON spec file in `src/specs/` (optionally in a subfolder)
 2. Include optional `icon` field for custom icon
 3. The form will automatically appear in the menu and landing page
-4. Data will be persisted to `<form_path_with_underscores>.txt`
+4. Data will be persisted to `<form_path_with_underscores>.txt` (or configured backend)
 
-### Customizing Folders
+No code changes required - this is pure convention.
+
+### Customizing Folders (Configuration)
 To customize a folder:
 1. Create `_folder.json` in the folder
 2. Specify `name`, `description`, `icon`, and `order`
 3. The menu will automatically use these settings
+
+No code changes required - this is configuration.
+
+---
 
 ## Recent Improvements
 
@@ -382,25 +707,6 @@ To customize a folder:
 - Case-insensitive substring matching
 - Created `search_autocomplete.html` template
 - Enhanced `generate_form_field()` to detect `datasource` attribute
-- Example field in `formulario_completo.json`:
-  ```json
-  {
-    "name": "contato_favorito",
-    "label": "Contato Favorito",
-    "type": "search",
-    "datasource": "contatos",
-    "required": false
-  }
-  ```
-
-**Search with Datasource Format:**
-```json
-{
-  "name": "field_name",
-  "type": "search",
-  "datasource": "contatos"
-}
-```
 
 #### Improvement #8: Responsive Table with Horizontal Scroll
 - Tables now wrapped in scrollable container (`table-wrapper`)
@@ -414,22 +720,9 @@ To customize a folder:
 
 #### Improvement #6: Complete HTML5 Field Type Support
 - Expanded from 8 to 20 supported field types (100% HTML5 coverage)
-- Added 4 new field templates:
-  - `select.html` - Dropdown selection with options
-  - `radio.html` - Radio button groups with options
-  - `color.html` - Color picker with live hex display
-  - `range.html` - Slider with live value display
-- Enhanced `generate_form_field()` to handle:
-  - Options array for select/radio fields
-  - Min/max/step attributes for range fields
-- Improved `generate_table_row()` to display:
-  - Labels instead of values for select/radio
-  - Color swatches for color fields
-  - Masked display for password fields
-  - Hidden fields are not displayed
-- Added 12 new input types via `input.html`:
-  - `url`, `search`, `datetime-local`, `time`, `month`, `week`, `hidden`
-- Created comprehensive example: `formulario_completo.json` demonstrating all 20 field types
+- Added 4 new field templates: `select.html`, `radio.html`, `color.html`, `range.html`
+- Enhanced `generate_form_field()` to handle options array and min/max/step attributes
+- Improved `generate_table_row()` to display labels, color swatches, and masked passwords
 - All 16 existing tests continue to pass
 - Zero breaking changes - fully backward compatible
 
@@ -437,24 +730,15 @@ To customize a folder:
 
 #### Improvement #4: Field Template System
 - Separated field rendering into individual Jinja2 templates
-- Created `src/templates/fields/` directory with 3 templates:
-  - `input.html` - For text, tel, email, number, password, date fields
-  - `textarea.html` - For textarea fields
-  - `checkbox.html` - For checkbox fields
-- Refactored `generate_form_field()` to use template files
+- Created `src/templates/fields/` directory with dedicated templates
 - Complete separation of field HTML from Python logic
 - Extended support to include password and date input types
-- Created example spec (`usuarios.json`) demonstrating new field types
-- All 16 tests continue to pass
 
 #### Improvement #5: Form Layout Enhancement
 - Improved form field layout with horizontal label-input alignment
-- Fields stacked vertically (one below the other)
-- Label and input on the same horizontal line within each field
 - Labels with fixed width (180px) for consistent alignment
 - Inputs expand to fill remaining space
 - Applied consistently to both `form.html` and `edit.html` templates
-- Responsive design maintained across different screen sizes
 
 ### Version 2.1
 
@@ -473,11 +757,3 @@ To customize a folder:
 - Reduced main file from 925 to 587 lines (-36.5%)
 - Better IDE support and maintainability
 - Follows Flask best practices
-
-## Future Evolution
-
-The project roadmap (see `docs/roadmap.md`) includes plans for additional features. When working on new features, consider:
-- Maintain backward compatibility with existing spec format
-- Document all AI prompts and interactions in `docs/prompts.md` (in Portuguese)
-- Add tests for new functionality
-- Update relevant documentation files
