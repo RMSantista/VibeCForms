@@ -975,5 +975,46 @@ curl http://localhost:5000/api/forms/clientes | jq 'length'
 
 ---
 
-**VibeCForms v3.0** - Sistema de Persistência Plugável
-Última atualização: 2025-10-17
+## Sistema de Workflow (v4.0)
+
+O VibeCForms v4.0 introduz um **sistema completo de workflow baseado em Kanban** que se integra perfeitamente com os formulários existentes.
+
+### Recursos Principais
+
+- **Criação automática de processos** - Formulários vinculados a kanbans criam processos automaticamente
+- **Gestão de estados** - Transições manuais e automáticas entre colunas
+- **Regras de negócio** - Pré-requisitos e validações para transições
+- **Inteligência artificial** - 4 agentes especializados, análise de padrões, detecção de anomalias
+- **Machine Learning** - Previsão de duração de processos
+- **Dashboard analytics** - Métricas em tempo real e identificação de gargalos
+- **Exportação** - CSV, Excel e PDF
+- **Auditoria** - Trilha completa para compliance
+
+### Configuração
+
+O sistema de workflow **não requer configuração adicional** - utiliza o mesmo sistema de persistência configurado em `persistence.json`. Processos são armazenados usando TXT ou SQLite automaticamente.
+
+### Documentação
+
+Para informações detalhadas sobre o sistema de workflow, consulte:
+
+- **CLAUDE.md** - Seção "Workflow System (Version 4.0)" com arquitetura completa
+- **CHANGELOG.md** - Seção "Version 4.0" com todas as features implementadas
+- **README.md** - Overview do sistema de workflow
+- **docs/workflow_phase*.md** - Sumários detalhados de cada fase de implementação
+- **Testes**: `tests/test_kanban*.py`, `tests/test_prerequisite*.py`, `tests/test_auto_transition*.py` e outros (224 testes, 100% passando)
+
+### REST API
+
+Endpoints disponíveis em `/workflow/api/*`:
+- `GET /workflow/api/kanbans` - Listar kanbans
+- `GET /workflow/api/kanban/<kanban_id>` - Detalhes do kanban
+- `POST /workflow/api/kanban` - Criar kanban
+- `GET /workflow/api/processes` - Listar processos
+- `GET /workflow/api/process/<process_id>` - Detalhes do processo
+- `POST /workflow/api/process/<process_id>/transition` - Transicionar processo
+
+---
+
+**VibeCForms v4.0** - Sistema de Persistência Plugável + Workflow com Kanban
+Última atualização: 2025-11-04

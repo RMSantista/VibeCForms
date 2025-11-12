@@ -1,0 +1,6 @@
+Ana;999;True
+Bob;456;False
+Ana;123;True
+Bob;456;False
+Ana;123;True
+Bob;456;False

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administração Workflow-Kanban</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/admin.css">
+</head>
+<body style="background: #2c3e50; margin: 0; padding: 0;">
+    <div class="admin-container">
+        <!-- Header -->
+        <div class="admin-header">
+            <h1><i class="fa fa-cogs"></i> Administração Workflow-Kanban</h1>
+            <a href="/" class="back-link">
+                <i class="fa fa-arrow-left"></i> Voltar
+            </a>
+        </div>
+
+        <!-- Estatísticas -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value">{{ total_kanbans }}</div>
+                <div class="stat-label">Kanbans Cadastrados</div>
+            </div>
+            <div class="stat-card success">
+                <div class="stat-value">{{ total_processes }}</div>
+                <div class="stat-label">Processos Ativos</div>
+            </div>
+            <div class="stat-card warning">
+                <div class="stat-value">{{ total_forms }}</div>
+                <div class="stat-label">Formulários Vinculados</div>
+            </div>
+        </div>
+
+        <!-- Ações Rápidas -->
+        <div class="action-buttons">
+            <a href="/admin/workflow/kanbans/create" class="btn btn-success">
+                <i class="fa fa-plus"></i> Novo Kanban
+            </a>
+            <a href="/admin/workflow/kanbans" class="btn btn-primary">
+                <i class="fa fa-list"></i> Listar Todos
+            </a>
+            <a href="/admin/workflow/mappings" class="btn btn-primary">
+                <i class="fa fa-link"></i> Vincular Formulários
+            </a>
+            <a href="#" class="btn btn-ai" onclick="alert('Funcionalidade em desenvolvimento')">
+                <i class="fa fa-robot"></i> Gerar via IA
+            </a>
+        </div>
+
+        <!-- Kanbans Recentes -->
+        <div class="info-section">
+            <h2><i class="fa fa-clock"></i> Kanbans Recentes</h2>
+
+            {% if recent_kanbans %}
+                <div class="kanban-grid">
+                    {% for kanban in recent_kanbans %}
+                    <div class="kanban-card">
+                        <div class="kanban-card-header">
+                            <div>
+                                <h3 class="kanban-card-title">{{ kanban.name }}</h3>
+                                <div class="kanban-card-id">ID: {{ kanban.id }}</div>
+                            </div>
+                        </div>
+
+                        {% if kanban.description %}
+                        <p class="kanban-card-description">{{ kanban.description }}</p>
+                        {% endif %}
+
+                        <div class="kanban-card-meta">
+                            <span class="meta-item">
+                                <i class="fa fa-columns"></i>
+                                {{ kanban.state_count }} estados
+                            </span>
+                            <span class="meta-item">
+                                <i class="fa fa-tasks"></i>
+                                {{ kanban.process_count }} processos
+                            </span>
+                        </div>
+
+                        <div class="kanban-card-actions">
+                            <a href="/workflow/{{ kanban.id }}" class="btn btn-success btn-sm">
+                                <i class="fa fa-eye"></i> Ver Kanban
+                            </a>
+                            <a href="/admin/workflow/kanbans/{{ kanban.id }}/edit" class="btn btn-primary btn-sm">
+                                <i class="fa fa-edit"></i> Editar
+                            </a>
+                            <a href="/admin/workflow/kanbans/{{ kanban.id }}/delete" class="btn btn-danger btn-sm">
+                                <i class="fa fa-trash"></i> Excluir
+                            </a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <i class="fa fa-inbox"></i>
+                    <h3>Nenhum kanban cadastrado</h3>
+                    <p>Comece criando seu primeiro workflow!</p>
+                    <a href="/admin/workflow/kanbans/create" class="btn btn-success">
+                        <i class="fa fa-plus"></i> Criar Primeiro Kanban
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Ações Adicionais -->
+        <div class="info-section">
+            <h2><i class="fa fa-bolt"></i> Ações Rápidas</h2>
+            <div class="item-list">
+                <div class="item">
+                    <span class="item-name">
+                        <i class="fa fa-link"></i> Vincular Formulários aos Kanbans
+                    </span>
+                    <a href="/admin/workflow/mappings" class="btn btn-primary btn-sm">Acessar</a>
+                </div>
+                <div class="item">
+                    <span class="item-name">
+                        <i class="fa fa-bell"></i> Configurar Notificações
+                    </span>
+                    <a href="#" class="btn btn-secondary btn-sm" onclick="alert('Selecione um kanban primeiro')">Configurar</a>
+                </div>
+                <div class="item">
+                    <span class="item-name">
+                        <i class="fa fa-chart-line"></i> Ver Analytics
+                    </span>
+                    <a href="#" class="btn btn-secondary btn-sm" onclick="alert('Funcionalidade em desenvolvimento')">Ver</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/admin.js"></script>
+</body>
+</html>

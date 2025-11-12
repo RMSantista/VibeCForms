@@ -31,7 +31,36 @@ The project demonstrates how to build a **dynamic form management system** using
 - ✅ Validations included (no empty records, required name/phone).
 - 🎨 Styled with CSS + icons (FontAwesome).
 
-### Latest: Version 3.0 - Pluggable Persistence System
+### Latest: Version 4.0 - Workflow System with Kanban
+- ✅ **Complete Kanban-Based Workflow System**
+  - 5-phase implementation (224 tests, 100% passing)
+  - Automatic process creation from forms
+  - State management with transitions
+  - Prerequisites validation and auto-transitions
+  - Real-time workflow analytics
+
+- ✅ **AI-Powered Intelligence**
+  - Pattern analysis and clustering
+  - Anomaly detection (stuck, delayed, fast-tracked processes)
+  - 4 specialized agents (Generic, Pattern, Rule, Orchestrator)
+  - Machine learning for duration predictions
+  - Risk factor identification
+
+- ✅ **Advanced Features**
+  - Interactive Kanban Editor (CRUD operations)
+  - Workflow Dashboard with health metrics
+  - Multiple export formats (CSV, Excel, PDF)
+  - Complete audit trail for compliance
+  - Agent performance tracking
+
+- ✅ **Seamless Integration**
+  - Forms automatically create workflow processes
+  - Bidirectional synchronization (form ↔ process)
+  - REST API endpoints (`/workflow/api/*`)
+  - Uses same persistence layer (TXT/SQLite)
+  - Zero breaking changes (fully optional)
+
+### Version 3.0 - Pluggable Persistence System
 - ✅ **Multi-Backend Support (8 backends)**
   - TXT, SQLite, MySQL, PostgreSQL, MongoDB, CSV, JSON, XML
   - Configurable via `persistence.json`

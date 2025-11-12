@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excluir Kanban - {{ kanban.name }}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/admin.css">
+</head>
+<body style="background: #2c3e50; margin: 0; padding: 0;">
+    <div class="admin-container">
+        <!-- Header -->
+        <div class="admin-header">
+            <h1><i class="fa fa-exclamation-triangle" style="color: #e74c3c;"></i> Confirmar Exclusão</h1>
+            <a href="/admin/workflow/kanbans" class="back-link">
+                <i class="fa fa-arrow-left"></i> Cancelar
+            </a>
+        </div>
+
+        <!-- Aviso de Exclusão -->
+        <div class="alert alert-warning">
+            <i class="fa fa-exclamation-triangle"></i>
+            <strong>Atenção!</strong> Esta ação não pode ser desfeita.
+        </div>
+
+        <!-- Informações do Kanban -->
+        <div class="info-section">
+            <h2><i class="fa fa-info-circle"></i> Kanban a ser Excluído</h2>
+
+            <div style="background: #34495e; padding: 25px; border-radius: 12px; border-left: 4px solid #e74c3c;">
+                <h3 style="color: #e74c3c; margin: 0 0 10px 0; font-size: 24px;">
+                    {{ kanban.name }}
+                </h3>
+                <p style="color: #95a5a6; margin: 0 0 15px 0; font-family: monospace; font-size: 14px;">
+                    ID: {{ kanban.id }}
+                </p>
+
+                {% if kanban.description %}
+                <p style="color: #ecf0f1; margin: 0 0 20px 0; line-height: 1.6;">
+                    {{ kanban.description }}
+                </p>
+                {% endif %}
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px;">
+                    <div style="background: #2c3e50; padding: 15px; border-radius: 8px; text-align: center;">
+                        <div style="color: #3498db; font-size: 32px; font-weight: bold;">
+                            {{ kanban.states|length }}
+                        </div>
+                        <div style="color: #95a5a6; font-size: 14px; margin-top: 5px;">
+                            Estados
+                        </div>
+                    </div>
+
+                    <div style="background: #2c3e50; padding: 15px; border-radius: 8px; text-align: center;">
+                        <div style="color: #3498db; font-size: 32px; font-weight: bold;">
+                            {{ kanban.linked_forms|length }}
+                        </div>
+                        <div style="color: #95a5a6; font-size: 14px; margin-top: 5px;">
+                            Formulários
+                        </div>
+                    </div>
+
+                    <div style="background: #2c3e50; padding: 15px; border-radius: 8px; text-align: center;">
+                        <div style="color: {% if process_count > 0 %}#e74c3c{% else %}#3498db{% endif %}; font-size: 32px; font-weight: bold;">
+                            {{ process_count }}
+                        </div>
+                        <div style="color: #95a5a6; font-size: 14px; margin-top: 5px;">
+                            Processos Ativos
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Impactos da Exclusão -->
+        <div class="info-section">
+            <h2><i class="fa fa-clipboard-list"></i> O que será Excluído</h2>
+
+            <div class="item-list">
+                <div class="item">
+                    <span class="item-name" style="color: #e74c3c;">
+                        <i class="fa fa-times-circle"></i> Definição do kanban ({{ kanban.id }}.json)
+                    </span>
+                </div>
+                <div class="item">
+                    <span class="item-name" style="color: #e74c3c;">
+                        <i class="fa fa-times-circle"></i> Todos os {{ kanban.states|length }} estados configurados
+                    </span>
+                </div>
+                <div class="item">
+                    <span class="item-name" style="color: #e74c3c;">
+                        <i class="fa fa-times-circle"></i> Configurações de transições e pré-requisitos
+                    </span>
+                </div>
+                <div class="item">
+                    <span class="item-name" style="color: #e74c3c;">
+                        <i class="fa fa-times-circle"></i> Vínculos com formulários
+                    </span>
+                </div>
+            </div>
+
+            {% if process_count > 0 %}
+            <div class="alert alert-error" style="margin-top: 20px;">
+                <i class="fa fa-exclamation-circle"></i>
+                <strong>Aviso Crítico!</strong> Existem <strong>{{ process_count }} processos ativos</strong> vinculados a este kanban.
+                Os processos NÃO serão excluídos, mas ficarão órfãos (sem kanban associado).
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- O que NÃO será Excluído -->
+        <div class="info-section">
+            <h2><i class="fa fa-shield-alt" style="color: #27ae60;"></i> O que será Preservado</h2>
+
+            <div class="item-list">
+                <div class="item">
+                    <span class="item-name" style="color: #27ae60;">
+                        <i class="fa fa-check-circle"></i> Formulários vinculados (continuarão funcionando normalmente)
+                    </span>
+                </div>
+                <div class="item">
+                    <span class="item-name" style="color: #27ae60;">
+                        <i class="fa fa-check-circle"></i> Dados dos formulários
+                    </span>
+                </div>
+                {% if process_count > 0 %}
+                <div class="item">
+                    <span class="item-name" style="color: #f39c12;">
+                        <i class="fa fa-exclamation-circle"></i> {{ process_count }} processos (ficarão órfãos)
+                    </span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Confirmação -->
+        <form method="POST">
+            <div class="info-section" style="background: #1a252f; border: 2px solid #e74c3c;">
+                <h2><i class="fa fa-keyboard"></i> Confirmação Obrigatória</h2>
+
+                <p style="color: #ecf0f1; margin-bottom: 20px;">
+                    Para prosseguir com a exclusão, digite exatamente:
+                    <strong style="color: #e74c3c; font-family: monospace; font-size: 18px;">{{ kanban.id }}</strong>
+                </p>
+
+                <div class="form-group">
+                    <input
+                        type="text"
+                        id="confirm-input"
+                        placeholder="Digite o ID do kanban para confirmar"
+                        style="border-color: #e74c3c; font-family: monospace;"
+                    >
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 30px;">
+                    <button
+                        type="submit"
+                        class="btn btn-danger"
+                        id="delete-btn"
+                        disabled
+                        style="opacity: 0.5; cursor: not-allowed;"
+                    >
+                        <i class="fa fa-trash"></i> Confirmar Exclusão
+                    </button>
+                    <a href="/admin/workflow/kanbans" class="btn btn-success">
+                        <i class="fa fa-arrow-left"></i> Cancelar (Voltar)
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <script src="/static/admin.js"></script>
+    <script>
+        // Validação da confirmação
+        const confirmInput = document.getElementById('confirm-input');
+        const deleteBtn = document.getElementById('delete-btn');
+        const expectedValue = '{{ kanban.id }}';
+
+        confirmInput.addEventListener('input', function() {
+            if (this.value === expectedValue) {
+                deleteBtn.disabled = false;
+                deleteBtn.style.opacity = '1';
+                deleteBtn.style.cursor = 'pointer';
+            } else {
+                deleteBtn.disabled = true;
+                deleteBtn.style.opacity = '0.5';
+                deleteBtn.style.cursor = 'not-allowed';
+            }
+        });
+
+        // Confirmação adicional ao submeter
+        deleteBtn.parentElement.addEventListener('submit', function(e) {
+            if (confirmInput.value !== expectedValue) {
+                e.preventDefault();
+                alert('Digite o ID do kanban corretamente para confirmar a exclusão.');
+                return false;
+            }
+
+            if (!confirm('Tem CERTEZA ABSOLUTA que deseja excluir este kanban? Esta ação não pode ser desfeita!')) {
+                e.preventDefault();
+                return false;
+            }
+        });
+    </script>
+</body>
+</html>

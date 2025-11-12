@@ -2,7 +2,7 @@
   "financeiro/contas": {
     "last_spec_hash": "5b7f40de8f2d127347e9096e73db5e38",
     "last_backend": "txt",
-    "last_updated": "2025-10-25T12:28:25.893937",
+    "last_updated": "2025-11-04T21:37:34.119496",
     "record_count": 23
   },
   "financeiro/pagamentos": {
@@ -32,7 +32,7 @@
   "rh/departamentos/areas": {
     "last_spec_hash": "c7979c39355291a3daad8aac31b2b1aa",
     "last_backend": "sqlite",
-    "last_updated": "2025-10-25T12:25:04.449749",
+    "last_updated": "2025-11-04T21:37:38.422053",
     "record_count": 11
   },
   "rh/funcionarios": {
@@ -44,7 +44,7 @@
   "contatos": {
     "last_spec_hash": "ee014237f822ba2d7ea15758cd6056dd",
     "last_backend": "sqlite",
-    "last_updated": "2025-10-30T18:26:33.939033",
+    "last_updated": "2025-11-04T21:37:08.754356",
     "record_count": 23
   },
   "formulario_completo": {
@@ -100,5 +100,11 @@
     "last_backend": "txt",
     "last_updated": "2025-10-16T17:01:24.467537",
     "record_count": 1
+  },
+  "pedidos": {
+    "last_spec_hash": "f4d06f588ce02e1f95abd4da0a5457fe",
+    "last_backend": "txt",
+    "last_updated": "2025-11-07T18:29:40.352954",
+    "record_count": 6
   }
 }

@@ -1,8 +1,6 @@
 import os
 import json
 from src.VibeCForms import (
-    read_forms,
-    write_forms,
     load_spec,
     validate_form_data,
     get_folder_icon,
@@ -11,11 +9,12 @@ from src.VibeCForms import (
     generate_menu_html,
 )
 
+# Import TxtRepository directly for testing persistence
+from persistence.adapters.txt_adapter import TxtRepository
+
 
 def test_write_and_read_forms(tmp_path):
-    """Test writing and reading forms with spec."""
-    test_file = tmp_path / "test.txt"
-
+    """Test writing and reading forms with spec using TxtRepository directly."""
     # Create test spec
     spec = {
         "title": "Test Form",
@@ -36,15 +35,29 @@ def test_write_and_read_forms(tmp_path):
         {"nome": "Bob", "telefone": "456", "whatsapp": False},
     ]
 
-    write_forms(forms, spec, str(test_file))
-    result = read_forms(spec, str(test_file))
-    assert result == forms
+    # Use TxtRepository directly with unique form name per test
+    config = {"path": str(tmp_path), "encoding": "utf-8", "delimiter": ";"}
+    repo = TxtRepository(config)
+
+    # Ensure clean state - drop if exists, then create
+    if repo.exists("test_write_read"):
+        repo.drop_storage("test_write_read")
+    repo.create_storage("test_write_read", spec)
+
+    # Write forms
+    for form_data in forms:
+        repo.create("test_write_read", spec, form_data)
+
+    # Read forms
+    result = repo.read_all("test_write_read", spec)
+    assert len(result) == 2
+    assert result[0]["nome"] == "Ana"
+    assert result[1]["nome"] == "Bob"
 
 
 def test_update_form(tmp_path):
-    """Test updating a form entry."""
-    test_file = tmp_path / "test.txt"
-
+    """Test updating a form entry using TxtRepository directly."""
+    # Create test spec
     spec = {
         "title": "Test Form",
         "fields": [
@@ -64,20 +77,32 @@ def test_update_form(tmp_path):
         {"nome": "Bob", "telefone": "456", "whatsapp": False},
     ]
 
-    write_forms(forms, spec, str(test_file))
+    # Use TxtRepository directly with unique form name
+    config = {"path": str(tmp_path), "encoding": "utf-8", "delimiter": ";"}
+    repo = TxtRepository(config)
 
-    # Altera o telefone de Ana
-    forms[0]["telefone"] = "999"
-    write_forms(forms, spec, str(test_file))
+    # Ensure clean state - drop if exists, then create
+    if repo.exists("test_update"):
+        repo.drop_storage("test_update")
+    repo.create_storage("test_update", spec)
 
-    result = read_forms(spec, str(test_file))
+    # Write initial forms
+    for form_data in forms:
+        repo.create("test_update", spec, form_data)
+
+    # Update Ana's telefone
+    repo.update(
+        "test_update", spec, 0, {"nome": "Ana", "telefone": "999", "whatsapp": True}
+    )
+
+    # Read and verify
+    result = repo.read_all("test_update", spec)
     assert result[0]["telefone"] == "999"
 
 
 def test_delete_form(tmp_path):
-    """Test deleting a form entry."""
-    test_file = tmp_path / "test.txt"
-
+    """Test deleting a form entry using TxtRepository directly."""
+    # Create test spec
     spec = {
         "title": "Test Form",
         "fields": [
@@ -97,13 +122,24 @@ def test_delete_form(tmp_path):
         {"nome": "Bob", "telefone": "456", "whatsapp": False},
     ]
 
-    write_forms(forms, spec, str(test_file))
+    # Use TxtRepository directly with unique form name
+    config = {"path": str(tmp_path), "encoding": "utf-8", "delimiter": ";"}
+    repo = TxtRepository(config)
 
-    # Remove Bob
-    forms = [c for c in forms if c.get("nome") != "Bob"]
-    write_forms(forms, spec, str(test_file))
+    # Ensure clean state - drop if exists, then create
+    if repo.exists("test_delete"):
+        repo.drop_storage("test_delete")
+    repo.create_storage("test_delete", spec)
 
-    result = read_forms(spec, str(test_file))
+    # Write initial forms
+    for form_data in forms:
+        repo.create("test_delete", spec, form_data)
+
+    # Delete Bob (index 1)
+    repo.delete("test_delete", spec, 1)
+
+    # Read and verify
+    result = repo.read_all("test_delete", spec)
     assert len(result) == 1
     assert result[0]["nome"] == "Ana"
 

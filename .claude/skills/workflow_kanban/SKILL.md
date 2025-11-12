@@ -1,6 +1,6 @@
 ---
 name: workflow_kanban
-description: AUTO-ACTIVATE on keywords (workflow, kanban, regras de negócio, transição, processo, estado, automação, patterns, agents, dashboard). Provides comprehensive knowledge and practical tools for developing the Kanban-Workflow system in VibeCForms v4.0. Covers workflow architecture, implementation phases, AI agents, pattern analysis, visual editors, business rules, auto-transitions, and analytics. Use when user mentions workflow-related concepts or business logic.
+description: Provides comprehensive knowledge and practical tools for developing, implementing, and managing the Kanban-Workflow system in VibeCForms v4.0. This skill should be used whenever the user asks about workflows, kanbans, state transitions, business rules, process automation, workflow engines, prerequisite checking, auto-transitions, AI agents for workflows, pattern analysis, anomaly detection, visual kanban editors, analytics dashboards, audit logs, or any aspect of implementing workflow management in VibeCForms. Use when asking about how workflow features work, how the module functions, or requesting information about workflow capabilities. Covers complete architecture (5 progressive levels), provides validation/generation scripts, templates, and implementation guidance. Also use when user mentions: fluxo, processo, estado, transição, regras de negócio, automação, or any workflow-related planning, implementation, troubleshooting, validation tasks, or feature inquiries.
 ---
 
 # Workflow Kanban - Sistema de Workflow para VibeCForms

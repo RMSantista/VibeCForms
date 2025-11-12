@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vincular Formulários aos Kanbans</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/admin.css">
+</head>
+<body style="background: #2c3e50; margin: 0; padding: 0;">
+    <div class="admin-container">
+        <!-- Header -->
+        <div class="admin-header">
+            <h1><i class="fa fa-link"></i> Vincular Formulários aos Kanbans</h1>
+            <a href="/admin/workflow/" class="back-link">
+                <i class="fa fa-arrow-left"></i> Voltar
+            </a>
+        </div>
+
+        <!-- Informação -->
+        <div class="alert alert-info">
+            <i class="fa fa-info-circle"></i>
+            <strong>Como funciona:</strong> Quando um formulário é vinculado a um kanban, toda vez que um novo registro for criado nesse formulário, um processo será automaticamente criado no workflow.
+        </div>
+
+        <!-- Seletor de Kanban -->
+        <div class="info-section">
+            <h2><i class="fa fa-filter"></i> Filtrar por Kanban</h2>
+            <div class="form-group">
+                <select id="kanban-selector" onchange="filterByKanban(this.value)" style="max-width: 500px;">
+                    <option value="">Todos os Kanbans</option>
+                    {% for kanban_id, kanban in kanbans.items() %}
+                    <option value="{{ kanban_id }}">{{ kanban.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <!-- Mapeamentos por Kanban -->
+        {% for kanban_id, kanban in kanbans.items() %}
+        <div class="info-section kanban-mapping" data-kanban-id="{{ kanban_id }}">
+            <h2>
+                <i class="fa fa-project-diagram"></i> {{ kanban.name }}
+                <span style="color: #95a5a6; font-size: 16px; font-weight: normal; margin-left: 10px;">
+                    (ID: {{ kanban_id }})
+                </span>
+            </h2>
+
+            <!-- Formulários Vinculados -->
+            <div style="margin-bottom: 20px;">
+                <h3 style="color: #27ae60; font-size: 18px; margin-bottom: 15px;">
+                    <i class="fa fa-check-circle"></i> Formulários Vinculados
+                </h3>
+
+                {% if kanban.linked_forms %}
+                <div class="item-list">
+                    {% for form_path in kanban.linked_forms %}
+                    <div class="item">
+                        <span class="item-name">
+                            <i class="fa fa-file-alt"></i> {{ form_path }}
+                        </span>
+                        <button
+                            type="button"
+                            class="btn btn-danger btn-sm"
+                            onclick="alert('Funcionalidade em desenvolvimento')"
+                        >
+                            <i class="fa fa-unlink"></i> Desvincular
+                        </button>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p style="color: #95a5a6; text-align: center; padding: 20px; background: #34495e; border-radius: 8px;">
+                    <i class="fa fa-unlink"></i> Nenhum formulário vinculado a este kanban
+                </p>
+                {% endif %}
+            </div>
+
+            <!-- Formulários Disponíveis -->
+            <div>
+                <h3 style="color: #3498db; font-size: 18px; margin-bottom: 15px;">
+                    <i class="fa fa-plus-circle"></i> Formulários Disponíveis
+                </h3>
+
+                {% set available_forms = [] %}
+                {% for form in forms %}
+                    {% if form.path not in kanban.linked_forms %}
+                        {% set _ = available_forms.append(form) %}
+                    {% endif %}
+                {% endfor %}
+
+                {% if available_forms %}
+                <div class="item-list">
+                    {% for form in available_forms %}
+                    <div class="item">
+                        <div>
+                            <span class="item-name">
+                                <i class="fa fa-file-alt"></i> {{ form.title }}
+                            </span>
+                            <small style="color: #95a5a6; margin-left: 25px;">
+                                Path: {{ form.path }} • {{ form.category }}
+                            </small>
+                        </div>
+                        <button
+                            type="button"
+                            class="btn btn-success btn-sm"
+                            onclick="alert('Funcionalidade em desenvolvimento')"
+                        >
+                            <i class="fa fa-link"></i> Vincular
+                        </button>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p style="color: #95a5a6; text-align: center; padding: 20px; background: #34495e; border-radius: 8px;">
+                    <i class="fa fa-check"></i> Todos os formulários já estão vinculados a este kanban
+                </p>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+
+        {% if not kanbans %}
+        <div class="empty-state">
+            <i class="fa fa-inbox"></i>
+            <h3>Nenhum kanban cadastrado</h3>
+            <p>Crie um kanban primeiro para poder vincular formulários.</p>
+            <a href="/admin/workflow/kanbans/create" class="btn btn-success">
+                <i class="fa fa-plus"></i> Criar Kanban
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <script src="/static/admin.js"></script>
+    <script>
+        function filterByKanban(kanbanId) {
+            const mappings = document.querySelectorAll('.kanban-mapping');
+
+            mappings.forEach(mapping => {
+                if (!kanbanId || mapping.dataset.kanbanId === kanbanId) {
+                    mapping.style.display = 'block';
+                } else {
+                    mapping.style.display = 'none';
+                }
+            });
+        }
+    </script>
+</body>
+</html>

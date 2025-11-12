@@ -39,6 +39,8 @@ class MigrationManager:
         old_backend: str,
         new_backend: str,
         record_count: int = 0,
+        old_config: Optional[Dict[str, Any]] = None,
+        new_config: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """
         Migrate data from one backend to another.
@@ -76,8 +78,8 @@ class MigrationManager:
         )
 
         # Get repositories for old and new backends
-        old_repo = MigrationManager._get_repository(old_backend)
-        new_repo = MigrationManager._get_repository(new_backend)
+        old_repo = MigrationManager._get_repository(old_backend, old_config)
+        new_repo = MigrationManager._get_repository(new_backend, new_config)
 
         if not old_repo or not new_repo:
             logger.error("Failed to create repositories for migration")
@@ -178,23 +180,28 @@ class MigrationManager:
             return False
 
     @staticmethod
-    def _get_repository(backend_type: str) -> Optional[BaseRepository]:
+    def _get_repository(
+        backend_type: str, custom_config: Optional[Dict[str, Any]] = None
+    ) -> Optional[BaseRepository]:
         """
         Get a repository instance for a specific backend type.
 
         Args:
             backend_type: Type of backend (e.g., 'txt', 'sqlite')
+            custom_config: Optional custom configuration (for testing)
 
         Returns:
             Repository instance or None
         """
-        config = get_config()
-
-        # Get backend configuration
-        backend_config = config.config.get("backends", {}).get(backend_type)
-        if not backend_config:
-            logger.error(f"No configuration found for backend type: {backend_type}")
-            return None
+        # Use custom config if provided, otherwise load from file
+        if custom_config:
+            backend_config = custom_config
+        else:
+            config = get_config()
+            backend_config = config.config.get("backends", {}).get(backend_type)
+            if not backend_config:
+                logger.error(f"No configuration found for backend type: {backend_type}")
+                return None
 
         # Create repository using factory (simulate form_path)
         # We need to temporarily modify config to use specific backend

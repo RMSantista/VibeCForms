@@ -1,0 +1,31 @@
+{
+  "id": "fluxo_admissao",
+  "name": "Fluxo de Admissão de Funcionários",
+  "description": "TESTE",
+  "states": [
+    {
+      "id": "novo",
+      "name": "Novo",
+      "type": "initial",
+      "description": "",
+      "color": "#3498db"
+    },
+    {
+      "id": "concluido",
+      "name": "Concluído",
+      "type": "final",
+      "description": "",
+      "color": "#27ae60"
+    }
+  ],
+  "recommended_transitions": [
+    {
+      "from": "novo",
+      "to": "concluido"
+    }
+  ],
+  "initial_state": "novo",
+  "created_at": "2025-11-10T17:35:11.794291",
+  "updated_at": "2025-11-10T17:35:11.794321",
+  "form_mappings": []
+}
