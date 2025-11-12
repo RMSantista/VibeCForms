@@ -1,0 +1,43 @@
+{
+  "title": "Cadastro de Usuários",
+  "icon": "fa-user-plus",
+  "fields": [
+    {
+      "name": "nome",
+      "label": "Nome Completo",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "email",
+      "label": "E-mail",
+      "type": "email",
+      "required": true
+    },
+    {
+      "name": "senha",
+      "label": "Senha",
+      "type": "password",
+      "required": true
+    },
+    {
+      "name": "data_nascimento",
+      "label": "Data de Nascimento",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "ativo",
+      "label": "Usuário Ativo",
+      "type": "checkbox",
+      "required": false
+    }
+  ],
+  "validation_messages": {
+    "all_empty": "Preencha todos os campos obrigatórios para cadastrar um usuário.",
+    "nome": "O nome completo é obrigatório.",
+    "email": "O e-mail é obrigatório.",
+    "senha": "A senha é obrigatória.",
+    "data_nascimento": "A data de nascimento é obrigatória."
+  }
+}

@@ -40,6 +40,8 @@ class PersistenceConfig:
             config_path = project_root / "src" / "config" / "persistence.json"
 
         self.config_path = Path(config_path)
+        # Store business case root (parent of config directory)
+        self.business_case_root = self.config_path.parent.parent
         self.config = self._load_config()
         self._validate_config()
 
@@ -165,13 +167,13 @@ class PersistenceConfig:
 
         Returns:
             Dictionary with backend configuration, with environment
-            variables substituted
+            variables substituted and relative paths resolved
 
         Example:
             >>> config.get_backend_config('usuarios')
             {
                 'type': 'sqlite',
-                'database': 'src/vibecforms.db',
+                'database': '/absolute/path/to/business/case/data/vibecforms.db',
                 'timeout': 10
             }
         """
@@ -180,6 +182,9 @@ class PersistenceConfig:
 
         # Substitute environment variables
         backend_config = self._substitute_env_vars(backend_config)
+
+        # Resolve relative paths to absolute paths
+        backend_config = self._resolve_paths(backend_config)
 
         return backend_config
 
@@ -238,6 +243,35 @@ class PersistenceConfig:
             return var_value
 
         return re.sub(pattern, replace_var, value)
+
+    def _resolve_paths(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Resolve relative paths in configuration to absolute paths.
+
+        Paths that are relative (not starting with /) are resolved relative
+        to the business case root directory.
+
+        Args:
+            config: Configuration dictionary
+
+        Returns:
+            Configuration with paths resolved to absolute paths
+
+        Example:
+            {"path": "data/"} -> {"path": "/absolute/path/to/business/case/data/"}
+            {"database": "data/db.sqlite"} -> {"database": "/absolute/path/to/business/case/data/db.sqlite"}
+        """
+        # Keys that typically contain file/directory paths
+        path_keys = ["path", "database", "backup_path"]
+
+        result = {}
+        for key, value in config.items():
+            if key in path_keys and isinstance(value, str):
+                # Convert relative paths to absolute
+                if not os.path.isabs(value):
+                    value = str(self.business_case_root / value)
+            result[key] = value
+        return result
 
     def get_setting(self, key: str, default: Any = None) -> Any:
         """
