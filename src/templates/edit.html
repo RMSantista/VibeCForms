@@ -42,6 +42,8 @@
         button:hover, .icon-btn:hover { background: #2980b9; }
         .cancel { background: #95a5a6; color: #fff; }
         .cancel:hover { background: #7f8c8d; }
+        .record-id { background: #ecf0f1; padding: 10px; border-radius: 5px; margin-bottom: 20px; font-family: 'Courier New', monospace; font-size: 12px; color: #7f8c8d; text-align: center; user-select: all; cursor: text; }
+        .record-id strong { color: #2c3e50; }
     </style>
     <script>
         window.onload = function() {
@@ -81,6 +83,11 @@
     <div class="main-content">
         <div class="container">
             <h2>Editar - {{ title }}</h2>
+            {% if record_id %}
+            <div class="record-id">
+                <strong>ID do Registro:</strong> {{ record_id }}
+            </div>
+            {% endif %}
             {% if error %}
             <div style="color:#e74c3c; background:#ffeaea; border:1px solid #e74c3c; padding:10px; margin-bottom:15px; border-radius:5px;">
                 <i class="fa fa-exclamation-triangle"></i> {{error}}

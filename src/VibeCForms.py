@@ -232,123 +232,6 @@ def get_all_forms_flat(menu_items=None, prefix=""):
     return forms
 
 
-def read_forms(spec, form_path):
-    """Read forms using configured persistence backend.
-
-    Args:
-        spec: Form specification
-        form_path: Path to the form (e.g., 'contatos', 'financeiro/contas')
-
-    Returns:
-        List of form data dictionaries
-    """
-    from persistence.schema_history import get_history
-    from persistence.config import get_config
-
-    # Check if backend has changed by comparing history with current config
-    history = get_history()
-    form_history = history.get_form_history(form_path)
-
-    config = get_config()
-    current_backend_config = config.get_backend_config(form_path)
-    current_backend = current_backend_config.get("type")
-
-    last_backend = history.get_last_backend(form_path)
-    backend_changed = last_backend and last_backend != current_backend
-
-    # Get repository for current (new) backend
-    repo = RepositoryFactory.get_repository(form_path)
-
-    # Check if storage exists and has data
-    has_data = False
-    record_count = 0
-
-    if backend_changed and form_history:
-        # Backend changed: use record count from history (reflects data in old backend)
-        record_count = form_history.get("record_count", 0)
-        has_data = record_count > 0
-        logger.info(
-            f"Backend changed for '{form_path}', using historical record count: {record_count}"
-        )
-    else:
-        # No backend change: check current backend for data
-        has_data = repo.exists(form_path) and repo.has_data(form_path)
-
-        if has_data:
-            try:
-                existing_data = repo.read_all(form_path, spec)
-                record_count = len(existing_data)
-            except Exception as e:
-                logger.warning(f"Error reading existing data for change detection: {e}")
-                has_data = False
-
-    # Check for schema or backend changes
-    schema_change, backend_change = check_form_changes(
-        form_path=form_path, spec=spec, has_data=has_data, record_count=record_count
-    )
-
-    # Check if changes require user confirmation
-    if schema_change or backend_change:
-        if schema_change and schema_change.has_changes():
-            logger.info(
-                f"Schema changes detected for '{form_path}': "
-                f"{schema_change.get_summary()}"
-            )
-
-        if backend_change:
-            logger.info(
-                f"Backend change detected for '{form_path}': "
-                f"{backend_change.old_backend} -> {backend_change.new_backend}"
-            )
-
-        # Redirect to confirmation UI if changes require confirmation
-        requires_confirmation = ChangeManager.requires_confirmation(
-            schema_change, backend_change
-        )
-        if requires_confirmation:
-            logger.info(f"Redirecting to migration confirmation for '{form_path}'")
-            # Use Flask's redirect - this will be caught by the caller
-            from flask import redirect as flask_redirect
-
-            raise Exception(f"MIGRATION_REQUIRED:{form_path}")
-
-    # Auto-create storage if it doesn't exist
-    if not repo.exists(form_path):
-        repo.create_storage(form_path, spec)
-
-    # Read data
-    data = repo.read_all(form_path, spec)
-
-    # Update tracking after successful read
-    update_form_tracking(form_path, spec, len(data))
-
-    return data
-
-
-def write_forms(forms, spec, form_path):
-    """Write forms using configured persistence backend.
-
-    Args:
-        forms: List of form data dictionaries
-        spec: Form specification
-        form_path: Path to the form (e.g., 'contatos', 'financeiro/contas')
-    """
-    repo = RepositoryFactory.get_repository(form_path)
-
-    # Auto-create storage if it doesn't exist
-    if not repo.exists(form_path):
-        repo.create_storage(form_path, spec)
-
-    # Clear all existing records
-    current = repo.read_all(form_path, spec)
-    for i in range(len(current)):
-        repo.delete(form_path, spec, 0)  # Always delete the first record
-
-    # Insert new records
-    for form_data in forms:
-        repo.create(form_path, spec, form_data)
-
-
 def generate_form_field(field, form_data=None):
     """Generate HTML for a single form field based on spec using templates."""
     field_name = field["name"]
@@ -503,9 +386,21 @@ def generate_form_field(field, form_data=None):
         )
 
 
-def generate_table_headers(spec):
-    """Generate table headers from spec."""
+def generate_table_headers(spec, include_id=False):
+    """Generate table headers from spec.
+
+    Args:
+        spec: Form specification
+        include_id: Whether to include ID column (default: False)
+
+    Returns:
+        HTML string for table headers
+    """
     headers = ""
+
+    if include_id:
+        headers += "<th>ID</th>\n"
+
     num_fields = len(spec["fields"])
     col_width = int(75 / num_fields)  # Reserve 25% for actions
 
@@ -516,14 +411,27 @@ def generate_table_headers(spec):
     return headers
 
 
-def generate_table_row(form_data, spec, idx, form_name):
-    """Generate a table row from form data."""
+def generate_table_row(record, spec, form_name):
+    """Generate a table row with UUID-based links.
+
+    Args:
+        record: Dictionary with record data INCLUDING 'id' field
+        spec: Form specification
+        form_name: Name of the form
+
+    Returns:
+        HTML string for table row
+    """
+    # Extract UUID
+    record_id = record.get("id", "")
+
+    # Build data cells
     cells = ""
 
     for field in spec["fields"]:
         field_name = field["name"]
         field_type = field["type"]
-        value = form_data.get(field_name, "")
+        value = record.get(field_name, "")
 
         if field_type == "checkbox":
             display_value = "Sim" if value else "Não"
@@ -549,11 +457,12 @@ def generate_table_row(form_data, spec, idx, form_name):
 
         cells += f"<td>{display_value}</td>\n"
 
+    # Add action buttons with UUID
     cells += f"""<td>
-        <form action="/{form_name}/edit/{idx}" method="get" style="display:inline;">
+        <form action="/{form_name}/edit/{record_id}" method="get" style="display:inline;">
             <button class="icon-btn edit" title="Editar"><i class="fa fa-pencil-alt"></i></button>
         </form>
-        <form action="/{form_name}/delete/{idx}" method="get" style="display:inline;" onsubmit="return confirm('Confirma exclusão?');">
+        <form action="/{form_name}/delete/{record_id}" method="get" style="display:inline;" onsubmit="return confirm('Confirma exclusão?');">
             <button class="icon-btn delete" title="Excluir"><i class="fa fa-trash"></i></button>
         </form>
     </td>"""
@@ -645,7 +554,14 @@ def api_search_contatos():
     except:
         return jsonify([])
 
-    forms = read_forms(contatos_spec, "contatos")
+    # Use repository directly instead of read_forms
+    repo = RepositoryFactory.get_repository("contatos")
+
+    # Auto-create storage if needed
+    if not repo.exists("contatos"):
+        repo.create_storage("contatos", contatos_spec)
+
+    forms = repo.read_all("contatos", contatos_spec)
 
     # Filter contacts by name (case-insensitive substring match)
     results = []
@@ -666,12 +582,63 @@ def main_page():
 
 @app.route("/<path:form_name>", methods=["GET", "POST"])
 def index(form_name):
+    """Main form page with CRUD operations."""
     spec = load_spec(form_name)
     error = ""
 
     # Generate dynamic menu
     menu_items = scan_specs_directory()
     menu_html = generate_menu_html(menu_items, form_name)
+
+    # Check for schema changes
+    from persistence.schema_history import get_history
+    from persistence.config import get_config
+
+    history = get_history()
+    form_history = history.get_form_history(form_name)
+
+    config = get_config()
+    current_backend_config = config.get_backend_config(form_name)
+    current_backend = current_backend_config.get("type")
+
+    last_backend = history.get_last_backend(form_name)
+    backend_changed = last_backend and last_backend != current_backend
+
+    # Get repository
+    repo = RepositoryFactory.get_repository(form_name)
+
+    # Check if storage exists and has data
+    has_data = False
+    record_count = 0
+
+    if backend_changed and form_history:
+        record_count = form_history.get("record_count", 0)
+        has_data = record_count > 0
+    else:
+        has_data = repo.exists(form_name) and repo.has_data(form_name)
+        if has_data:
+            try:
+                existing_data = repo.read_all(form_name, spec)
+                record_count = len(existing_data)
+            except Exception as e:
+                logger.warning(f"Error reading existing data: {e}")
+                has_data = False
+
+    # Check for schema or backend changes
+    schema_change, backend_change = check_form_changes(
+        form_path=form_name, spec=spec, has_data=has_data, record_count=record_count
+    )
+
+    # Redirect to confirmation if needed
+    requires_confirmation = ChangeManager.requires_confirmation(
+        schema_change, backend_change
+    )
+    if requires_confirmation:
+        return redirect(f"/migrate/confirm/{form_name}")
+
+    # Auto-create storage if needed
+    if not repo.exists(form_name):
+        repo.create_storage(form_name, spec)
 
     if request.method == "POST":
         # Collect form data
@@ -690,24 +657,13 @@ def index(form_name):
 
         if error:
             # Re-render with error and preserve form data
-            try:
-                forms = read_forms(spec, form_name)
-            except Exception as e:
-                # Check if migration is required
-                if str(e).startswith("MIGRATION_REQUIRED:"):
-                    form_path = str(e).split(":", 1)[1]
-                    return redirect(f"/migrate/confirm/{form_path}")
-                raise
-
+            forms = repo.read_all(form_name, spec)
             form_fields = "".join(
                 [generate_form_field(f, form_data) for f in spec["fields"]]
             )
             table_headers = generate_table_headers(spec)
             table_rows = "".join(
-                [
-                    generate_table_row(forms[i], spec, i, form_name)
-                    for i in range(len(forms))
-                ]
+                [generate_table_row(record, spec, form_name) for record in forms]
             )
 
             return render_template(
@@ -721,34 +677,23 @@ def index(form_name):
                 table_rows=table_rows,
             )
 
-        # Save the form
-        try:
-            forms = read_forms(spec, form_name)
-        except Exception as e:
-            # Check if migration is required
-            if str(e).startswith("MIGRATION_REQUIRED:"):
-                form_path = str(e).split(":", 1)[1]
-                return redirect(f"/migrate/confirm/{form_path}")
-            raise
+        # Create new record (repository generates UUID)
+        record_id = repo.create(form_name, spec, form_data)
 
-        forms.append(form_data)
-        write_forms(forms, spec, form_name)
+        # Update tracking
+        forms = repo.read_all(form_name, spec)
+        update_form_tracking(form_name, spec, len(forms))
+
+        # Redirect to avoid resubmission
         return redirect(f"/{form_name}")
 
     # GET request - show the form
-    try:
-        forms = read_forms(spec, form_name)
-    except Exception as e:
-        # Check if migration is required
-        if str(e).startswith("MIGRATION_REQUIRED:"):
-            form_path = str(e).split(":", 1)[1]
-            return redirect(f"/migrate/confirm/{form_path}")
-        raise
+    forms = repo.read_all(form_name, spec)
 
     form_fields = "".join([generate_form_field(f) for f in spec["fields"]])
     table_headers = generate_table_headers(spec)
     table_rows = "".join(
-        [generate_table_row(forms[i], spec, i, form_name) for i in range(len(forms))]
+        [generate_table_row(record, spec, form_name) for record in forms]
     )
 
     return render_template(
@@ -965,18 +910,23 @@ def migrate_execute(form_path):
         return redirect(f"/{form_path}")
 
 
-@app.route("/<path:form_name>/edit/<int:idx>", methods=["GET", "POST"])
-def edit(form_name, idx):
+@app.route("/<path:form_name>/edit/<string:record_id>", methods=["GET", "POST"])
+def edit(form_name, record_id):
+    """Edit an existing record by UUID."""
     spec = load_spec(form_name)
-    forms = read_forms(spec, form_name)
-    error = ""
+    repo = RepositoryFactory.get_repository(form_name)
 
     # Generate dynamic menu
     menu_items = scan_specs_directory()
     menu_html = generate_menu_html(menu_items, form_name)
 
-    if idx < 0 or idx >= len(forms):
-        return "Formulário não encontrado", 404
+    # Get the record by UUID
+    record = repo.read_by_id(form_name, spec, record_id)
+
+    if not record:
+        return "Record not found", 404
+
+    error = ""
 
     if request.method == "POST":
         # Collect form data
@@ -1005,15 +955,22 @@ def edit(form_name, idx):
                 menu_html=menu_html,
                 error=error,
                 form_fields=form_fields,
+                record_id=record_id,
             )
 
-        # Update the form
-        forms[idx] = form_data
-        write_forms(forms, spec, form_name)
-        return redirect(f"/{form_name}")
+        # Update record by UUID
+        success = repo.update_by_id(form_name, spec, record_id, form_data)
+
+        if success:
+            # Update tracking
+            forms = repo.read_all(form_name, spec)
+            update_form_tracking(form_name, spec, len(forms))
+            return redirect(f"/{form_name}")
+        else:
+            return "Update failed", 500
 
     # GET request - show edit form
-    form_fields = "".join([generate_form_field(f, forms[idx]) for f in spec["fields"]])
+    form_fields = "".join([generate_form_field(f, record) for f in spec["fields"]])
 
     return render_template(
         "edit.html",
@@ -1022,31 +979,25 @@ def edit(form_name, idx):
         menu_html=menu_html,
         error="",
         form_fields=form_fields,
+        record_id=record_id,
     )
 
 
-@app.route("/<path:form_name>/delete/<int:idx>")
-def delete(form_name, idx):
+@app.route("/<path:form_name>/delete/<string:record_id>")
+def delete_record(form_name, record_id):
+    """Delete a record by UUID."""
     spec = load_spec(form_name)
-    forms = read_forms(spec, form_name)
+    repo = RepositoryFactory.get_repository(form_name)
 
-    if idx < 0 or idx >= len(forms):
-        return "Formulário não encontrado", 404
+    # Delete by UUID
+    success = repo.delete_by_id(form_name, spec, record_id)
 
-    forms.pop(idx)
-    write_forms(forms, spec, form_name)
+    if success:
+        # Update tracking
+        forms = repo.read_all(form_name, spec)
+        update_form_tracking(form_name, spec, len(forms))
+
     return redirect(f"/{form_name}")
-
-
-# Keep old routes for backward compatibility
-@app.route("/edit/<int:idx>", methods=["GET", "POST"])
-def old_edit(idx):
-    return redirect(f"/contatos/edit/{idx}")
-
-
-@app.route("/delete/<int:idx>")
-def old_delete(idx):
-    return redirect(f"/contatos/delete/{idx}")
 
 
 if __name__ == "__main__":

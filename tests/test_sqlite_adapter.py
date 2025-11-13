@@ -94,18 +94,23 @@ def test_create_and_read_record(temp_db, sample_spec):
 
     # Create record
     data = {"nome": "João Silva", "email": "joao@example.com", "ativo": True}
-    assert repo.create("test_form", sample_spec, data)
+    record_id = repo.create("test_form", sample_spec, data)
+
+    # Verify UUID returned
+    assert isinstance(record_id, str)
+    assert len(record_id) == 27  # Crockford Base32 UUID length
 
     # Read all records
     records = repo.read_all("test_form", sample_spec)
     assert len(records) == 1
+    assert records[0]["id"] == record_id
     assert records[0]["nome"] == "João Silva"
     assert records[0]["email"] == "joao@example.com"
     assert records[0]["ativo"] is True
 
 
 def test_update_record(temp_db, sample_spec):
-    """Test updating a record."""
+    """Test updating a record by UUID."""
     config, db_path = temp_db
     repo = SQLiteRepository(config)
 
@@ -113,7 +118,7 @@ def test_update_record(temp_db, sample_spec):
 
     # Create record
     data = {"nome": "João Silva", "email": "joao@example.com", "ativo": True}
-    repo.create("test_form", sample_spec, data)
+    record_id = repo.create("test_form", sample_spec, data)
 
     # Update record
     updated_data = {
@@ -121,48 +126,57 @@ def test_update_record(temp_db, sample_spec):
         "email": "joao.santos@example.com",
         "ativo": False,
     }
-    assert repo.update("test_form", sample_spec, 0, updated_data)
+    success = repo.update_by_id("test_form", sample_spec, record_id, updated_data)
+    assert success is True
 
     # Verify update
     records = repo.read_all("test_form", sample_spec)
     assert len(records) == 1
+    assert records[0]["id"] == record_id
     assert records[0]["nome"] == "João Santos"
     assert records[0]["email"] == "joao.santos@example.com"
     assert records[0]["ativo"] is False
 
 
 def test_delete_record(temp_db, sample_spec):
-    """Test deleting a record."""
+    """Test deleting a record by UUID."""
     config, db_path = temp_db
     repo = SQLiteRepository(config)
 
     repo.create_storage("test_form", sample_spec)
 
     # Create multiple records
-    repo.create(
+    id1 = repo.create(
         "test_form",
         sample_spec,
         {"nome": "João", "email": "joao@example.com", "ativo": True},
     )
-    repo.create(
+    id2 = repo.create(
         "test_form",
         sample_spec,
         {"nome": "Maria", "email": "maria@example.com", "ativo": True},
     )
-    repo.create(
+    id3 = repo.create(
         "test_form",
         sample_spec,
         {"nome": "Pedro", "email": "pedro@example.com", "ativo": False},
     )
 
-    # Delete second record (index 1)
-    assert repo.delete("test_form", sample_spec, 1)
+    # Delete Maria's record
+    success = repo.delete_by_id("test_form", sample_spec, id2)
+    assert success is True
 
     # Verify deletion
     records = repo.read_all("test_form", sample_spec)
     assert len(records) == 2
     assert records[0]["nome"] == "João"
+    assert records[0]["id"] == id1
     assert records[1]["nome"] == "Pedro"
+    assert records[1]["id"] == id3
+
+    # Try to read deleted record
+    deleted = repo.read_by_id("test_form", sample_spec, id2)
+    assert deleted is None
 
 
 def test_has_data(temp_db, sample_spec):
@@ -221,8 +235,12 @@ def test_multiple_forms(temp_db):
     repo.create_storage("produtos", spec2)
 
     # Add data to each
-    repo.create("contatos", spec1, {"nome": "João"})
-    repo.create("produtos", spec2, {"nome": "Produto A"})
+    id1 = repo.create("contatos", spec1, {"nome": "João"})
+    id2 = repo.create("produtos", spec2, {"nome": "Produto A"})
+
+    # Verify UUIDs
+    assert isinstance(id1, str) and len(id1) == 27
+    assert isinstance(id2, str) and len(id2) == 27
 
     # Verify both exist independently
     contatos = repo.read_all("contatos", spec1)
@@ -230,7 +248,9 @@ def test_multiple_forms(temp_db):
 
     assert len(contatos) == 1
     assert len(produtos) == 1
+    assert contatos[0]["id"] == id1
     assert contatos[0]["nome"] == "João"
+    assert produtos[0]["id"] == id2
     assert produtos[0]["nome"] == "Produto A"
 
 
@@ -249,12 +269,14 @@ def test_boolean_field_conversion(temp_db):
     repo.create_storage("test", spec)
 
     # Test True
-    repo.create("test", spec, {"ativo": True})
+    id1 = repo.create("test", spec, {"ativo": True})
     records = repo.read_all("test", spec)
+    assert records[0]["id"] == id1
     assert records[0]["ativo"] is True
 
     # Test False
-    repo.delete("test", spec, 0)
-    repo.create("test", spec, {"ativo": False})
+    repo.delete_by_id("test", spec, id1)
+    id2 = repo.create("test", spec, {"ativo": False})
     records = repo.read_all("test", spec)
+    assert records[0]["id"] == id2
     assert records[0]["ativo"] is False

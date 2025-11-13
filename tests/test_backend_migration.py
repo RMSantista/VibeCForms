@@ -242,11 +242,15 @@ def test_migration_rollback_on_failure(tmp_path, txt_config, sample_spec):
     """Test that migration rolls back on failure."""
     txt_repo = TxtRepository(txt_config)
     txt_repo.create_storage("test_form", sample_spec)
-    txt_repo.create(
+    record_id = txt_repo.create(
         "test_form",
         sample_spec,
         {"nome": "João", "telefone": "11-9999-8888", "ativo": True},
     )
+
+    # Verify UUID returned
+    assert isinstance(record_id, str)
+    assert len(record_id) == 27
 
     # Try to migrate to an invalid backend (should fail)
     success = MigrationManager.migrate_backend(
@@ -262,4 +266,5 @@ def test_migration_rollback_on_failure(tmp_path, txt_config, sample_spec):
     # Original TXT data should still be intact
     txt_data = txt_repo.read_all("test_form", sample_spec)
     assert len(txt_data) == 1
+    assert txt_data[0]["id"] == record_id
     assert txt_data[0]["nome"] == "João"

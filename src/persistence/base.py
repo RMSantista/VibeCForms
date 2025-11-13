@@ -10,6 +10,8 @@ changing the application code.
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
 
+from src.utils import crockford
+
 
 class BaseRepository(ABC):
     """
@@ -57,91 +59,122 @@ class BaseRepository(ABC):
             spec: Form specification for field type conversion
 
         Returns:
-            List of dictionaries, each representing a record
+            List of dictionaries, each containing record data with 'id' field
             Empty list if no records exist
 
-        Example:
+        Note:
+            Each returned dictionary must include the 'id' field with the
+            Crockford Base32 UUID. Example:
             [
-                {'nome': 'João', 'telefone': '11999999999', 'ativo': True},
-                {'nome': 'Maria', 'telefone': '11988888888', 'ativo': False}
+                {'id': '3HNMQR8PJSG0C9VWBYTE12K', 'nome': 'João', 'telefone': '11999999999', 'ativo': True},
+                {'id': '7KXPW4MNZQTC2DRGVHJ8A5S', 'nome': 'Maria', 'telefone': '11988888888', 'ativo': False}
             ]
         """
         pass
 
     @abstractmethod
-    def read_one(
-        self, form_path: str, spec: Dict[str, Any], idx: int
+    def read_by_id(
+        self, form_path: str, spec: Dict[str, Any], record_id: str
     ) -> Optional[Dict[str, Any]]:
         """
-        Read a single record by its index.
+        Read a single record by its UUID.
 
         Args:
-            form_path: Path to the form
-            spec: Form specification for field type conversion
-            idx: Zero-based index of the record
+            form_path: Path to the form (e.g., 'contatos', 'financeiro/contas')
+            spec: Form specification dictionary
+            record_id: Crockford Base32 UUID (27 characters)
 
         Returns:
-            Dictionary with record data if found
-            None if index is out of bounds
+            Dictionary with record data including 'id' field, or None if not found
 
         Example:
-            {'nome': 'João', 'telefone': '11999999999', 'ativo': True}
+            {'id': '3HNMQR8PJSG0C9VWBYTE12K', 'nome': 'João', 'telefone': '11999999999', 'ativo': True}
         """
         pass
 
     @abstractmethod
-    def create(
-        self, form_path: str, spec: Dict[str, Any], data: Dict[str, Any]
-    ) -> bool:
+    def create(self, form_path: str, spec: Dict[str, Any], data: Dict[str, Any]) -> str:
         """
-        Insert a new record into the form storage.
+        Create a new record and return its UUID.
 
         Args:
             form_path: Path to the form
-            spec: Form specification for validation and type conversion
-            data: Dictionary containing field values to insert
+            spec: Form specification dictionary
+            data: Dictionary with field values (should NOT include 'id')
 
         Returns:
-            True if record was inserted successfully
-            False if insertion failed
+            Generated Crockford Base32 UUID (27 characters)
+
+        Note:
+            The implementation should:
+            1. Generate a new UUID using src.utils.crockford.generate_id()
+            2. Add the UUID to the data as 'id' field
+            3. Store the record
+            4. Return the UUID
 
         Example:
             data = {'nome': 'João', 'telefone': '11999999999', 'ativo': True}
+            record_id = repo.create('contatos', spec, data)
+            # Returns: '3HNMQR8PJSG0C9VWBYTE12K'
         """
         pass
 
     @abstractmethod
-    def update(
-        self, form_path: str, spec: Dict[str, Any], idx: int, data: Dict[str, Any]
+    def update_by_id(
+        self, form_path: str, spec: Dict[str, Any], record_id: str, data: Dict[str, Any]
     ) -> bool:
         """
-        Update an existing record.
+        Update an existing record by its UUID.
 
         Args:
             form_path: Path to the form
-            spec: Form specification for validation and type conversion
-            idx: Zero-based index of the record to update
-            data: Dictionary containing new field values
+            spec: Form specification dictionary
+            record_id: Crockford Base32 UUID (27 characters)
+            data: Dictionary with updated field values (should NOT include 'id')
 
         Returns:
-            True if record was updated successfully
-            False if index doesn't exist or update failed
+            True if update successful, False if record not found
+
+        Example:
+            data = {'nome': 'João Silva', 'telefone': '11999999999'}
+            success = repo.update_by_id('contatos', spec, '3HNMQR8PJSG0C9VWBYTE12K', data)
         """
         pass
 
     @abstractmethod
-    def delete(self, form_path: str, spec: Dict[str, Any], idx: int) -> bool:
+    def delete_by_id(
+        self, form_path: str, spec: Dict[str, Any], record_id: str
+    ) -> bool:
         """
-        Delete a record by its index.
+        Delete a record by its UUID.
 
         Args:
             form_path: Path to the form
-            spec: Form specification
-            idx: Zero-based index of the record to delete
+            spec: Form specification dictionary
+            record_id: Crockford Base32 UUID (27 characters)
 
         Returns:
-            True if record was deleted successfully
-            False if index doesn't exist or deletion failed
+            True if deletion successful, False if record not found
+
+        Example:
+            success = repo.delete_by_id('contatos', spec, '3HNMQR8PJSG0C9VWBYTE12K')
+        """
+        pass
+
+    @abstractmethod
+    def id_exists(self, form_path: str, record_id: str) -> bool:
+        """
+        Check if a record with given UUID exists.
+
+        Args:
+            form_path: Path to the form
+            record_id: Crockford Base32 UUID (27 characters)
+
+        Returns:
+            True if record exists, False otherwise
+
+        Example:
+            exists = repo.id_exists('contatos', '3HNMQR8PJSG0C9VWBYTE12K')
         """
         pass
 

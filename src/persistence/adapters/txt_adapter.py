@@ -14,6 +14,7 @@ from pathlib import Path
 from datetime import datetime
 from persistence.base import BaseRepository
 from persistence.schema_detector import SchemaChangeDetector, ChangeType
+from src.utils import crockford
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +27,10 @@ class TxtRepository(BaseRepository):
     storing data in .txt files with semicolon-separated values.
 
     File format:
-        value1;value2;value3
-        value4;value5;value6
+        UUID;value1;value2;value3
+        UUID;value4;value5;value6
 
+    The UUID is stored as the FIRST column in each line (27-char Crockford Base32).
     Booleans are stored as "True" or "False" strings.
     """
 
@@ -89,7 +91,7 @@ class TxtRepository(BaseRepository):
         return True
 
     def read_all(self, form_path: str, spec: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Read all records from the text file."""
+        """Read all records from the text file including UUID."""
         file_path = self._get_file_path(form_path)
 
         if not os.path.exists(file_path):
@@ -107,18 +109,29 @@ class TxtRepository(BaseRepository):
                 continue
 
             values = line.strip().split(self.delimiter)
-            if len(values) != len(field_names):
+
+            # First value is UUID, rest are field values
+            if len(values) < 1:
+                logger.warning(f"Skipping empty line {line_num} in {file_path}")
+                continue
+
+            record_id = values[0]
+            field_values = values[1:]
+
+            if len(field_values) != len(field_names):
                 logger.warning(
                     f"Skipping malformed line {line_num} in {file_path}: "
-                    f"expected {len(field_names)} fields, got {len(values)}"
+                    f"expected {len(field_names)} fields, got {len(field_values)}"
                 )
                 continue
 
-            form_data = {}
+            # Start with ID
+            form_data = {"id": record_id}
+
             for i, field in enumerate(spec["fields"]):
                 field_name = field["name"]
                 field_type = field["type"]
-                value = values[i]
+                value = field_values[i]
 
                 # Convert value based on field type
                 if field_type == "checkbox":
@@ -140,73 +153,110 @@ class TxtRepository(BaseRepository):
         logger.debug(f"Read {len(forms)} records from {file_path}")
         return forms
 
-    def read_one(
-        self, form_path: str, spec: Dict[str, Any], idx: int
+    def read_by_id(
+        self, form_path: str, spec: Dict[str, Any], record_id: str
     ) -> Optional[Dict[str, Any]]:
-        """Read a single record by index."""
-        forms = self.read_all(form_path, spec)
+        """Read a single record by UUID."""
+        all_records = self.read_all(form_path, spec)
 
-        if idx < 0 or idx >= len(forms):
-            logger.debug(f"Index {idx} out of bounds for {form_path}")
-            return None
+        for record in all_records:
+            if record.get("id") == record_id:
+                return record
 
-        return forms[idx]
+        logger.debug(f"Record with ID {record_id} not found in {form_path}")
+        return None
 
-    def create(
-        self, form_path: str, spec: Dict[str, Any], data: Dict[str, Any]
-    ) -> bool:
-        """Insert a new record."""
+    def create(self, form_path: str, spec: Dict[str, Any], data: Dict[str, Any]) -> str:
+        """Insert a new record with generated UUID.
+
+        Returns:
+            str: The generated UUID for the new record
+        """
+        # Generate UUID
+        record_id = crockford.generate_id()
+
+        # Add ID to data
+        data_with_id = {"id": record_id, **data}
+
         # Read existing records
         forms = self.read_all(form_path, spec)
 
         # Append new record
-        forms.append(data)
+        forms.append(data_with_id)
 
         # Write all records back
-        return self._write_all(form_path, spec, forms)
+        success = self._write_all(form_path, spec, forms)
 
-    def update(
-        self, form_path: str, spec: Dict[str, Any], idx: int, data: Dict[str, Any]
+        if success:
+            return record_id
+        else:
+            raise Exception(f"Failed to create record in {form_path}")
+
+    def update_by_id(
+        self, form_path: str, spec: Dict[str, Any], record_id: str, data: Dict[str, Any]
     ) -> bool:
-        """Update an existing record."""
+        """Update an existing record by UUID."""
         forms = self.read_all(form_path, spec)
 
-        if idx < 0 or idx >= len(forms):
-            logger.error(f"Cannot update: index {idx} out of bounds for {form_path}")
-            return False
+        # Find record with matching ID
+        for i, record in enumerate(forms):
+            if record.get("id") == record_id:
+                # Preserve the ID, update other fields
+                updated_record = {"id": record_id, **data}
+                forms[i] = updated_record
+                logger.debug(f"Updated record {record_id} in {form_path}")
+                return self._write_all(form_path, spec, forms)
 
-        # Update the record
-        forms[idx] = data
+        logger.error(f"Cannot update: record {record_id} not found in {form_path}")
+        return False
 
-        # Write all records back
-        return self._write_all(form_path, spec, forms)
-
-    def delete(self, form_path: str, spec: Dict[str, Any], idx: int) -> bool:
-        """Delete a record by index."""
+    def delete_by_id(
+        self, form_path: str, spec: Dict[str, Any], record_id: str
+    ) -> bool:
+        """Delete a record by UUID."""
         forms = self.read_all(form_path, spec)
 
-        if idx < 0 or idx >= len(forms):
-            logger.error(f"Cannot delete: index {idx} out of bounds for {form_path}")
+        # Find and remove record with matching ID
+        for i, record in enumerate(forms):
+            if record.get("id") == record_id:
+                forms.pop(i)
+                logger.debug(f"Deleted record {record_id} from {form_path}")
+                return self._write_all(form_path, spec, forms)
+
+        logger.error(f"Cannot delete: record {record_id} not found in {form_path}")
+        return False
+
+    def id_exists(self, form_path: str, record_id: str) -> bool:
+        """Check if record with UUID exists."""
+        file_path = self._get_file_path(form_path)
+
+        if not os.path.exists(file_path):
             return False
 
-        # Remove the record
-        forms.pop(idx)
+        # Read file directly without full parsing for efficiency
+        try:
+            with open(file_path, "r", encoding=self.encoding) as file:
+                for line in file:
+                    if line.strip().startswith(record_id + self.delimiter):
+                        return True
+        except Exception as e:
+            logger.error(f"Error checking if ID exists in {file_path}: {e}")
+            return False
 
-        # Write remaining records back
-        return self._write_all(form_path, spec, forms)
+        return False
 
     def _write_all(
         self, form_path: str, spec: Dict[str, Any], forms: List[Dict[str, Any]]
     ) -> bool:
         """
-        Write all records to the text file.
+        Write all records to the text file with UUID as first column.
 
         This is a helper method used by create, update, and delete.
 
         Args:
             form_path: Form path
             spec: Form specification
-            forms: List of records to write
+            forms: List of records to write (must include 'id' field)
 
         Returns:
             True if successful
@@ -216,7 +266,15 @@ class TxtRepository(BaseRepository):
         try:
             with open(file_path, "w", encoding=self.encoding) as f:
                 for form_data in forms:
-                    values = []
+                    # Extract ID (must be present)
+                    record_id = form_data.get("id", "")
+                    if not record_id:
+                        logger.error(f"Record missing 'id' field: {form_data}")
+                        return False
+
+                    # Build values list starting with ID
+                    values = [record_id]
+
                     for field in spec["fields"]:
                         field_name = field["name"]
                         value = form_data.get(field_name, "")
@@ -403,8 +461,13 @@ class TxtRepository(BaseRepository):
                         {"name": change.field_name, "type": change.field_type}
                     )
 
-                # Add default values for new fields in each record
+                # Add default values for new fields in each record (preserve ID)
                 for form in forms:
+                    # Ensure ID is preserved
+                    if "id" not in form:
+                        logger.error("Record missing ID during field addition")
+                        raise Exception("Record missing ID")
+
                     for change in added_fields:
                         form[change.field_name] = self._get_default_value(
                             change.field_type
@@ -478,10 +541,14 @@ class TxtRepository(BaseRepository):
             # Read data with old field name
             forms = self.read_all(form_path, old_spec)
 
-            # Rename field in each record
+            # Rename field in each record (preserve ID)
             for form in forms:
                 if old_name in form:
                     form[new_name] = form.pop(old_name)
+                # Ensure ID is preserved
+                if "id" not in form:
+                    logger.error("Record missing ID during rename")
+                    raise Exception("Record missing ID")
 
             # Write with new spec
             success = self._write_all(form_path, spec, forms)
@@ -541,9 +608,14 @@ class TxtRepository(BaseRepository):
             # Read all data
             forms = self.read_all(form_path, spec)
 
-            # Convert each record's field value
+            # Convert each record's field value (preserve ID)
             conversion_errors = 0
             for i, form in enumerate(forms):
+                # Ensure ID is preserved
+                if "id" not in form:
+                    logger.error(f"Record {i} missing ID during type change")
+                    raise Exception(f"Record {i} missing ID")
+
                 if field_name in form:
                     old_value = form[field_name]
 
@@ -661,8 +733,13 @@ class TxtRepository(BaseRepository):
             # Read all data with old spec
             forms = self.read_all(form_path, old_spec)
 
-            # Remove field from each record
+            # Remove field from each record (preserve ID)
             for form in forms:
+                # Ensure ID is preserved
+                if "id" not in form:
+                    logger.error("Record missing ID during field removal")
+                    raise Exception("Record missing ID")
+
                 if field_name in form:
                     del form[field_name]
 

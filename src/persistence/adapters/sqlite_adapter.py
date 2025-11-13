@@ -15,6 +15,7 @@ from pathlib import Path
 from datetime import datetime
 from persistence.base import BaseRepository
 from persistence.schema_detector import SchemaChangeDetector, ChangeType
+from src.utils import crockford
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +106,18 @@ class SQLiteRepository(BaseRepository):
         # Replace slashes with underscores for SQL table names
         return form_path.replace("/", "_")
 
+    def _sanitize_table_name(self, form_path: str) -> str:
+        """
+        Sanitize and get the table name for a form (alias for _get_table_name).
+
+        Args:
+            form_path: Form path (e.g., 'contatos', 'financeiro/contas')
+
+        Returns:
+            Table name (e.g., 'contatos', 'financeiro_contas')
+        """
+        return self._get_table_name(form_path)
+
     def create_storage(self, form_path: str, spec: Dict[str, Any]) -> bool:
         """Create storage (table) for the form."""
         table_name = self._get_table_name(form_path)
@@ -114,7 +127,7 @@ class SQLiteRepository(BaseRepository):
             return False
 
         # Build CREATE TABLE statement
-        columns = ["id INTEGER PRIMARY KEY AUTOINCREMENT"]
+        columns = ["id TEXT PRIMARY KEY"]
 
         for field in spec["fields"]:
             field_name = field["name"]
@@ -145,7 +158,7 @@ class SQLiteRepository(BaseRepository):
             return False
 
     def read_all(self, form_path: str, spec: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Read all records from the table."""
+        """Read all records from the table including UUID."""
         table_name = self._get_table_name(form_path)
 
         if not self.exists(form_path):
@@ -162,7 +175,9 @@ class SQLiteRepository(BaseRepository):
             # Convert rows to dictionaries and apply type conversions
             forms = []
             for row in rows:
-                form_data = {}
+                # Start with the UUID
+                form_data = {"id": row["id"]}
+
                 for field in spec["fields"]:
                     field_name = field["name"]
                     field_type = field["type"]
@@ -201,24 +216,73 @@ class SQLiteRepository(BaseRepository):
 
         return forms[idx]
 
-    def create(
-        self, form_path: str, spec: Dict[str, Any], data: Dict[str, Any]
-    ) -> bool:
-        """Insert a new record into the table."""
+    def read_by_id(
+        self, form_path: str, spec: Dict[str, Any], record_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Read a single record by UUID."""
+        table_name = self._get_table_name(form_path)
+
+        if not self.exists(form_path):
+            logger.debug(f"Table doesn't exist: {table_name}")
+            return None
+
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute(f"SELECT * FROM {table_name} WHERE id = ?", (record_id,))
+            row = cursor.fetchone()
+            conn.close()
+
+            if not row:
+                logger.debug(f"Record {record_id} not found in {table_name}")
+                return None
+
+            # Build record dictionary starting with UUID
+            record = {"id": row["id"]}
+
+            for field in spec["fields"]:
+                field_name = field["name"]
+                field_type = field["type"]
+                value = row[field_name]
+
+                # Convert based on field type
+                if field_type == "checkbox":
+                    record[field_name] = bool(value) if value is not None else False
+                elif field_type == "number" or field_type == "range":
+                    record[field_name] = int(value) if value is not None else 0
+                else:
+                    record[field_name] = value if value is not None else ""
+
+            logger.debug(f"Read record {record_id} from {table_name}")
+            return record
+
+        except Exception as e:
+            logger.error(f"Failed to read record {record_id} from {table_name}: {e}")
+            return None
+
+    def create(self, form_path: str, spec: Dict[str, Any], data: Dict[str, Any]) -> str:
+        """Insert a new record into the table with generated UUID.
+
+        Returns:
+            str: The generated UUID for the new record
+        """
         table_name = self._get_table_name(form_path)
 
         if not self.exists(form_path):
             self.create_storage(form_path, spec)
 
-        # Build INSERT statement
-        field_names = [field["name"] for field in spec["fields"]]
-        placeholders = ", ".join(["?" for _ in field_names])
-        columns = ", ".join(field_names)
+        # Generate UUID
+        record_id = crockford.generate_id()
 
-        insert_sql = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
+        # Build INSERT statement including id column
+        columns = ["id"] + [field["name"] for field in spec["fields"]]
+        placeholders = ", ".join(["?" for _ in columns])
+        columns_str = ", ".join(columns)
 
-        # Extract values in correct order
-        values = []
+        insert_sql = f"INSERT INTO {table_name} ({columns_str}) VALUES ({placeholders})"
+
+        # Build values list starting with UUID
+        values = [record_id]
         for field in spec["fields"]:
             field_name = field["name"]
             field_type = field["type"]
@@ -242,12 +306,12 @@ class SQLiteRepository(BaseRepository):
             conn.commit()
             conn.close()
 
-            logger.debug(f"Inserted record into {table_name}")
-            return True
+            logger.debug(f"Inserted record {record_id} into {table_name}")
+            return record_id
 
         except Exception as e:
             logger.error(f"Failed to insert into {table_name}: {e}")
-            return False
+            raise
 
     def update(
         self, form_path: str, spec: Dict[str, Any], idx: int, data: Dict[str, Any]
@@ -315,6 +379,69 @@ class SQLiteRepository(BaseRepository):
             logger.error(f"Failed to update {table_name}: {e}")
             return False
 
+    def update_by_id(
+        self, form_path: str, spec: Dict[str, Any], record_id: str, data: Dict[str, Any]
+    ) -> bool:
+        """Update a record by UUID."""
+        table_name = self._get_table_name(form_path)
+
+        if not self.exists(form_path):
+            logger.error(f"Cannot update: table {table_name} doesn't exist")
+            return False
+
+        # Build SET clause and values
+        set_parts = []
+        values = []
+
+        for field in spec["fields"]:
+            field_name = field["name"]
+            field_type = field["type"]
+            value = data.get(field_name, "")
+
+            set_parts.append(f"{field_name} = ?")
+
+            # Convert based on field type
+            if field_type == "checkbox":
+                values.append(1 if value else 0)
+            elif field_type == "number" or field_type == "range":
+                try:
+                    values.append(int(value) if value else 0)
+                except ValueError:
+                    values.append(0)
+            else:
+                values.append(str(value) if value else "")
+
+        if not set_parts:
+            logger.warning(f"No fields to update for record {record_id}")
+            return False
+
+        # Add record_id to end of values for WHERE clause
+        values.append(record_id)
+
+        # Execute UPDATE
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+
+            update_sql = f"UPDATE {table_name} SET {', '.join(set_parts)} WHERE id = ?"
+            cursor.execute(update_sql, values)
+            conn.commit()
+
+            # Check if any rows were updated
+            rows_updated = cursor.rowcount > 0
+            conn.close()
+
+            if rows_updated:
+                logger.debug(f"Updated record {record_id} in {table_name}")
+            else:
+                logger.warning(f"Record {record_id} not found in {table_name}")
+
+            return rows_updated
+
+        except Exception as e:
+            logger.error(f"Failed to update record {record_id} in {table_name}: {e}")
+            return False
+
     def delete(self, form_path: str, spec: Dict[str, Any], idx: int) -> bool:
         """Delete a record by index."""
         table_name = self._get_table_name(form_path)
@@ -344,6 +471,62 @@ class SQLiteRepository(BaseRepository):
 
         except Exception as e:
             logger.error(f"Failed to delete from {table_name}: {e}")
+            return False
+
+    def delete_by_id(
+        self, form_path: str, spec: Dict[str, Any], record_id: str
+    ) -> bool:
+        """Delete a record by UUID."""
+        table_name = self._get_table_name(form_path)
+
+        if not self.exists(form_path):
+            logger.error(f"Cannot delete: table {table_name} doesn't exist")
+            return False
+
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+
+            # Delete the record
+            delete_sql = f"DELETE FROM {table_name} WHERE id = ?"
+            cursor.execute(delete_sql, (record_id,))
+            conn.commit()
+
+            # Check if any rows were deleted
+            rows_deleted = cursor.rowcount > 0
+            conn.close()
+
+            if rows_deleted:
+                logger.debug(f"Deleted record {record_id} from {table_name}")
+            else:
+                logger.warning(f"Record {record_id} not found in {table_name}")
+
+            return rows_deleted
+
+        except Exception as e:
+            logger.error(f"Failed to delete record {record_id} from {table_name}: {e}")
+            return False
+
+    def id_exists(self, form_path: str, record_id: str) -> bool:
+        """Check if record with UUID exists."""
+        table_name = self._get_table_name(form_path)
+
+        if not self.exists(form_path):
+            return False
+
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                f"SELECT 1 FROM {table_name} WHERE id = ? LIMIT 1", (record_id,)
+            )
+            result = cursor.fetchone()
+            conn.close()
+
+            return result is not None
+
+        except Exception as e:
+            logger.error(f"Failed to check if record {record_id} exists: {e}")
             return False
 
     def drop_storage(self, form_path: str, force: bool = False) -> bool:
@@ -638,8 +821,8 @@ class SQLiteRepository(BaseRepository):
             # Create new table with renamed field
             temp_table = f"{table_name}_temp"
 
-            # Build CREATE TABLE for new structure
-            columns = ["id INTEGER PRIMARY KEY AUTOINCREMENT"]
+            # Build CREATE TABLE for new structure (preserving UUID column)
+            columns = ["id TEXT PRIMARY KEY"]
             for field in spec["fields"]:
                 field_name = field["name"]
                 field_type = field["type"]
@@ -657,12 +840,12 @@ class SQLiteRepository(BaseRepository):
 
             cursor.execute(create_sql)
 
-            # Copy data from old table to new table
+            # Copy data from old table to new table, preserving UUIDs
             # Build field list with old_name -> new_name mapping
-            old_fields = [
+            old_fields = ["id"] + [
                 old_name if f["name"] == new_name else f["name"] for f in spec["fields"]
             ]
-            new_fields = [f["name"] for f in spec["fields"]]
+            new_fields = ["id"] + [f["name"] for f in spec["fields"]]
 
             old_fields_sql = ", ".join(old_fields)
             new_fields_sql = ", ".join(new_fields)
@@ -737,8 +920,8 @@ class SQLiteRepository(BaseRepository):
             # Create new table with updated type
             temp_table = f"{table_name}_temp"
 
-            # Build CREATE TABLE with new field type
-            columns = ["id INTEGER PRIMARY KEY AUTOINCREMENT"]
+            # Build CREATE TABLE with new field type (preserving UUID column)
+            columns = ["id TEXT PRIMARY KEY"]
             for field in spec["fields"]:
                 fname = field["name"]
                 ftype = field["type"]
@@ -754,8 +937,8 @@ class SQLiteRepository(BaseRepository):
 
             cursor.execute(create_sql)
 
-            # Convert and insert data
-            field_names = [f["name"] for f in spec["fields"]]
+            # Convert and insert data, preserving UUIDs
+            field_names = ["id"] + [f["name"] for f in spec["fields"]]
             placeholders = ", ".join(["?" for _ in field_names])
             columns_insert = ", ".join(field_names)
 
@@ -765,7 +948,9 @@ class SQLiteRepository(BaseRepository):
 
             conversion_errors = 0
             for row in rows:
-                values = []
+                # Start with UUID
+                values = [row["id"]]
+
                 for field in spec["fields"]:
                     fname = field["name"]
                     ftype = field["type"]
@@ -855,8 +1040,8 @@ class SQLiteRepository(BaseRepository):
             # Create new table without the removed field
             temp_table = f"{table_name}_temp"
 
-            # Build CREATE TABLE without removed field
-            columns = ["id INTEGER PRIMARY KEY AUTOINCREMENT"]
+            # Build CREATE TABLE without removed field (preserving UUID column)
+            columns = ["id TEXT PRIMARY KEY"]
             for field in spec["fields"]:
                 fname = field["name"]
                 ftype = field["type"]
@@ -872,8 +1057,8 @@ class SQLiteRepository(BaseRepository):
 
             cursor.execute(create_sql)
 
-            # Copy data excluding the removed field
-            field_names = [f["name"] for f in spec["fields"]]
+            # Copy data excluding the removed field, preserving UUIDs
+            field_names = ["id"] + [f["name"] for f in spec["fields"]]
             fields_sql = ", ".join(field_names)
 
             copy_sql = f"""

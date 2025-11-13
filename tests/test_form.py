@@ -1,21 +1,21 @@
 import os
 import json
 from src.VibeCForms import (
-    read_forms,
-    write_forms,
     load_spec,
     validate_form_data,
     get_folder_icon,
     scan_specs_directory,
     get_all_forms_flat,
     generate_menu_html,
+    generate_form_field,
+    generate_table_headers,
+    generate_table_row,
 )
+from src.persistence.factory import RepositoryFactory
 
 
 def test_write_and_read_forms(tmp_path):
-    """Test writing and reading forms with spec."""
-    test_file = tmp_path / "test.txt"
-
+    """Test writing and reading forms with UUID."""
     # Create test spec
     spec = {
         "title": "Test Form",
@@ -31,20 +31,53 @@ def test_write_and_read_forms(tmp_path):
         ],
     }
 
-    forms = [
-        {"nome": "Ana", "telefone": "123", "whatsapp": True},
-        {"nome": "Bob", "telefone": "456", "whatsapp": False},
-    ]
+    # Configure repository to use temp path
+    config = {
+        "type": "txt",
+        "path": str(tmp_path),
+        "delimiter": ";",
+        "encoding": "utf-8",
+        "extension": ".txt",
+    }
 
-    write_forms(forms, spec, str(test_file))
-    result = read_forms(spec, str(test_file))
-    assert result == forms
+    from src.persistence.adapters.txt_adapter import TxtRepository
+
+    repo = TxtRepository(config)
+
+    # Create storage
+    if not repo.exists("test_form"):
+        repo.create_storage("test_form", spec)
+
+    # Create records
+    data1 = {"nome": "Ana", "telefone": "123", "whatsapp": True}
+    data2 = {"nome": "Bob", "telefone": "456", "whatsapp": False}
+
+    record_id1 = repo.create("test_form", spec, data1)
+    record_id2 = repo.create("test_form", spec, data2)
+
+    # Verify UUIDs returned
+    assert isinstance(record_id1, str)
+    assert len(record_id1) == 27  # Crockford Base32 UUID length
+    assert isinstance(record_id2, str)
+    assert len(record_id2) == 27
+
+    # Read all records
+    records = repo.read_all("test_form", spec)
+
+    # Verify
+    assert len(records) == 2
+    assert records[0]["id"] == record_id1
+    assert records[0]["nome"] == "Ana"
+    assert records[0]["telefone"] == "123"
+    assert records[0]["whatsapp"] is True
+    assert records[1]["id"] == record_id2
+    assert records[1]["nome"] == "Bob"
+    assert records[1]["telefone"] == "456"
+    assert records[1]["whatsapp"] is False
 
 
 def test_update_form(tmp_path):
-    """Test updating a form entry."""
-    test_file = tmp_path / "test.txt"
-
+    """Test updating a form entry by UUID."""
     spec = {
         "title": "Test Form",
         "fields": [
@@ -59,25 +92,46 @@ def test_update_form(tmp_path):
         ],
     }
 
-    forms = [
-        {"nome": "Ana", "telefone": "123", "whatsapp": True},
-        {"nome": "Bob", "telefone": "456", "whatsapp": False},
-    ]
+    # Configure repository
+    config = {
+        "type": "txt",
+        "path": str(tmp_path),
+        "delimiter": ";",
+        "encoding": "utf-8",
+        "extension": ".txt",
+    }
 
-    write_forms(forms, spec, str(test_file))
+    from src.persistence.adapters.txt_adapter import TxtRepository
 
-    # Altera o telefone de Ana
-    forms[0]["telefone"] = "999"
-    write_forms(forms, spec, str(test_file))
+    repo = TxtRepository(config)
 
-    result = read_forms(spec, str(test_file))
-    assert result[0]["telefone"] == "999"
+    # Create storage
+    if not repo.exists("test_form"):
+        repo.create_storage("test_form", spec)
+
+    # Create initial records
+    data1 = {"nome": "Ana", "telefone": "123", "whatsapp": True}
+    data2 = {"nome": "Bob", "telefone": "456", "whatsapp": False}
+
+    record_id1 = repo.create("test_form", spec, data1)
+    repo.create("test_form", spec, data2)
+
+    # Update Ana's phone number
+    updated_data = {"nome": "Ana", "telefone": "999", "whatsapp": True}
+    success = repo.update_by_id("test_form", spec, record_id1, updated_data)
+
+    assert success is True
+
+    # Verify update
+    record = repo.read_by_id("test_form", spec, record_id1)
+    assert record["telefone"] == "999"
+    assert record["nome"] == "Ana"
+    assert record["whatsapp"] is True
+    assert record["id"] == record_id1  # ID unchanged
 
 
 def test_delete_form(tmp_path):
-    """Test deleting a form entry."""
-    test_file = tmp_path / "test.txt"
-
+    """Test deleting a form entry by UUID."""
     spec = {
         "title": "Test Form",
         "fields": [
@@ -92,20 +146,47 @@ def test_delete_form(tmp_path):
         ],
     }
 
-    forms = [
-        {"nome": "Ana", "telefone": "123", "whatsapp": True},
-        {"nome": "Bob", "telefone": "456", "whatsapp": False},
-    ]
+    # Configure repository
+    config = {
+        "type": "txt",
+        "path": str(tmp_path),
+        "delimiter": ";",
+        "encoding": "utf-8",
+        "extension": ".txt",
+    }
 
-    write_forms(forms, spec, str(test_file))
+    from src.persistence.adapters.txt_adapter import TxtRepository
 
-    # Remove Bob
-    forms = [c for c in forms if c.get("nome") != "Bob"]
-    write_forms(forms, spec, str(test_file))
+    repo = TxtRepository(config)
 
-    result = read_forms(spec, str(test_file))
-    assert len(result) == 1
-    assert result[0]["nome"] == "Ana"
+    # Create storage
+    if not repo.exists("test_form"):
+        repo.create_storage("test_form", spec)
+
+    # Create records
+    data1 = {"nome": "Ana", "telefone": "123", "whatsapp": True}
+    data2 = {"nome": "Bob", "telefone": "456", "whatsapp": False}
+
+    record_id1 = repo.create("test_form", spec, data1)
+    record_id2 = repo.create("test_form", spec, data2)
+
+    # Verify both exist
+    records = repo.read_all("test_form", spec)
+    assert len(records) == 2
+
+    # Delete Bob
+    success = repo.delete_by_id("test_form", spec, record_id2)
+    assert success is True
+
+    # Verify deletion
+    records = repo.read_all("test_form", spec)
+    assert len(records) == 1
+    assert records[0]["nome"] == "Ana"
+    assert records[0]["id"] == record_id1
+
+    # Try to read deleted record
+    deleted_record = repo.read_by_id("test_form", spec, record_id2)
+    assert deleted_record is None
 
 
 def test_validation():
