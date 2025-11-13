@@ -63,17 +63,31 @@ class SQLiteRepository(BaseRepository):
         Args:
             config: Configuration dictionary with:
                 - database: Path to SQLite database file
-                - timeout: Connection timeout in seconds (default: 10)
+                - timeout: Connection timeout in seconds (default: 30)
                 - check_same_thread: SQLite check_same_thread parameter
         """
         self.database = config.get("database", "src/vibecforms.db")
-        self.timeout = config.get("timeout", 10)
+        self.timeout = config.get("timeout", 30)  # Increased from 10 to 30 seconds
         self.check_same_thread = config.get("check_same_thread", False)
 
         # Ensure database directory exists
         db_dir = os.path.dirname(self.database)
         if db_dir:
             Path(db_dir).mkdir(parents=True, exist_ok=True)
+
+        # Enable WAL mode for better concurrency
+        conn = None
+        try:
+            conn = self._get_connection()
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA busy_timeout=30000")  # 30 seconds
+            conn.commit()
+            logger.info("SQLite WAL mode enabled")
+        except Exception as e:
+            logger.warning(f"Failed to enable WAL mode: {e}")
+        finally:
+            if conn:
+                conn.close()
 
         logger.info(f"SQLiteRepository initialized: database={self.database}")
 
@@ -143,12 +157,12 @@ class SQLiteRepository(BaseRepository):
         columns_sql = ",\n    ".join(columns)
         create_sql = f"CREATE TABLE {table_name} (\n    {columns_sql}\n)"
 
+        conn = None
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
             cursor.execute(create_sql)
             conn.commit()
-            conn.close()
 
             logger.info(f"Created table: {table_name}")
             return True
@@ -156,6 +170,9 @@ class SQLiteRepository(BaseRepository):
         except Exception as e:
             logger.error(f"Failed to create table {table_name}: {e}")
             return False
+        finally:
+            if conn:
+                conn.close()
 
     def read_all(self, form_path: str, spec: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Read all records from the table including UUID."""
@@ -165,12 +182,12 @@ class SQLiteRepository(BaseRepository):
             logger.debug(f"Table doesn't exist: {table_name}")
             return []
 
+        conn = None
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
             cursor.execute(f"SELECT * FROM {table_name}")
             rows = cursor.fetchall()
-            conn.close()
 
             # Convert rows to dictionaries and apply type conversions
             forms = []
@@ -201,6 +218,9 @@ class SQLiteRepository(BaseRepository):
         except Exception as e:
             logger.error(f"Failed to read from {table_name}: {e}")
             return []
+        finally:
+            if conn:
+                conn.close()
 
     def read_one(
         self, form_path: str, spec: Dict[str, Any], idx: int
@@ -226,12 +246,12 @@ class SQLiteRepository(BaseRepository):
             logger.debug(f"Table doesn't exist: {table_name}")
             return None
 
+        conn = None
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
             cursor.execute(f"SELECT * FROM {table_name} WHERE id = ?", (record_id,))
             row = cursor.fetchone()
-            conn.close()
 
             if not row:
                 logger.debug(f"Record {record_id} not found in {table_name}")
@@ -259,6 +279,9 @@ class SQLiteRepository(BaseRepository):
         except Exception as e:
             logger.error(f"Failed to read record {record_id} from {table_name}: {e}")
             return None
+        finally:
+            if conn:
+                conn.close()
 
     def create(self, form_path: str, spec: Dict[str, Any], data: Dict[str, Any]) -> str:
         """Insert a new record into the table with generated UUID.
@@ -299,19 +322,24 @@ class SQLiteRepository(BaseRepository):
             else:
                 values.append(str(value) if value else "")
 
+        conn = None
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
             cursor.execute(insert_sql, values)
             conn.commit()
-            conn.close()
 
             logger.debug(f"Inserted record {record_id} into {table_name}")
             return record_id
 
         except Exception as e:
+            if conn:
+                conn.rollback()
             logger.error(f"Failed to insert into {table_name}: {e}")
             raise
+        finally:
+            if conn:
+                conn.close()
 
     def update(
         self, form_path: str, spec: Dict[str, Any], idx: int, data: Dict[str, Any]
@@ -327,6 +355,7 @@ class SQLiteRepository(BaseRepository):
             return False
 
         # Get the row ID (we need to get it from the database)
+        conn = None
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
@@ -335,7 +364,6 @@ class SQLiteRepository(BaseRepository):
 
             if not row:
                 logger.error(f"No record found at index {idx}")
-                conn.close()
                 return False
 
             record_id = row["id"]
@@ -370,14 +398,18 @@ class SQLiteRepository(BaseRepository):
 
             cursor.execute(update_sql, values)
             conn.commit()
-            conn.close()
 
             logger.debug(f"Updated record {idx} in {table_name}")
             return True
 
         except Exception as e:
+            if conn:
+                conn.rollback()
             logger.error(f"Failed to update {table_name}: {e}")
             return False
+        finally:
+            if conn:
+                conn.close()
 
     def update_by_id(
         self, form_path: str, spec: Dict[str, Any], record_id: str, data: Dict[str, Any]
@@ -419,6 +451,7 @@ class SQLiteRepository(BaseRepository):
         values.append(record_id)
 
         # Execute UPDATE
+        conn = None
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
@@ -429,7 +462,6 @@ class SQLiteRepository(BaseRepository):
 
             # Check if any rows were updated
             rows_updated = cursor.rowcount > 0
-            conn.close()
 
             if rows_updated:
                 logger.debug(f"Updated record {record_id} in {table_name}")
@@ -439,14 +471,20 @@ class SQLiteRepository(BaseRepository):
             return rows_updated
 
         except Exception as e:
+            if conn:
+                conn.rollback()
             logger.error(f"Failed to update record {record_id} in {table_name}: {e}")
             return False
+        finally:
+            if conn:
+                conn.close()
 
     def delete(self, form_path: str, spec: Dict[str, Any], idx: int) -> bool:
         """Delete a record by index."""
         table_name = self._get_table_name(form_path)
 
         # Get the row ID at the given index
+        conn = None
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
@@ -455,7 +493,6 @@ class SQLiteRepository(BaseRepository):
 
             if not row:
                 logger.error(f"No record found at index {idx}")
-                conn.close()
                 return False
 
             record_id = row["id"]
@@ -464,14 +501,18 @@ class SQLiteRepository(BaseRepository):
             delete_sql = f"DELETE FROM {table_name} WHERE id = ?"
             cursor.execute(delete_sql, (record_id,))
             conn.commit()
-            conn.close()
 
             logger.debug(f"Deleted record {idx} from {table_name}")
             return True
 
         except Exception as e:
+            if conn:
+                conn.rollback()
             logger.error(f"Failed to delete from {table_name}: {e}")
             return False
+        finally:
+            if conn:
+                conn.close()
 
     def delete_by_id(
         self, form_path: str, spec: Dict[str, Any], record_id: str
@@ -483,6 +524,7 @@ class SQLiteRepository(BaseRepository):
             logger.error(f"Cannot delete: table {table_name} doesn't exist")
             return False
 
+        conn = None
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
@@ -494,7 +536,6 @@ class SQLiteRepository(BaseRepository):
 
             # Check if any rows were deleted
             rows_deleted = cursor.rowcount > 0
-            conn.close()
 
             if rows_deleted:
                 logger.debug(f"Deleted record {record_id} from {table_name}")
@@ -504,8 +545,13 @@ class SQLiteRepository(BaseRepository):
             return rows_deleted
 
         except Exception as e:
+            if conn:
+                conn.rollback()
             logger.error(f"Failed to delete record {record_id} from {table_name}: {e}")
             return False
+        finally:
+            if conn:
+                conn.close()
 
     def id_exists(self, form_path: str, record_id: str) -> bool:
         """Check if record with UUID exists."""
@@ -542,24 +588,30 @@ class SQLiteRepository(BaseRepository):
             logger.warning(f"Cannot drop {table_name}: table has data and force=False")
             return False
 
+        conn = None
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
             cursor.execute(f"DROP TABLE {table_name}")
             conn.commit()
-            conn.close()
 
             logger.info(f"Dropped table: {table_name}")
             return True
 
         except Exception as e:
+            if conn:
+                conn.rollback()
             logger.error(f"Failed to drop table {table_name}: {e}")
             return False
+        finally:
+            if conn:
+                conn.close()
 
     def exists(self, form_path: str) -> bool:
         """Check if the table exists."""
         table_name = self._get_table_name(form_path)
 
+        conn = None
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
@@ -568,13 +620,15 @@ class SQLiteRepository(BaseRepository):
                 (table_name,),
             )
             result = cursor.fetchone()
-            conn.close()
 
             return result is not None
 
         except Exception as e:
             logger.error(f"Failed to check if table exists: {e}")
             return False
+        finally:
+            if conn:
+                conn.close()
 
     def has_data(self, form_path: str) -> bool:
         """Check if the table has any records."""
@@ -583,18 +637,21 @@ class SQLiteRepository(BaseRepository):
         if not self.exists(form_path):
             return False
 
+        conn = None
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
             cursor.execute(f"SELECT COUNT(*) as count FROM {table_name}")
             row = cursor.fetchone()
-            conn.close()
 
             return row["count"] > 0
 
         except Exception as e:
             logger.error(f"Failed to check if table has data: {e}")
             return False
+        finally:
+            if conn:
+                conn.close()
 
     def migrate_schema(
         self, form_path: str, old_spec: Dict[str, Any], new_spec: Dict[str, Any]
