@@ -29,7 +29,7 @@ _private_*
 # Pasta de testes do pytest
 htmlcov/
 .cache/
-data/txt/testes/
+data/txt/tests/
 _tmp_pytest*
 
 # Banco de dados SQLite (dados dinâmicos)
