@@ -1,0 +1,157 @@
+{
+  "stats": {
+    "txt_files_moved": 8,
+    "db_files_moved": 1,
+    "backup_files_moved": 5,
+    "errors": [],
+    "started_at": "2025-11-13T23:04:19.836321",
+    "completed_at": "2025-11-13T23:04:19.878903"
+  },
+  "operations": [
+    {
+      "timestamp": "2025-11-13T23:04:19.836433",
+      "type": "INFO",
+      "message": "============================================================"
+    },
+    {
+      "timestamp": "2025-11-13T23:04:19.836450",
+      "type": "INFO",
+      "message": "MIGRAÇÃO DE DADOS: src/ → data/"
+    },
+    {
+      "timestamp": "2025-11-13T23:04:19.836460",
+      "type": "INFO",
+      "message": "Modo: MIGRATION MODE"
+    },
+    {
+      "timestamp": "2025-11-13T23:04:19.836466",
+      "type": "INFO",
+      "message": "============================================================"
+    },
+    {
+      "timestamp": "2025-11-13T23:04:19.837500",
+      "type": "INFO",
+      "message": "Criando backup em: /home/rodrigo/VibeCForms/data/backups/migrations/pre_reorganization/full_backup_20251113_230419"
+    },
+    {
+      "timestamp": "2025-11-13T23:04:19.844072",
+      "type": "INFO",
+      "message": "✅ Backup criado com sucesso: 8 arquivos TXT"
+    },
+    {
+      "timestamp": "2025-11-13T23:04:19.844093",
+      "type": "INFO",
+      "message": "Iniciando migração de arquivos TXT..."
+    },
+    {
+      "timestamp": "2025-11-13T23:04:19.844242",
+      "type": "INFO",
+      "message": "Encontrados 8 arquivos TXT para migrar"
+    },
+    {
+      "timestamp": "2025-11-13T23:04:19.844254",
+      "type": "INFO",
+      "message": "  Movendo: financeiro_pagamentos.txt"
+    },
+    {
+      "timestamp": "2025-11-13T23:04:19.844342",
+      "type": "INFO",
+      "message": "  Movendo: contatos.txt"
+    },
+    {
+      "timestamp": "2025-11-13T23:04:19.844436",
+      "type": "INFO",
+      "message": "  Movendo: rh_funcionarios.txt"
+    },
+    {
+      "timestamp": "2025-11-13T23:04:19.844504",
+      "type": "INFO",
+      "message": "  Movendo: produtos.txt"
+    },
+    {
+      "timestamp": "2025-11-13T23:04:19.844585",
+      "type": "INFO",
+      "message": "  Movendo: formulario_completo.txt"
+    },
+    {
+      "timestamp": "2025-11-13T23:04:19.844685",
+      "type": "INFO",
+      "message": "  Movendo: rh_departamentos_areas.txt"
+    },
+    {
+      "timestamp": "2025-11-13T23:04:19.844853",
+      "type": "INFO",
+      "message": "  Movendo: usuarios.txt"
+    },
+    {
+      "timestamp": "2025-11-13T23:04:19.844951",
+      "type": "INFO",
+      "message": "  Movendo: financeiro_contas.txt"
+    },
+    {
+      "timestamp": "2025-11-13T23:04:19.845037",
+      "type": "INFO",
+      "message": "✅ Arquivos TXT migrados: 8"
+    },
+    {
+      "timestamp": "2025-11-13T23:04:19.845051",
+      "type": "INFO",
+      "message": "Iniciando migração de arquivos de banco de dados..."
+    },
+    {
+      "timestamp": "2025-11-13T23:04:19.845119",
+      "type": "INFO",
+      "message": "  Movendo: vibecforms.db"
+    },
+    {
+      "timestamp": "2025-11-13T23:04:19.845225",
+      "type": "INFO",
+      "message": "✅ Banco de dados migrado: vibecforms.db"
+    },
+    {
+      "timestamp": "2025-11-13T23:04:19.845236",
+      "type": "INFO",
+      "message": "Iniciando migração de backups existentes..."
+    },
+    {
+      "timestamp": "2025-11-13T23:04:19.845321",
+      "type": "INFO",
+      "message": "  Movendo backups de migrações..."
+    },
+    {
+      "timestamp": "2025-11-13T23:04:19.847013",
+      "type": "INFO",
+      "message": "✅ Backups migrados: 5"
+    },
+    {
+      "timestamp": "2025-11-13T23:04:19.877621",
+      "type": "INFO",
+      "message": "✅ Diretório src/backups/ removido"
+    },
+    {
+      "timestamp": "2025-11-13T23:04:19.877687",
+      "type": "INFO",
+      "message": "Verificando integridade da migração..."
+    },
+    {
+      "timestamp": "2025-11-13T23:04:19.878380",
+      "type": "INFO",
+      "message": "✅ Nenhum arquivo de dados permanece em src/"
+    },
+    {
+      "timestamp": "2025-11-13T23:04:19.878738",
+      "type": "INFO",
+      "message": "✅ Arquivos em data/txt/: 8"
+    },
+    {
+      "timestamp": "2025-11-13T23:04:19.878752",
+      "type": "INFO",
+      "message": "✅ Arquivos em data/sqlite/: 1"
+    },
+    {
+      "timestamp": "2025-11-13T23:04:19.878761",
+      "type": "INFO",
+      "message": "✅ Contagem de arquivos conferida!"
+    }
+  ]
+}
