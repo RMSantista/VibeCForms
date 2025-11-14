@@ -1028,3 +1028,76 @@ class SQLiteRepository(BaseRepository):
         except Exception as e:
             logger.error(f"Failed to restore from backup: {e}")
             return False
+
+    # =========================================================================
+    # NEW ID-BASED CRUD METHODS (Stub implementations for FASE 3)
+    # =========================================================================
+
+    def read_by_id(
+        self, form_path: str, spec: Dict[str, Any], record_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Read a single record by its unique ID. (Stub - FASE 3)"""
+        raise NotImplementedError("ID-based methods will be implemented in FASE 3")
+
+    def update_by_id(
+        self,
+        form_path: str,
+        spec: Dict[str, Any],
+        record_id: str,
+        data: Dict[str, Any],
+    ) -> bool:
+        """Update an existing record by its ID. (Stub - FASE 3)"""
+        raise NotImplementedError("ID-based methods will be implemented in FASE 3")
+
+    def delete_by_id(
+        self, form_path: str, spec: Dict[str, Any], record_id: str
+    ) -> bool:
+        """Delete a record by its unique ID. (Stub - FASE 3)"""
+        raise NotImplementedError("ID-based methods will be implemented in FASE 3")
+
+    # =========================================================================
+    # TAG MANAGEMENT METHODS (Stub implementations for FASE 3)
+    # =========================================================================
+
+    def add_tag(
+        self,
+        object_type: str,
+        object_id: str,
+        tag: str,
+        applied_by: str,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        """Add a tag to an object. (Stub - FASE 3)"""
+        raise NotImplementedError("Tag methods will be implemented in FASE 3")
+
+    def remove_tag(
+        self, object_type: str, object_id: str, tag: str, removed_by: str
+    ) -> bool:
+        """Remove a tag from an object. (Stub - FASE 3)"""
+        raise NotImplementedError("Tag methods will be implemented in FASE 3")
+
+    def get_tags(
+        self, object_type: str, object_id: str, active_only: bool = True
+    ) -> List[Dict[str, Any]]:
+        """Get all tags for an object. (Stub - FASE 3)"""
+        raise NotImplementedError("Tag methods will be implemented in FASE 3")
+
+    def has_tag(self, object_type: str, object_id: str, tag: str) -> bool:
+        """Check if an object has a specific tag. (Stub - FASE 3)"""
+        raise NotImplementedError("Tag methods will be implemented in FASE 3")
+
+    def get_objects_by_tag(
+        self, object_type: str, tag: str, active_only: bool = True
+    ) -> List[str]:
+        """Get all object IDs with a specific tag. (Stub - FASE 3)"""
+        raise NotImplementedError("Tag methods will be implemented in FASE 3")
+
+    def get_tag_history(
+        self, object_type: str, object_id: str, tag: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get complete tag history for an object. (Stub - FASE 3)"""
+        raise NotImplementedError("Tag methods will be implemented in FASE 3")
+
+    def get_tag_statistics(self, object_type: str) -> Dict[str, int]:
+        """Get statistics about tag usage. (Stub - FASE 3)"""
+        raise NotImplementedError("Tag methods will be implemented in FASE 3")
