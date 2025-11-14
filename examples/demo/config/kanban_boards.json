@@ -1,0 +1,40 @@
+{
+  "boards": {
+    "sales_pipeline": {
+      "title": "Pipeline de Vendas",
+      "form": "contatos",
+      "columns": [
+        {
+          "tag": "lead",
+          "label": "Leads",
+          "color": "#e3f2fd"
+        },
+        {
+          "tag": "qualified",
+          "label": "Qualificados",
+          "color": "#fff3e0"
+        },
+        {
+          "tag": "proposal",
+          "label": "Proposta",
+          "color": "#f3e5f5"
+        },
+        {
+          "tag": "negotiation",
+          "label": "Negociação",
+          "color": "#e8f5e9"
+        },
+        {
+          "tag": "closed_won",
+          "label": "Ganhos",
+          "color": "#c8e6c9"
+        },
+        {
+          "tag": "closed_lost",
+          "label": "Perdidos",
+          "color": "#ffcdd2"
+        }
+      ]
+    }
+  }
+}

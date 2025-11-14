@@ -11,394 +11,391 @@ from pathlib import Path
 from typing import Dict
 
 TEMPLATES = {
-    'order_flow': {
-        'id': 'order_flow',
-        'name': 'Fluxo de Pedidos',
-        'description': 'Workflow completo para gestão de pedidos: orçamento → pedido → entrega → concluído',
-        'states': [
+    "order_flow": {
+        "id": "order_flow",
+        "name": "Fluxo de Pedidos",
+        "description": "Workflow completo para gestão de pedidos: orçamento → pedido → entrega → concluído",
+        "states": [
             {
-                'id': 'orcamento',
-                'name': 'Orçamento',
-                'description': 'Solicitação inicial de orçamento',
-                'color': '#FFA500',
-                'is_initial': True
+                "id": "orcamento",
+                "name": "Orçamento",
+                "description": "Solicitação inicial de orçamento",
+                "color": "#FFA500",
+                "is_initial": True,
             },
             {
-                'id': 'orcamento_aprovado',
-                'name': 'Orçamento Aprovado',
-                'description': 'Orçamento aprovado pelo cliente',
-                'color': '#4169E1'
+                "id": "orcamento_aprovado",
+                "name": "Orçamento Aprovado",
+                "description": "Orçamento aprovado pelo cliente",
+                "color": "#4169E1",
             },
             {
-                'id': 'pedido',
-                'name': 'Pedido Confirmado',
-                'description': 'Pedido confirmado e em produção',
-                'color': '#9370DB',
-                'auto_transition_to': 'em_entrega',
-                'timeout_hours': 48
+                "id": "pedido",
+                "name": "Pedido Confirmado",
+                "description": "Pedido confirmado e em produção",
+                "color": "#9370DB",
+                "auto_transition_to": "em_entrega",
+                "timeout_hours": 48,
             },
             {
-                'id': 'em_entrega',
-                'name': 'Em Entrega',
-                'description': 'Pedido em processo de entrega',
-                'color': '#20B2AA'
+                "id": "em_entrega",
+                "name": "Em Entrega",
+                "description": "Pedido em processo de entrega",
+                "color": "#20B2AA",
             },
             {
-                'id': 'concluido',
-                'name': 'Concluído',
-                'description': 'Pedido entregue e finalizado',
-                'color': '#32CD32',
-                'is_final': True
+                "id": "concluido",
+                "name": "Concluído",
+                "description": "Pedido entregue e finalizado",
+                "color": "#32CD32",
+                "is_final": True,
             },
             {
-                'id': 'cancelado',
-                'name': 'Cancelado',
-                'description': 'Pedido cancelado',
-                'color': '#DC143C',
-                'is_final': True
-            }
+                "id": "cancelado",
+                "name": "Cancelado",
+                "description": "Pedido cancelado",
+                "color": "#DC143C",
+                "is_final": True,
+            },
         ],
-        'transitions': [
+        "transitions": [
             {
-                'from': 'orcamento',
-                'to': 'orcamento_aprovado',
-                'type': 'manual',
-                'label': 'Aprovar Orçamento',
-                'prerequisites': [
+                "from": "orcamento",
+                "to": "orcamento_aprovado",
+                "type": "manual",
+                "label": "Aprovar Orçamento",
+                "prerequisites": [
                     {
-                        'type': 'field_check',
-                        'field': 'valor_total',
-                        'condition': 'not_empty',
-                        'message': 'Valor total deve estar preenchido'
+                        "type": "field_check",
+                        "field": "valor_total",
+                        "condition": "not_empty",
+                        "message": "Valor total deve estar preenchido",
                     }
-                ]
+                ],
             },
             {
-                'from': 'orcamento_aprovado',
-                'to': 'pedido',
-                'type': 'manual',
-                'label': 'Confirmar Pedido',
-                'prerequisites': [
+                "from": "orcamento_aprovado",
+                "to": "pedido",
+                "type": "manual",
+                "label": "Confirmar Pedido",
+                "prerequisites": [
                     {
-                        'type': 'field_check',
-                        'field': 'forma_pagamento',
-                        'condition': 'not_empty',
-                        'message': 'Forma de pagamento deve estar definida'
+                        "type": "field_check",
+                        "field": "forma_pagamento",
+                        "condition": "not_empty",
+                        "message": "Forma de pagamento deve estar definida",
                     }
-                ]
+                ],
             },
             {
-                'from': 'pedido',
-                'to': 'em_entrega',
-                'type': 'system',
-                'label': 'Iniciar Entrega',
-                'auto_trigger': True
+                "from": "pedido",
+                "to": "em_entrega",
+                "type": "system",
+                "label": "Iniciar Entrega",
+                "auto_trigger": True,
             },
             {
-                'from': 'em_entrega',
-                'to': 'concluido',
-                'type': 'manual',
-                'label': 'Finalizar Entrega'
+                "from": "em_entrega",
+                "to": "concluido",
+                "type": "manual",
+                "label": "Finalizar Entrega",
             },
             {
-                'from': 'orcamento',
-                'to': 'cancelado',
-                'type': 'manual',
-                'label': 'Cancelar'
+                "from": "orcamento",
+                "to": "cancelado",
+                "type": "manual",
+                "label": "Cancelar",
             },
             {
-                'from': 'orcamento_aprovado',
-                'to': 'cancelado',
-                'type': 'manual',
-                'label': 'Cancelar'
+                "from": "orcamento_aprovado",
+                "to": "cancelado",
+                "type": "manual",
+                "label": "Cancelar",
             },
             {
-                'from': 'pedido',
-                'to': 'cancelado',
-                'type': 'manual',
-                'label': 'Cancelar'
-            }
+                "from": "pedido",
+                "to": "cancelado",
+                "type": "manual",
+                "label": "Cancelar",
+            },
         ],
-        'linked_forms': ['pedidos', 'orcamentos']
+        "linked_forms": ["pedidos", "orcamentos"],
     },
-
-    'support_ticket': {
-        'id': 'support_ticket',
-        'name': 'Tickets de Suporte',
-        'description': 'Workflow para gerenciamento de tickets de suporte técnico',
-        'states': [
+    "support_ticket": {
+        "id": "support_ticket",
+        "name": "Tickets de Suporte",
+        "description": "Workflow para gerenciamento de tickets de suporte técnico",
+        "states": [
             {
-                'id': 'novo',
-                'name': 'Novo',
-                'description': 'Ticket recém-criado',
-                'color': '#FFD700',
-                'is_initial': True,
-                'auto_transition_to': 'em_analise',
-                'timeout_hours': 1
+                "id": "novo",
+                "name": "Novo",
+                "description": "Ticket recém-criado",
+                "color": "#FFD700",
+                "is_initial": True,
+                "auto_transition_to": "em_analise",
+                "timeout_hours": 1,
             },
             {
-                'id': 'em_analise',
-                'name': 'Em Análise',
-                'description': 'Ticket sendo analisado',
-                'color': '#4169E1'
+                "id": "em_analise",
+                "name": "Em Análise",
+                "description": "Ticket sendo analisado",
+                "color": "#4169E1",
             },
             {
-                'id': 'aguardando_cliente',
-                'name': 'Aguardando Cliente',
-                'description': 'Aguardando resposta do cliente',
-                'color': '#FF8C00',
-                'timeout_hours': 72
+                "id": "aguardando_cliente",
+                "name": "Aguardando Cliente",
+                "description": "Aguardando resposta do cliente",
+                "color": "#FF8C00",
+                "timeout_hours": 72,
             },
             {
-                'id': 'resolvido',
-                'name': 'Resolvido',
-                'description': 'Problema resolvido',
-                'color': '#32CD32',
-                'is_final': True
+                "id": "resolvido",
+                "name": "Resolvido",
+                "description": "Problema resolvido",
+                "color": "#32CD32",
+                "is_final": True,
             },
             {
-                'id': 'fechado',
-                'name': 'Fechado',
-                'description': 'Ticket fechado sem solução',
-                'color': '#808080',
-                'is_final': True
-            }
+                "id": "fechado",
+                "name": "Fechado",
+                "description": "Ticket fechado sem solução",
+                "color": "#808080",
+                "is_final": True,
+            },
         ],
-        'transitions': [
+        "transitions": [
             {
-                'from': 'novo',
-                'to': 'em_analise',
-                'type': 'system',
-                'label': 'Iniciar Análise',
-                'auto_trigger': True
+                "from": "novo",
+                "to": "em_analise",
+                "type": "system",
+                "label": "Iniciar Análise",
+                "auto_trigger": True,
             },
             {
-                'from': 'em_analise',
-                'to': 'aguardando_cliente',
-                'type': 'manual',
-                'label': 'Solicitar Informações'
+                "from": "em_analise",
+                "to": "aguardando_cliente",
+                "type": "manual",
+                "label": "Solicitar Informações",
             },
             {
-                'from': 'em_analise',
-                'to': 'resolvido',
-                'type': 'manual',
-                'label': 'Resolver'
+                "from": "em_analise",
+                "to": "resolvido",
+                "type": "manual",
+                "label": "Resolver",
             },
             {
-                'from': 'aguardando_cliente',
-                'to': 'em_analise',
-                'type': 'manual',
-                'label': 'Cliente Respondeu'
+                "from": "aguardando_cliente",
+                "to": "em_analise",
+                "type": "manual",
+                "label": "Cliente Respondeu",
             },
             {
-                'from': 'aguardando_cliente',
-                'to': 'fechado',
-                'type': 'system',
-                'label': 'Timeout - Sem Resposta'
+                "from": "aguardando_cliente",
+                "to": "fechado",
+                "type": "system",
+                "label": "Timeout - Sem Resposta",
             },
             {
-                'from': 'novo',
-                'to': 'fechado',
-                'type': 'manual',
-                'label': 'Fechar Ticket'
-            }
+                "from": "novo",
+                "to": "fechado",
+                "type": "manual",
+                "label": "Fechar Ticket",
+            },
         ],
-        'linked_forms': ['tickets', 'chamados']
+        "linked_forms": ["tickets", "chamados"],
     },
-
-    'hiring': {
-        'id': 'hiring',
-        'name': 'Processo de Contratação',
-        'description': 'Workflow para gestão de processos seletivos e contratações',
-        'states': [
+    "hiring": {
+        "id": "hiring",
+        "name": "Processo de Contratação",
+        "description": "Workflow para gestão de processos seletivos e contratações",
+        "states": [
             {
-                'id': 'candidatura',
-                'name': 'Candidatura Recebida',
-                'description': 'Candidato se inscreveu para vaga',
-                'color': '#87CEEB',
-                'is_initial': True
+                "id": "candidatura",
+                "name": "Candidatura Recebida",
+                "description": "Candidato se inscreveu para vaga",
+                "color": "#87CEEB",
+                "is_initial": True,
             },
             {
-                'id': 'triagem',
-                'name': 'Triagem',
-                'description': 'Análise inicial de currículo',
-                'color': '#4169E1'
+                "id": "triagem",
+                "name": "Triagem",
+                "description": "Análise inicial de currículo",
+                "color": "#4169E1",
             },
             {
-                'id': 'entrevista_rh',
-                'name': 'Entrevista RH',
-                'description': 'Entrevista com RH',
-                'color': '#9370DB'
+                "id": "entrevista_rh",
+                "name": "Entrevista RH",
+                "description": "Entrevista com RH",
+                "color": "#9370DB",
             },
             {
-                'id': 'entrevista_tecnica',
-                'name': 'Entrevista Técnica',
-                'description': 'Entrevista com gestor/equipe técnica',
-                'color': '#8B4789'
+                "id": "entrevista_tecnica",
+                "name": "Entrevista Técnica",
+                "description": "Entrevista com gestor/equipe técnica",
+                "color": "#8B4789",
             },
             {
-                'id': 'proposta',
-                'name': 'Proposta Enviada',
-                'description': 'Proposta de emprego enviada',
-                'color': '#FFD700'
+                "id": "proposta",
+                "name": "Proposta Enviada",
+                "description": "Proposta de emprego enviada",
+                "color": "#FFD700",
             },
             {
-                'id': 'contratado',
-                'name': 'Contratado',
-                'description': 'Candidato aceitou proposta',
-                'color': '#32CD32',
-                'is_final': True
+                "id": "contratado",
+                "name": "Contratado",
+                "description": "Candidato aceitou proposta",
+                "color": "#32CD32",
+                "is_final": True,
             },
             {
-                'id': 'rejeitado',
-                'name': 'Rejeitado',
-                'description': 'Candidato não aprovado',
-                'color': '#DC143C',
-                'is_final': True
-            }
+                "id": "rejeitado",
+                "name": "Rejeitado",
+                "description": "Candidato não aprovado",
+                "color": "#DC143C",
+                "is_final": True,
+            },
         ],
-        'transitions': [
+        "transitions": [
             {
-                'from': 'candidatura',
-                'to': 'triagem',
-                'type': 'manual',
-                'label': 'Iniciar Triagem'
+                "from": "candidatura",
+                "to": "triagem",
+                "type": "manual",
+                "label": "Iniciar Triagem",
             },
             {
-                'from': 'triagem',
-                'to': 'entrevista_rh',
-                'type': 'manual',
-                'label': 'Aprovar para RH',
-                'prerequisites': [
+                "from": "triagem",
+                "to": "entrevista_rh",
+                "type": "manual",
+                "label": "Aprovar para RH",
+                "prerequisites": [
                     {
-                        'type': 'field_check',
-                        'field': 'curriculo',
-                        'condition': 'not_empty',
-                        'message': 'Currículo deve estar anexado'
+                        "type": "field_check",
+                        "field": "curriculo",
+                        "condition": "not_empty",
+                        "message": "Currículo deve estar anexado",
                     }
-                ]
+                ],
             },
             {
-                'from': 'entrevista_rh',
-                'to': 'entrevista_tecnica',
-                'type': 'manual',
-                'label': 'Aprovar para Técnica'
+                "from": "entrevista_rh",
+                "to": "entrevista_tecnica",
+                "type": "manual",
+                "label": "Aprovar para Técnica",
             },
             {
-                'from': 'entrevista_tecnica',
-                'to': 'proposta',
-                'type': 'manual',
-                'label': 'Enviar Proposta'
+                "from": "entrevista_tecnica",
+                "to": "proposta",
+                "type": "manual",
+                "label": "Enviar Proposta",
             },
             {
-                'from': 'proposta',
-                'to': 'contratado',
-                'type': 'manual',
-                'label': 'Proposta Aceita'
+                "from": "proposta",
+                "to": "contratado",
+                "type": "manual",
+                "label": "Proposta Aceita",
             },
             {
-                'from': 'candidatura',
-                'to': 'rejeitado',
-                'type': 'manual',
-                'label': 'Rejeitar'
+                "from": "candidatura",
+                "to": "rejeitado",
+                "type": "manual",
+                "label": "Rejeitar",
             },
             {
-                'from': 'triagem',
-                'to': 'rejeitado',
-                'type': 'manual',
-                'label': 'Rejeitar'
+                "from": "triagem",
+                "to": "rejeitado",
+                "type": "manual",
+                "label": "Rejeitar",
             },
             {
-                'from': 'entrevista_rh',
-                'to': 'rejeitado',
-                'type': 'manual',
-                'label': 'Rejeitar'
+                "from": "entrevista_rh",
+                "to": "rejeitado",
+                "type": "manual",
+                "label": "Rejeitar",
             },
             {
-                'from': 'entrevista_tecnica',
-                'to': 'rejeitado',
-                'type': 'manual',
-                'label': 'Rejeitar'
+                "from": "entrevista_tecnica",
+                "to": "rejeitado",
+                "type": "manual",
+                "label": "Rejeitar",
             },
             {
-                'from': 'proposta',
-                'to': 'rejeitado',
-                'type': 'manual',
-                'label': 'Proposta Recusada'
-            }
+                "from": "proposta",
+                "to": "rejeitado",
+                "type": "manual",
+                "label": "Proposta Recusada",
+            },
         ],
-        'linked_forms': ['candidatos', 'vagas']
+        "linked_forms": ["candidatos", "vagas"],
     },
-
-    'approval': {
-        'id': 'approval',
-        'name': 'Fluxo de Aprovação',
-        'description': 'Workflow genérico para aprovação de documentos/solicitações',
-        'states': [
+    "approval": {
+        "id": "approval",
+        "name": "Fluxo de Aprovação",
+        "description": "Workflow genérico para aprovação de documentos/solicitações",
+        "states": [
             {
-                'id': 'pendente',
-                'name': 'Pendente',
-                'description': 'Aguardando revisão',
-                'color': '#FFA500',
-                'is_initial': True
+                "id": "pendente",
+                "name": "Pendente",
+                "description": "Aguardando revisão",
+                "color": "#FFA500",
+                "is_initial": True,
             },
             {
-                'id': 'em_revisao',
-                'name': 'Em Revisão',
-                'description': 'Sendo revisado',
-                'color': '#4169E1'
+                "id": "em_revisao",
+                "name": "Em Revisão",
+                "description": "Sendo revisado",
+                "color": "#4169E1",
             },
             {
-                'id': 'aprovado',
-                'name': 'Aprovado',
-                'description': 'Aprovado',
-                'color': '#32CD32',
-                'is_final': True
+                "id": "aprovado",
+                "name": "Aprovado",
+                "description": "Aprovado",
+                "color": "#32CD32",
+                "is_final": True,
             },
             {
-                'id': 'rejeitado',
-                'name': 'Rejeitado',
-                'description': 'Rejeitado - necessita correções',
-                'color': '#DC143C',
-                'is_final': True
-            }
+                "id": "rejeitado",
+                "name": "Rejeitado",
+                "description": "Rejeitado - necessita correções",
+                "color": "#DC143C",
+                "is_final": True,
+            },
         ],
-        'transitions': [
+        "transitions": [
             {
-                'from': 'pendente',
-                'to': 'em_revisao',
-                'type': 'manual',
-                'label': 'Iniciar Revisão'
+                "from": "pendente",
+                "to": "em_revisao",
+                "type": "manual",
+                "label": "Iniciar Revisão",
             },
             {
-                'from': 'em_revisao',
-                'to': 'aprovado',
-                'type': 'manual',
-                'label': 'Aprovar'
+                "from": "em_revisao",
+                "to": "aprovado",
+                "type": "manual",
+                "label": "Aprovar",
             },
             {
-                'from': 'em_revisao',
-                'to': 'rejeitado',
-                'type': 'manual',
-                'label': 'Rejeitar',
-                'prerequisites': [
+                "from": "em_revisao",
+                "to": "rejeitado",
+                "type": "manual",
+                "label": "Rejeitar",
+                "prerequisites": [
                     {
-                        'type': 'field_check',
-                        'field': 'motivo_rejeicao',
-                        'condition': 'not_empty',
-                        'message': 'Motivo da rejeição deve ser informado'
+                        "type": "field_check",
+                        "field": "motivo_rejeicao",
+                        "condition": "not_empty",
+                        "message": "Motivo da rejeição deve ser informado",
                     }
-                ]
+                ],
             },
             {
-                'from': 'pendente',
-                'to': 'rejeitado',
-                'type': 'manual',
-                'label': 'Rejeitar Diretamente'
-            }
+                "from": "pendente",
+                "to": "rejeitado",
+                "type": "manual",
+                "label": "Rejeitar Diretamente",
+            },
         ],
-        'linked_forms': []
-    }
+        "linked_forms": [],
+    },
 }
 
 
@@ -432,7 +429,7 @@ def generate_template(template_id: str, output_path: str = None):
 
     # Write JSON
     try:
-        with open(out_file, 'w', encoding='utf-8') as f:
+        with open(out_file, "w", encoding="utf-8") as f:
             json.dump(template_data, f, indent=2, ensure_ascii=False)
 
         print(f"✅ Template generated successfully!")
@@ -449,7 +446,7 @@ def generate_template(template_id: str, output_path: str = None):
 def main():
     """CLI entry point."""
     parser = argparse.ArgumentParser(
-        description='Generate pre-configured kanban templates for VibeCForms Workflow system',
+        description="Generate pre-configured kanban templates for VibeCForms Workflow system",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -461,26 +458,22 @@ Examples:
 
   # Generate and save to specific file
   %(prog)s --template support_ticket --output tickets.json
-        """
+        """,
     )
 
     parser.add_argument(
-        '--list',
-        action='store_true',
-        help='List all available templates'
+        "--list", action="store_true", help="List all available templates"
     )
 
     parser.add_argument(
-        '--template',
+        "--template",
         type=str,
         choices=list(TEMPLATES.keys()),
-        help='Template to generate'
+        help="Template to generate",
     )
 
     parser.add_argument(
-        '--output',
-        type=str,
-        help='Output file path (default: <template_id>.json)'
+        "--output", type=str, help="Output file path (default: <template_id>.json)"
     )
 
     args = parser.parse_args()
@@ -493,5 +486,5 @@ Examples:
         parser.print_help()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

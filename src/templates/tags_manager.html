@@ -1,0 +1,517 @@
+<html>
+<head>
+    <title>Gerenciamento de Tags - VibeCForms</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #f7f7f7; margin: 0; padding: 0; }
+        .layout { display: flex; min-height: 100vh; }
+        .sidebar { width: 250px; background: #2c3e50; color: #fff; padding: 20px 0; position: fixed; height: 100vh; z-index: 1000; display: flex; flex-direction: column; }
+        .sidebar-header { padding: 0 20px 20px; border-bottom: 1px solid #34495e; margin-bottom: 20px; flex-shrink: 0; }
+        .sidebar-header h1 { font-size: 24px; font-style: italic; margin: 0; color: #3498db; }
+        .sidebar-header p { font-size: 12px; margin: 5px 0 0; color: #95a5a6; }
+        .menu-container { flex: 1; overflow-y: auto; position: relative; }
+        .menu { list-style: none; padding: 0; margin: 0; }
+        .menu li { margin: 0; position: static; }
+        .menu a { display: flex; align-items: center; gap: 12px; padding: 15px 20px; color: #ecf0f1; text-decoration: none; transition: all 0.2s; white-space: nowrap; }
+        .menu a:hover { background: #34495e; color: #3498db; }
+        .menu a.active { background: #3498db; color: #fff; }
+        .menu a.active-path { background: #34495e; }
+        .menu a i { font-size: 18px; width: 20px; text-align: center; }
+        .submenu-arrow { font-size: 12px !important; margin-left: auto; }
+        .has-submenu { position: relative; }
+        .submenu { list-style: none; padding: 0; margin: 0; position: fixed; left: 250px; background: #34495e; min-width: 220px; width: auto; box-shadow: 4px 4px 12px rgba(0,0,0,0.4); display: none; z-index: 2000; border-radius: 4px; }
+        .has-submenu:hover > .submenu { display: block; }
+        .submenu li { position: static; }
+        .submenu li a { padding: 12px 20px; font-size: 14px; white-space: nowrap; }
+        .level-2 { background: #2c3e50; }
+        .level-3 { background: #1a252f; }
+        .main-content { margin-left: 250px; flex: 1; padding: 40px; position: relative; z-index: 1; }
+        .container { max-width: 1200px; margin: 0 auto; background: #fff; padding: 30px 60px; border-radius: 10px; box-shadow: 0 2px 8px #ccc; position: relative; z-index: 1; }
+        h2 { text-align: center; margin-bottom: 25px; color: #2c3e50; }
+        h3 { color: #2c3e50; margin-top: 30px; margin-bottom: 15px; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+        .section { background: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #e0e0e0; }
+        .form-row { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; }
+        label { font-weight: bold; color: #2c3e50; min-width: 150px; }
+        input[type="text"], select { padding: 8px 12px; border-radius: 5px; border: 1px solid #bbb; flex: 1; font-size: 14px; }
+        button { background: #3498db; color: #fff; border: none; border-radius: 5px; padding: 8px 16px; cursor: pointer; font-size: 14px; transition: background 0.2s; }
+        button:hover { background: #2980b9; }
+        button:disabled { background: #95a5a6; cursor: not-allowed; }
+        .btn-success { background: #27ae60; }
+        .btn-success:hover { background: #229954; }
+        .btn-danger { background: #e74c3c; }
+        .btn-danger:hover { background: #c0392b; }
+        .tag-badge { display: inline-block; padding: 6px 12px; border-radius: 16px; font-size: 13px; margin: 4px; font-weight: 500; transition: all 0.2s; }
+        .tag-badge:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .tag-badge .remove-btn { margin-left: 8px; cursor: pointer; opacity: 0.7; }
+        .tag-badge .remove-btn:hover { opacity: 1; }
+        .tag-color-0 { background: #3498db; color: #fff; }
+        .tag-color-1 { background: #27ae60; color: #fff; }
+        .tag-color-2 { background: #e74c3c; color: #fff; }
+        .tag-color-3 { background: #f39c12; color: #fff; }
+        .tag-color-4 { background: #9b59b6; color: #fff; }
+        .tag-color-5 { background: #1abc9c; color: #fff; }
+        .tag-color-6 { background: #e67e22; color: #fff; }
+        .tag-color-7 { background: #34495e; color: #fff; }
+        .tag-color-8 { background: #16a085; color: #fff; }
+        .tag-color-9 { background: #2c3e50; color: #fff; }
+        .alert { padding: 12px 20px; border-radius: 6px; margin-bottom: 20px; display: none; }
+        .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .alert-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .alert.show { display: block; animation: slideDown 0.3s ease-out; }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .history-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .history-table th, .history-table td { padding: 10px; border-bottom: 1px solid #e0e0e0; text-align: left; }
+        .history-table th { background: #ecf0f1; font-weight: bold; color: #2c3e50; }
+        .history-table tr:hover { background: #f9f9f9; }
+        .status-active { color: #27ae60; font-weight: bold; }
+        .status-removed { color: #e74c3c; font-style: italic; }
+        .home-link { display: flex; align-items: center; gap: 12px; padding: 15px 20px; color: #ecf0f1; text-decoration: none; transition: all 0.2s; border-top: 1px solid #34495e; margin-top: 10px; }
+        .home-link:hover { background: #34495e; color: #3498db; }
+        .home-link i { font-size: 18px; width: 20px; text-align: center; }
+        .search-results { margin-top: 15px; }
+        .result-item { background: #fff; padding: 12px 15px; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .result-item:hover { background: #f5f5f5; }
+        .no-data { text-align: center; color: #95a5a6; font-style: italic; padding: 20px; }
+        .tag-input-container { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+        .tag-validation-error { color: #e74c3c; font-size: 12px; margin-top: 5px; display: none; }
+    </style>
+    <script>
+        let currentRecordId = null;
+        let currentFormName = null;
+
+        function showAlert(message, type = 'success') {
+            const alertDiv = document.getElementById(type === 'success' ? 'successAlert' : 'errorAlert');
+            alertDiv.textContent = message;
+            alertDiv.classList.add('show');
+            setTimeout(() => alertDiv.classList.remove('show'), 4000);
+        }
+
+        function validateTagName(tag) {
+            // Tags must be lowercase, alphanumeric, and underscores only
+            const pattern = /^[a-z0-9_]+$/;
+            return pattern.test(tag);
+        }
+
+        function showValidationError(message) {
+            const errorDiv = document.getElementById('tagValidationError');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            setTimeout(() => errorDiv.style.display = 'none', 3000);
+        }
+
+        async function searchObject() {
+            const formName = document.getElementById('formSelect').value;
+            const objectId = document.getElementById('objectIdInput').value.trim();
+
+            if (!formName) {
+                showAlert('Selecione um formulário', 'error');
+                return;
+            }
+
+            if (!objectId) {
+                showAlert('Digite um ID de objeto', 'error');
+                return;
+            }
+
+            currentFormName = formName;
+            currentRecordId = objectId;
+
+            // Load tags for this object
+            await loadObjectTags();
+        }
+
+        async function loadObjectTags() {
+            if (!currentRecordId || !currentFormName) return;
+
+            try {
+                const response = await fetch(`/api/${currentFormName}/tags/${currentRecordId}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    displayActiveTags(data.tags);
+                    await loadTagHistory();
+                    document.getElementById('tagManagement').style.display = 'block';
+                    showAlert('Tags carregadas com sucesso!', 'success');
+                } else {
+                    showAlert(data.error || 'Erro ao carregar tags', 'error');
+                    document.getElementById('tagManagement').style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Error loading tags:', error);
+                showAlert('Erro ao carregar tags: ' + error.message, 'error');
+            }
+        }
+
+        function displayActiveTags(tags) {
+            const container = document.getElementById('activeTagsContainer');
+
+            if (!tags || tags.length === 0) {
+                container.innerHTML = '<div class="no-data">Nenhuma tag ativa</div>';
+                return;
+            }
+
+            container.innerHTML = tags.map((tagData, index) => {
+                const tag = tagData.tag || tagData;
+                const colorClass = `tag-color-${getTagColorIndex(tag)}`;
+                return `<span class="tag-badge ${colorClass}">
+                    ${tag}
+                    <span class="remove-btn" onclick="removeTag('${tag}')" title="Remover tag">
+                        <i class="fa fa-times"></i>
+                    </span>
+                </span>`;
+            }).join('');
+        }
+
+        function getTagColorIndex(tag) {
+            // Simple hash function to assign consistent colors to tags
+            let hash = 0;
+            for (let i = 0; i < tag.length; i++) {
+                hash = tag.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            return Math.abs(hash) % 10;
+        }
+
+        async function addTag() {
+            const tagInput = document.getElementById('newTagInput');
+            const tag = tagInput.value.trim().toLowerCase();
+
+            if (!tag) {
+                showValidationError('Digite um nome de tag');
+                return;
+            }
+
+            if (!validateTagName(tag)) {
+                showValidationError('Tag inválida: use apenas letras minúsculas, números e underscore');
+                return;
+            }
+
+            if (!currentRecordId || !currentFormName) {
+                showAlert('Selecione um objeto primeiro', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/${currentFormName}/tags/${currentRecordId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tag: tag, applied_by: 'user' })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert(`Tag "${tag}" adicionada com sucesso!`, 'success');
+                    tagInput.value = '';
+                    await loadObjectTags();
+                } else {
+                    showAlert(data.error || 'Erro ao adicionar tag', 'error');
+                }
+            } catch (error) {
+                console.error('Error adding tag:', error);
+                showAlert('Erro ao adicionar tag: ' + error.message, 'error');
+            }
+        }
+
+        async function removeTag(tag) {
+            if (!confirm(`Confirma a remoção da tag "${tag}"?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(
+                    `/api/${currentFormName}/tags/${currentRecordId}/${encodeURIComponent(tag)}?removed_by=user`,
+                    { method: 'DELETE' }
+                );
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert(`Tag "${tag}" removida com sucesso!`, 'success');
+                    await loadObjectTags();
+                } else {
+                    showAlert(data.error || 'Erro ao remover tag', 'error');
+                }
+            } catch (error) {
+                console.error('Error removing tag:', error);
+                showAlert('Erro ao remover tag: ' + error.message, 'error');
+            }
+        }
+
+        async function loadTagHistory() {
+            if (!currentRecordId || !currentFormName) return;
+
+            try {
+                const response = await fetch(`/api/${currentFormName}/tags/${currentRecordId}/history`);
+                const data = await response.json();
+
+                if (data.success) {
+                    displayTagHistory(data.history);
+                } else {
+                    console.error('Error loading history:', data.error);
+                }
+            } catch (error) {
+                console.error('Error loading tag history:', error);
+            }
+        }
+
+        function displayTagHistory(history) {
+            const container = document.getElementById('historyTableBody');
+
+            if (!history || history.length === 0) {
+                container.innerHTML = '<tr><td colspan="5" class="no-data">Nenhum histórico disponível</td></tr>';
+                return;
+            }
+
+            // Sort by timestamp descending (most recent first)
+            history.sort((a, b) => new Date(b.applied_at || 0) - new Date(a.applied_at || 0));
+
+            container.innerHTML = history.map(item => {
+                const isActive = !item.removed_at;
+                const statusClass = isActive ? 'status-active' : 'status-removed';
+                const statusText = isActive ? 'Ativa' : 'Removida';
+                const appliedAt = new Date(item.applied_at).toLocaleString('pt-BR');
+                const removedAt = item.removed_at ? new Date(item.removed_at).toLocaleString('pt-BR') : '-';
+                const removedBy = item.removed_by || '-';
+
+                const colorClass = `tag-color-${getTagColorIndex(item.tag)}`;
+
+                return `<tr>
+                    <td><span class="tag-badge ${colorClass}" style="cursor: default;">${item.tag}</span></td>
+                    <td class="${statusClass}">${statusText}</td>
+                    <td>${appliedAt}</td>
+                    <td>${item.applied_by || 'Desconhecido'}</td>
+                    <td>${removedAt}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        async function searchByTag() {
+            const formName = document.getElementById('searchFormSelect').value;
+            const tag = document.getElementById('searchTagInput').value.trim().toLowerCase();
+
+            if (!formName) {
+                showAlert('Selecione um formulário', 'error');
+                return;
+            }
+
+            if (!tag) {
+                showAlert('Digite uma tag para buscar', 'error');
+                return;
+            }
+
+            if (!validateTagName(tag)) {
+                showAlert('Tag inválida: use apenas letras minúsculas, números e underscore', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/${formName}/search/tags?tag=${encodeURIComponent(tag)}&include_data=true`);
+                const data = await response.json();
+
+                if (data.success) {
+                    displaySearchResults(data.objects, data.tag, formName);
+                    showAlert(`Encontrados ${data.count} objetos com a tag "${tag}"`, 'success');
+                } else {
+                    showAlert(data.error || 'Erro ao buscar objetos', 'error');
+                }
+            } catch (error) {
+                console.error('Error searching by tag:', error);
+                showAlert('Erro ao buscar objetos: ' + error.message, 'error');
+            }
+        }
+
+        function displaySearchResults(objects, tag, formName) {
+            const container = document.getElementById('searchResultsContainer');
+
+            if (!objects || objects.length === 0) {
+                container.innerHTML = '<div class="no-data">Nenhum objeto encontrado com esta tag</div>';
+                return;
+            }
+
+            container.innerHTML = objects.map(obj => {
+                const recordId = obj._record_id || 'ID desconhecido';
+                // Display first few fields for preview
+                const fields = Object.entries(obj)
+                    .filter(([key, value]) => !key.startsWith('_') && value)
+                    .slice(0, 3)
+                    .map(([key, value]) => `<strong>${key}:</strong> ${value}`)
+                    .join(' | ');
+
+                return `<div class="result-item">
+                    <div>
+                        <div style="font-size: 12px; color: #7f8c8d; margin-bottom: 4px;">ID: ${recordId}</div>
+                        <div>${fields || 'Sem dados para exibir'}</div>
+                    </div>
+                    <div>
+                        <button onclick="loadObjectById('${formName}', '${recordId}')" class="btn-success">
+                            <i class="fa fa-eye"></i> Ver Tags
+                        </button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function loadObjectById(formName, recordId) {
+            document.getElementById('formSelect').value = formName;
+            document.getElementById('objectIdInput').value = recordId;
+            searchObject();
+            // Scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        window.onload = function() {
+            // Position submenus dynamically
+            var menuItems = document.querySelectorAll('.has-submenu');
+            menuItems.forEach(function(item) {
+                item.addEventListener('mouseenter', function() {
+                    var submenu = this.querySelector(':scope > .submenu');
+                    if (submenu) {
+                        var rect = this.getBoundingClientRect();
+                        submenu.style.top = rect.top + 'px';
+
+                        if (this.closest('.submenu')) {
+                            submenu.style.left = (rect.right) + 'px';
+                        }
+                    }
+                });
+            });
+
+            // Add enter key support for inputs
+            document.getElementById('objectIdInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    searchObject();
+                }
+            });
+
+            document.getElementById('newTagInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addTag();
+                }
+            });
+
+            document.getElementById('searchTagInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    searchByTag();
+                }
+            });
+        };
+    </script>
+</head>
+<body>
+<div class="layout">
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h1>VibeCForms</h1>
+            <p>Formulários Dinâmicos</p>
+        </div>
+        <div class="menu-container">
+            <ul class="menu">
+                {{ menu_html|safe }}
+                <li><a href="/tags/manager" class="active"><i class="fa fa-tags"></i> Gerenciar Tags</a></li>
+            </ul>
+            <a href="/" class="home-link"><i class="fa fa-home"></i> Página Inicial</a>
+        </div>
+    </nav>
+    <div class="main-content">
+        <div class="container">
+            <h2><i class="fa fa-tags"></i> Gerenciamento de Tags</h2>
+
+            <div id="successAlert" class="alert alert-success"></div>
+            <div id="errorAlert" class="alert alert-error"></div>
+
+            <!-- Search Object Section -->
+            <div class="section">
+                <h3><i class="fa fa-search"></i> Buscar Objeto</h3>
+                <div class="form-row">
+                    <label for="formSelect">Formulário:</label>
+                    <select id="formSelect">
+                        <option value="">Selecione um formulário...</option>
+                        {% for form in forms %}
+                        <option value="{{ form.path }}">{{ form.title }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-row">
+                    <label for="objectIdInput">ID do Objeto:</label>
+                    <input type="text" id="objectIdInput" placeholder="Digite o ID do objeto (27 caracteres)">
+                    <button onclick="searchObject()">
+                        <i class="fa fa-search"></i> Buscar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tag Management Section (hidden until object is loaded) -->
+            <div id="tagManagement" style="display: none;">
+                <!-- Active Tags -->
+                <div class="section">
+                    <h3><i class="fa fa-tag"></i> Tags Ativas</h3>
+                    <div id="activeTagsContainer">
+                        <div class="no-data">Carregando...</div>
+                    </div>
+                </div>
+
+                <!-- Add Tag -->
+                <div class="section">
+                    <h3><i class="fa fa-plus"></i> Adicionar Tag</h3>
+                    <div class="tag-input-container">
+                        <input type="text" id="newTagInput" placeholder="Digite o nome da tag (ex: importante, urgente, revisado)">
+                        <button class="btn-success" onclick="addTag()">
+                            <i class="fa fa-plus"></i> Adicionar
+                        </button>
+                    </div>
+                    <div id="tagValidationError" class="tag-validation-error"></div>
+                    <p style="font-size: 12px; color: #7f8c8d; margin-top: 8px;">
+                        <i class="fa fa-info-circle"></i> Use apenas letras minúsculas, números e underscore (_)
+                    </p>
+                </div>
+
+                <!-- Tag History -->
+                <div class="section">
+                    <h3><i class="fa fa-history"></i> Histórico de Tags</h3>
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>Tag</th>
+                                <th>Status</th>
+                                <th>Aplicada Em</th>
+                                <th>Aplicada Por</th>
+                                <th>Removida Em</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody">
+                            <tr><td colspan="5" class="no-data">Carregando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Search by Tag Section -->
+            <div class="section">
+                <h3><i class="fa fa-search-plus"></i> Buscar Objetos por Tag</h3>
+                <div class="form-row">
+                    <label for="searchFormSelect">Formulário:</label>
+                    <select id="searchFormSelect">
+                        <option value="">Selecione um formulário...</option>
+                        {% for form in forms %}
+                        <option value="{{ form.path }}">{{ form.title }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-row">
+                    <label for="searchTagInput">Tag:</label>
+                    <input type="text" id="searchTagInput" placeholder="Digite o nome da tag">
+                    <button onclick="searchByTag()">
+                        <i class="fa fa-search"></i> Buscar
+                    </button>
+                </div>
+                <div id="searchResultsContainer" class="search-results"></div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

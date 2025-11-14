@@ -79,11 +79,23 @@ class SchemaHistory:
 
             with open(self.history_file, "w", encoding="utf-8") as f:
                 json.dump(self.history, f, indent=2, ensure_ascii=False)
+                f.flush()  # Ensure data is written to disk
+                os.fsync(f.fileno())  # Force OS to write to disk
 
-            logger.info(f"Saved schema history to {self.history_file}")
+            logger.info(f"✅ Saved schema history to {self.history_file}")
+
+            # Verify the save by reading back
+            try:
+                with open(self.history_file, "r", encoding="utf-8") as f:
+                    verification = json.load(f)
+                logger.info(f"✅ Verified schema history file is readable and valid")
+            except Exception as verify_error:
+                logger.error(f"❌ Failed to verify schema history save: {verify_error}")
+                return False
+
             return True
         except Exception as e:
-            logger.error(f"Error saving history: {e}")
+            logger.error(f"❌ Error saving history: {e}")
             return False
 
     def get_form_history(self, form_path: str) -> Optional[Dict[str, Any]]:

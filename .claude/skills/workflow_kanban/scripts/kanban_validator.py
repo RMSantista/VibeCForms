@@ -9,14 +9,20 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Set, Tuple
 
+
 class KanbanValidator:
     """Validates kanban JSON structure and business rules."""
 
-    REQUIRED_FIELDS = ['id', 'name', 'states', 'transitions']
-    REQUIRED_STATE_FIELDS = ['id', 'name']
-    REQUIRED_TRANSITION_FIELDS = ['from', 'to']
-    VALID_TRANSITION_TYPES = ['manual', 'system', 'agent']
-    VALID_PREREQUISITE_TYPES = ['field_check', 'external_api', 'time_elapsed', 'custom_script']
+    REQUIRED_FIELDS = ["id", "name", "states", "transitions"]
+    REQUIRED_STATE_FIELDS = ["id", "name"]
+    REQUIRED_TRANSITION_FIELDS = ["from", "to"]
+    VALID_TRANSITION_TYPES = ["manual", "system", "agent"]
+    VALID_PREREQUISITE_TYPES = [
+        "field_check",
+        "external_api",
+        "time_elapsed",
+        "custom_script",
+    ]
 
     def __init__(self, json_path: str):
         self.json_path = Path(json_path)
@@ -43,7 +49,7 @@ class KanbanValidator:
                 self.errors.append(f"File not found: {self.json_path}")
                 return False
 
-            with open(self.json_path, 'r', encoding='utf-8') as f:
+            with open(self.json_path, "r", encoding="utf-8") as f:
                 self.data = json.load(f)
             return True
 
@@ -64,10 +70,10 @@ class KanbanValidator:
 
     def _validate_states(self):
         """Validate states array and individual state objects."""
-        if 'states' not in self.data:
+        if "states" not in self.data:
             return
 
-        states = self.data['states']
+        states = self.data["states"]
 
         if not isinstance(states, list):
             self.errors.append("Field 'states' must be an array")
@@ -90,32 +96,34 @@ class KanbanValidator:
                     self.errors.append(f"State at index {idx}: missing field '{field}'")
 
             # Check for duplicate state IDs
-            state_id = state.get('id')
+            state_id = state.get("id")
             if state_id:
                 if state_id in state_ids:
                     self.errors.append(f"Duplicate state ID: '{state_id}'")
                 state_ids.add(state_id)
 
             # Validate auto_transition_to if present
-            if 'auto_transition_to' in state:
-                auto_to = state['auto_transition_to']
+            if "auto_transition_to" in state:
+                auto_to = state["auto_transition_to"]
                 if auto_to and auto_to not in state_ids and auto_to != state_id:
                     # Will validate after all states are collected
                     pass
 
     def _validate_transitions(self):
         """Validate transitions array and transition rules."""
-        if 'transitions' not in self.data or 'states' not in self.data:
+        if "transitions" not in self.data or "states" not in self.data:
             return
 
-        transitions = self.data['transitions']
+        transitions = self.data["transitions"]
 
         if not isinstance(transitions, list):
             self.errors.append("Field 'transitions' must be an array")
             return
 
         # Collect valid state IDs
-        valid_state_ids = {state['id'] for state in self.data['states'] if 'id' in state}
+        valid_state_ids = {
+            state["id"] for state in self.data["states"] if "id" in state
+        }
 
         for idx, trans in enumerate(transitions):
             if not isinstance(trans, dict):
@@ -125,24 +133,26 @@ class KanbanValidator:
             # Check required fields
             for field in self.REQUIRED_TRANSITION_FIELDS:
                 if field not in trans:
-                    self.errors.append(f"Transition at index {idx}: missing field '{field}'")
+                    self.errors.append(
+                        f"Transition at index {idx}: missing field '{field}'"
+                    )
 
             # Validate 'from' state exists
-            from_state = trans.get('from')
+            from_state = trans.get("from")
             if from_state and from_state not in valid_state_ids:
                 self.errors.append(
                     f"Transition at index {idx}: 'from' state '{from_state}' does not exist"
                 )
 
             # Validate 'to' state exists
-            to_state = trans.get('to')
+            to_state = trans.get("to")
             if to_state and to_state not in valid_state_ids:
                 self.errors.append(
                     f"Transition at index {idx}: 'to' state '{to_state}' does not exist"
                 )
 
             # Validate transition type if present
-            trans_type = trans.get('type', 'manual')
+            trans_type = trans.get("type", "manual")
             if trans_type not in self.VALID_TRANSITION_TYPES:
                 self.errors.append(
                     f"Transition at index {idx}: invalid type '{trans_type}'. "
@@ -150,8 +160,8 @@ class KanbanValidator:
                 )
 
             # Validate prerequisites if present
-            if 'prerequisites' in trans:
-                self._validate_prerequisites(trans['prerequisites'], idx)
+            if "prerequisites" in trans:
+                self._validate_prerequisites(trans["prerequisites"], idx)
 
     def _validate_prerequisites(self, prerequisites: List, transition_idx: int):
         """Validate prerequisite definitions."""
@@ -168,7 +178,7 @@ class KanbanValidator:
                 )
                 continue
 
-            prereq_type = prereq.get('type')
+            prereq_type = prereq.get("type")
             if not prereq_type:
                 self.warnings.append(
                     f"Transition {transition_idx}, prerequisite {prereq_idx}: missing 'type' field"
@@ -182,15 +192,15 @@ class KanbanValidator:
 
     def _detect_infinite_cycles(self):
         """Detect potential infinite loops in auto-transitions."""
-        if 'states' not in self.data:
+        if "states" not in self.data:
             return
 
         # Build auto-transition graph
         auto_graph: Dict[str, str] = {}
-        for state in self.data['states']:
-            if 'auto_transition_to' in state and state.get('auto_transition_to'):
-                state_id = state.get('id')
-                auto_to = state['auto_transition_to']
+        for state in self.data["states"]:
+            if "auto_transition_to" in state and state.get("auto_transition_to"):
+                state_id = state.get("id")
+                auto_to = state["auto_transition_to"]
                 if state_id:
                     auto_graph[state_id] = auto_to
 
@@ -205,7 +215,7 @@ class KanbanValidator:
                     cycle_path = [start_state]
                     temp = start_state
                     while auto_graph.get(temp) != start_state:
-                        temp = auto_graph.get(temp, '')
+                        temp = auto_graph.get(temp, "")
                         if temp:
                             cycle_path.append(temp)
                         else:
@@ -219,7 +229,7 @@ class KanbanValidator:
                     break
 
                 visited.add(current)
-                current = auto_graph.get(current, '')
+                current = auto_graph.get(current, "")
 
     def print_report(self):
         """Print validation report to stdout."""
@@ -228,9 +238,9 @@ class KanbanValidator:
         print(f"{'=' * 70}")
         print(f"File: {self.json_path}")
 
-        if self.data.get('name'):
+        if self.data.get("name"):
             print(f"Kanban Name: {self.data['name']}")
-        if self.data.get('id'):
+        if self.data.get("id"):
             print(f"Kanban ID: {self.data['id']}")
 
         print(f"\n{'-' * 70}")
@@ -278,5 +288,5 @@ def main():
     sys.exit(0 if is_valid else 1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

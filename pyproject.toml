@@ -49,6 +49,7 @@ check = "pre-commit run --all-files"
 addopts = [
     "-v",
     "--tb=short",
+    "--basetemp=data/txt/tests",
 ]
 # Pytest exit codes: 0 (all passed), 1 (tests failed), 5 (no tests collected)
 # Skipped tests will still result in exit code 0

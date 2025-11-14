@@ -290,6 +290,44 @@ class PersistenceConfig:
         """
         return self.config.get(key, default)
 
+    @property
+    def form_mappings(self) -> Dict[str, str]:
+        """
+        Get the form_mappings dictionary from configuration.
+
+        Returns:
+            Dictionary mapping form paths to backend names
+
+        Example:
+            >>> config.form_mappings['contatos']
+            'sqlite'
+        """
+        return self.config.get("form_mappings", {})
+
+    @property
+    def backends(self) -> Dict[str, Dict[str, Any]]:
+        """
+        Get the backends dictionary from configuration.
+
+        Returns:
+            Dictionary of backend configurations
+
+        Example:
+            >>> config.backends['sqlite']
+            {'type': 'sqlite', 'database': 'src/vibecforms.db', ...}
+        """
+        return self.config.get("backends", {})
+
+    def save(self) -> None:
+        """
+        Save configuration back to the JSON file.
+
+        Useful when form_mappings or other settings are modified at runtime.
+        """
+        with open(self.config_path, "w", encoding="utf-8") as f:
+            json.dump(self.config, f, indent=2, ensure_ascii=False)
+        logger.info(f"Persistence configuration saved to {self.config_path}")
+
     def reload(self) -> None:
         """
         Reload configuration from file.
