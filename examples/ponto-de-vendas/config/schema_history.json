@@ -1,0 +1,20 @@
+{
+  "contatos": {
+    "last_spec_hash": "ee014237f822ba2d7ea15758cd6056dd",
+    "last_backend": "sqlite",
+    "last_updated": "2025-11-14T08:54:10.988872",
+    "record_count": 2
+  },
+  "financeiro/contas": {
+    "last_spec_hash": "5b7f40de8f2d127347e9096e73db5e38",
+    "last_backend": "txt",
+    "last_updated": "2025-11-14T08:53:57.848982",
+    "record_count": 0
+  },
+  "produtos": {
+    "last_spec_hash": "8e699969d9a6b89b7fc69a8901a4b138",
+    "last_backend": "sqlite",
+    "last_updated": "2025-11-14T08:54:10.004573",
+    "record_count": 0
+  }
+}

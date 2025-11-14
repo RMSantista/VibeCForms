@@ -1,0 +1,29 @@
+{
+  "title": "Agenda Pessoal",
+  "icon": "fa-address-book",
+  "fields": [
+    {
+      "name": "nome",
+      "label": "Nome",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "telefone",
+      "label": "Telefone",
+      "type": "tel",
+      "required": true
+    },
+    {
+      "name": "whatsapp",
+      "label": "WhatsApp",
+      "type": "checkbox",
+      "required": false
+    }
+  ],
+  "validation_messages": {
+    "all_empty": "Não existe cadastro vazio. Informe nome e telefone.",
+    "nome": "É obrigatório cadastrar ao menos um nome.",
+    "telefone": "O contato deve ter um telefone."
+  }
+}

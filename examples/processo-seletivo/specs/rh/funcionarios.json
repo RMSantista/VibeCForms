@@ -1,0 +1,42 @@
+{
+  "title": "Funcionários",
+  "icon": "fa-id-card",
+  "fields": [
+    {
+      "name": "nome",
+      "label": "Nome Completo",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "cargo",
+      "label": "Cargo",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "email",
+      "label": "E-mail",
+      "type": "email",
+      "required": true
+    },
+    {
+      "name": "salario",
+      "label": "Salário",
+      "type": "number",
+      "required": false
+    },
+    {
+      "name": "ativo",
+      "label": "Ativo",
+      "type": "checkbox",
+      "required": false
+    }
+  ],
+  "validation_messages": {
+    "all_empty": "Informe ao menos o nome, cargo e e-mail do funcionário.",
+    "nome": "É obrigatório informar o nome do funcionário.",
+    "cargo": "É obrigatório informar o cargo.",
+    "email": "É obrigatório informar o e-mail."
+  }
+}

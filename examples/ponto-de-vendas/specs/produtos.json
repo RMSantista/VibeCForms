@@ -1,0 +1,42 @@
+{
+  "title": "Catálogo de Produtos",
+  "icon": "fa-box",
+  "fields": [
+    {
+      "name": "nome",
+      "label": "Nome do Produto",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "categoria",
+      "label": "Categoria",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "preco",
+      "label": "Preço",
+      "type": "number",
+      "required": true
+    },
+    {
+      "name": "descricao",
+      "label": "Descrição",
+      "type": "textarea",
+      "required": false
+    },
+    {
+      "name": "disponivel",
+      "label": "Disponível",
+      "type": "checkbox",
+      "required": false
+    }
+  ],
+  "validation_messages": {
+    "all_empty": "Não é possível criar um produto vazio. Informe nome, categoria e preço.",
+    "nome": "O nome do produto é obrigatório.",
+    "categoria": "A categoria é obrigatória.",
+    "preco": "O preço é obrigatório."
+  }
+}

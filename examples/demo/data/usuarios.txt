@@ -1,0 +1,19 @@
+Sr. Brayan Pires;souzapedro-henrique@example.org;senha123;2025-08-20;True
+Sabrina da Mota;rebeca13@example.org;senha123;2025-07-02;False
+Catarina Macedo;luan98@example.com;senha123;2025-06-12;True
+Cauã Cassiano;leaotheodoro@example.com;senha123;2024-11-10;False
+Mariah Farias;ymarques@example.com;senha123;2025-07-19;False
+Pietra Cavalcante;luiz-gustavoandrade@example.com;senha123;2025-06-20;True
+Davi Porto;britodaniela@example.com;senha123;2025-07-09;False
+Dr. João Felipe Costela;pietro28@example.net;senha123;2025-01-11;True
+Maria Eduarda Vieira;hpeixoto@example.net;senha123;2025-05-23;True
+Mariah Mendes;alexandrerios@example.org;senha123;2025-01-22;False
+Enzo Peixoto;nathanpinto@example.com;senha123;2025-01-25;True
+Erick Azevedo;thalesda-rocha@example.com;senha123;2025-01-30;True
+Davi Lucca Oliveira;usa@example.org;senha123;2025-10-07;False
+Levi Aparecida;murilocasa-grande@example.org;senha123;2025-09-26;True
+Sra. Maria Luiza Castro;antony99@example.net;senha123;2025-08-15;True
+Igor Novaes;vramos@example.org;senha123;2024-11-23;False
+Lara da Mata;rioslara@example.net;senha123;2024-12-27;True
+Gustavo das Neves;lucas49@example.net;senha123;2025-10-06;False
+Dra. Ísis Vasconcelos;ana-clara08@example.com;senha123;2025-03-13;False

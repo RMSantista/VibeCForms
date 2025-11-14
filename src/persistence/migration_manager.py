@@ -229,8 +229,16 @@ class MigrationManager:
         Returns:
             Backup info dictionary with paths and metadata
         """
+        # Get backup path from config
+        config = get_config()
+        backup_path = config.get_setting("backup_path", "backups/migrations")
+
+        # Resolve relative paths against business case root
+        if not os.path.isabs(backup_path):
+            backup_path = str(config.business_case_root / backup_path)
+
         # Create migration backups directory
-        backup_dir = Path("src/backups/migrations")
+        backup_dir = Path(backup_path)
         backup_dir.mkdir(parents=True, exist_ok=True)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

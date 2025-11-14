@@ -2,6 +2,8 @@ import os
 import sys
 import json
 import logging
+import argparse
+from pathlib import Path
 from flask import (
     Flask,
     render_template,
@@ -30,11 +32,130 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-DATA_FILE = os.path.join(os.path.dirname(__file__), "registros.txt")
-SPECS_DIR = os.path.join(os.path.dirname(__file__), "specs")
-TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")
+# Global variables for business case paths (set during initialization)
+BUSINESS_CASE_ROOT = None
+SPECS_DIR = None
+TEMPLATE_DIR = None
+FALLBACK_TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")
 
-app = Flask(__name__, template_folder=TEMPLATE_DIR)
+# Create app with fallback template directory (will be updated during initialization)
+app = Flask(__name__, template_folder=FALLBACK_TEMPLATE_DIR)
+
+
+def parse_arguments():
+    """Parse command-line arguments for business case path."""
+    parser = argparse.ArgumentParser(
+        description="VibeCForms - AI-first framework for process tracking systems",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python src/VibeCForms.py examples/ponto-de-vendas
+  python src/VibeCForms.py examples/processo-seletivo
+  uv run app examples/demo
+        """,
+    )
+    parser.add_argument(
+        "business_case_path",
+        help="Path to the business case directory (e.g., examples/ponto-de-vendas)",
+    )
+    return parser.parse_args()
+
+
+def initialize_app(business_case_path):
+    """Initialize the Flask app with the given business case path.
+
+    Args:
+        business_case_path: Path to the business case directory
+    """
+    global BUSINESS_CASE_ROOT, SPECS_DIR, TEMPLATE_DIR
+
+    # Convert to absolute path
+    BUSINESS_CASE_ROOT = os.path.abspath(business_case_path)
+
+    # Validate business case directory exists
+    if not os.path.isdir(BUSINESS_CASE_ROOT):
+        print(f"Error: Business case directory not found: {BUSINESS_CASE_ROOT}")
+        print("\nAvailable examples:")
+        examples_dir = os.path.join(os.path.dirname(__file__), "..", "examples")
+        if os.path.isdir(examples_dir):
+            for item in os.listdir(examples_dir):
+                item_path = os.path.join(examples_dir, item)
+                if os.path.isdir(item_path):
+                    print(f"  - examples/{item}")
+        sys.exit(1)
+
+    # Set up directory paths
+    SPECS_DIR = os.path.join(BUSINESS_CASE_ROOT, "specs")
+    TEMPLATE_DIR = os.path.join(BUSINESS_CASE_ROOT, "templates")
+
+    # Validate required directories exist
+    if not os.path.isdir(SPECS_DIR):
+        print(f"Error: specs/ directory not found in {BUSINESS_CASE_ROOT}")
+        sys.exit(1)
+
+    # Template directory is optional (will fallback to src/templates)
+    if not os.path.isdir(TEMPLATE_DIR):
+        logger.info(f"templates/ not found in business case, using fallback templates")
+        TEMPLATE_DIR = FALLBACK_TEMPLATE_DIR
+
+    # Update Flask app template folder
+    app.template_folder = TEMPLATE_DIR
+
+    # Initialize persistence configuration with business case config path
+    from persistence.config import get_config, reset_config
+    from persistence.schema_history import get_history, reset_history
+
+    reset_config()  # Reset any existing config
+    reset_history()  # Reset any existing history
+    config_path = os.path.join(BUSINESS_CASE_ROOT, "config", "persistence.json")
+    history_path = os.path.join(BUSINESS_CASE_ROOT, "config", "schema_history.json")
+    get_config(config_path)  # Initialize with business case config
+    get_history(history_path)  # Initialize with business case history
+
+    logger.info(f"Initialized VibeCForms with business case: {BUSINESS_CASE_ROOT}")
+    logger.info(f"  - Specs: {SPECS_DIR}")
+    logger.info(f"  - Templates: {TEMPLATE_DIR}")
+    logger.info(f"  - Config: {config_path}")
+    logger.info(f"  - History: {history_path}")
+
+
+def get_template_path(template_name):
+    """Get template path with fallback support.
+
+    First tries business case templates, then falls back to src/templates.
+
+    Args:
+        template_name: Name of the template file (can include subdirectory, e.g., "fields/input.html")
+
+    Returns:
+        Full path to the template file
+    """
+    # Check business case templates first
+    business_template = os.path.join(TEMPLATE_DIR, template_name)
+    if os.path.exists(business_template):
+        return business_template
+
+    # Fallback to src/templates
+    fallback_template = os.path.join(FALLBACK_TEMPLATE_DIR, template_name)
+    if os.path.exists(fallback_template):
+        return fallback_template
+
+    # Neither exists, return business case path (will fail appropriately)
+    return business_template
+
+
+def read_template(template_name):
+    """Read template content with fallback support.
+
+    Args:
+        template_name: Name of the template file (can include subdirectory)
+
+    Returns:
+        Template content as string
+    """
+    template_path = get_template_path(template_name)
+    with open(template_path, "r", encoding="utf-8") as f:
+        return f.read()
 
 
 def load_spec(form_path):
@@ -102,13 +223,17 @@ def load_folder_config(folder_path):
     return None
 
 
-def scan_specs_directory(base_path=SPECS_DIR, relative_path=""):
+def scan_specs_directory(base_path=None, relative_path=""):
     """Recursively scan the specs directory and build menu structure.
 
     Returns a list of menu items, where each item is either:
     - {"type": "form", "name": str, "path": str, "title": str, "icon": str}
     - {"type": "folder", "name": str, "path": str, "icon": str, "children": list, "description": str (optional)}
     """
+    # Use current SPECS_DIR if base_path not provided
+    if base_path is None:
+        base_path = SPECS_DIR
+
     items = []
     full_path = os.path.join(base_path, relative_path) if relative_path else base_path
 
@@ -360,14 +485,8 @@ def generate_form_field(field, form_data=None):
     if form_data:
         value = form_data.get(field_name, "")
 
-    # Load appropriate template based on field type
-    template_path = os.path.join(TEMPLATE_DIR, "fields")
-
     if field_type == "checkbox":
-        template_file = os.path.join(template_path, "checkbox.html")
-        with open(template_file, "r", encoding="utf-8") as f:
-            template_content = f.read()
-
+        template_content = read_template("fields/checkbox.html")
         checked = form_data and form_data.get(field_name)
         return render_template_string(
             template_content,
@@ -377,10 +496,7 @@ def generate_form_field(field, form_data=None):
         )
 
     elif field_type == "textarea":
-        template_file = os.path.join(template_path, "textarea.html")
-        with open(template_file, "r", encoding="utf-8") as f:
-            template_content = f.read()
-
+        template_content = read_template("fields/textarea.html")
         return render_template_string(
             template_content,
             field_name=field_name,
@@ -390,10 +506,7 @@ def generate_form_field(field, form_data=None):
         )
 
     elif field_type == "select":
-        template_file = os.path.join(template_path, "select.html")
-        with open(template_file, "r", encoding="utf-8") as f:
-            template_content = f.read()
-
+        template_content = read_template("fields/select.html")
         options = field.get("options", [])
         return render_template_string(
             template_content,
@@ -405,10 +518,7 @@ def generate_form_field(field, form_data=None):
         )
 
     elif field_type == "radio":
-        template_file = os.path.join(template_path, "radio.html")
-        with open(template_file, "r", encoding="utf-8") as f:
-            template_content = f.read()
-
+        template_content = read_template("fields/radio.html")
         options = field.get("options", [])
         return render_template_string(
             template_content,
@@ -420,10 +530,7 @@ def generate_form_field(field, form_data=None):
         )
 
     elif field_type == "color":
-        template_file = os.path.join(template_path, "color.html")
-        with open(template_file, "r", encoding="utf-8") as f:
-            template_content = f.read()
-
+        template_content = read_template("fields/color.html")
         return render_template_string(
             template_content,
             field_name=field_name,
@@ -433,10 +540,7 @@ def generate_form_field(field, form_data=None):
         )
 
     elif field_type == "range":
-        template_file = os.path.join(template_path, "range.html")
-        with open(template_file, "r", encoding="utf-8") as f:
-            template_content = f.read()
-
+        template_content = read_template("fields/range.html")
         min_value = field.get("min", 0)
         max_value = field.get("max", 100)
         step_value = field.get("step", 1)
@@ -454,10 +558,7 @@ def generate_form_field(field, form_data=None):
 
     elif field_type == "search" and field.get("datasource"):
         # Search field with autocomplete from datasource
-        template_file = os.path.join(template_path, "search_autocomplete.html")
-        with open(template_file, "r", encoding="utf-8") as f:
-            template_content = f.read()
-
+        template_content = read_template("fields/search_autocomplete.html")
         return render_template_string(
             template_content,
             field_name=field_name,
@@ -468,10 +569,7 @@ def generate_form_field(field, form_data=None):
 
     else:
         # Input types: text, tel, email, number, password, date, url, search, datetime-local, time, month, week, hidden
-        template_file = os.path.join(template_path, "input.html")
-        with open(template_file, "r", encoding="utf-8") as f:
-            template_content = f.read()
-
+        template_content = read_template("fields/input.html")
         input_type = (
             field_type
             if field_type
@@ -1050,8 +1148,14 @@ def old_delete(idx):
 
 
 if __name__ == "__main__":
-    print("Iniciando servidor Flask em http://0.0.0.0:5000 ...")
-    print("Formulários disponíveis: http://0.0.0.0:5000/contatos")
+    # Parse command-line arguments
+    args = parse_arguments()
+
+    # Initialize app with business case path
+    initialize_app(args.business_case_path)
+
+    print(f"Iniciando VibeCForms com business case: {BUSINESS_CASE_ROOT}")
+    print("Servidor Flask em http://0.0.0.0:5000 ...")
     try:
         app.run(debug=True, host="0.0.0.0", port=5000)
     except Exception as e:

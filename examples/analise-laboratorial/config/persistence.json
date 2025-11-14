@@ -1,0 +1,23 @@
+{
+  "version": "1.0",
+  "default_backend": "txt",
+
+  "backends": {
+    "txt": {
+      "type": "txt",
+      "path": "data/",
+      "delimiter": ";",
+      "encoding": "utf-8",
+      "extension": ".txt"
+    }
+  },
+
+  "form_mappings": {
+    "*": "default_backend"
+  },
+
+  "auto_create_storage": true,
+  "auto_migrate_schema": true,
+  "backup_before_migrate": true,
+  "backup_path": "backups/migrations/"
+}

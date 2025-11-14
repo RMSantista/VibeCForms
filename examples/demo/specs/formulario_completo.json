@@ -1,0 +1,148 @@
+{
+  "title": "Formulário Completo - Todos os Tipos de Campos",
+  "icon": "fa-clipboard-check",
+  "fields": [
+    {
+      "name": "nome",
+      "label": "Nome Completo",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "email",
+      "label": "E-mail",
+      "type": "email",
+      "required": true
+    },
+    {
+      "name": "telefone",
+      "label": "Telefone",
+      "type": "tel",
+      "required": false
+    },
+    {
+      "name": "senha",
+      "label": "Senha",
+      "type": "password",
+      "required": true
+    },
+    {
+      "name": "idade",
+      "label": "Idade",
+      "type": "number",
+      "required": false
+    },
+    {
+      "name": "data_nascimento",
+      "label": "Data de Nascimento",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "horario_preferido",
+      "label": "Horário de Contato",
+      "type": "time",
+      "required": false
+    },
+    {
+      "name": "agendamento",
+      "label": "Data e Hora do Agendamento",
+      "type": "datetime-local",
+      "required": false
+    },
+    {
+      "name": "mes_aniversario",
+      "label": "Mês de Aniversário",
+      "type": "month",
+      "required": false
+    },
+    {
+      "name": "semana_ferias",
+      "label": "Semana de Férias",
+      "type": "week",
+      "required": false
+    },
+    {
+      "name": "website",
+      "label": "Website Pessoal",
+      "type": "url",
+      "required": false
+    },
+    {
+      "name": "contato_favorito",
+      "label": "Contato Favorito",
+      "type": "search",
+      "datasource": "contatos",
+      "required": false
+    },
+    {
+      "name": "estado",
+      "label": "Estado",
+      "type": "select",
+      "options": [
+        {"value": "SP", "label": "São Paulo"},
+        {"value": "RJ", "label": "Rio de Janeiro"},
+        {"value": "MG", "label": "Minas Gerais"},
+        {"value": "ES", "label": "Espírito Santo"},
+        {"value": "PR", "label": "Paraná"},
+        {"value": "SC", "label": "Santa Catarina"},
+        {"value": "RS", "label": "Rio Grande do Sul"}
+      ],
+      "required": true
+    },
+    {
+      "name": "genero",
+      "label": "Gênero",
+      "type": "radio",
+      "options": [
+        {"value": "M", "label": "Masculino"},
+        {"value": "F", "label": "Feminino"},
+        {"value": "O", "label": "Outro"},
+        {"value": "N", "label": "Prefiro não informar"}
+      ],
+      "required": true
+    },
+    {
+      "name": "cor_favorita",
+      "label": "Cor Favorita",
+      "type": "color",
+      "required": false
+    },
+    {
+      "name": "prioridade",
+      "label": "Nível de Prioridade (1-10)",
+      "type": "range",
+      "min": 1,
+      "max": 10,
+      "step": 1,
+      "required": false
+    },
+    {
+      "name": "observacoes",
+      "label": "Observações",
+      "type": "textarea",
+      "required": false
+    },
+    {
+      "name": "aceita_termos",
+      "label": "Aceito os termos e condições",
+      "type": "checkbox",
+      "required": false
+    },
+    {
+      "name": "codigo_interno",
+      "label": "Código Interno",
+      "type": "hidden",
+      "required": false
+    }
+  ],
+  "validation_messages": {
+    "all_empty": "Por favor, preencha pelo menos os campos obrigatórios.",
+    "nome": "O nome completo é obrigatório.",
+    "email": "O e-mail é obrigatório.",
+    "senha": "A senha é obrigatória.",
+    "data_nascimento": "A data de nascimento é obrigatória.",
+    "estado": "Por favor, selecione um estado.",
+    "genero": "Por favor, selecione uma opção de gênero."
+  }
+}
