@@ -9,11 +9,13 @@ interface while preserving the existing data format and behavior.
 import os
 import shutil
 import logging
+import json
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 from datetime import datetime
 from persistence.base import BaseRepository
 from persistence.schema_detector import SchemaChangeDetector, ChangeType
+from utils.crockford import generate_id
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +75,71 @@ class TxtRepository(BaseRepository):
         safe_name = form_path.replace("/", "_")
         return os.path.join(self.path, f"{safe_name}{self.extension}")
 
+    def _get_tags_file_path(self) -> str:
+        """Get the path to the global tags file."""
+        return os.path.join(self.path, "tags.txt")
+
+    def _read_all_tags(self) -> List[Dict[str, Any]]:
+        """Read all tags from the tags file."""
+        tags_file = self._get_tags_file_path()
+
+        if not os.path.exists(tags_file):
+            return []
+
+        tags = []
+        try:
+            with open(tags_file, "r", encoding=self.encoding) as f:
+                for line in f:
+                    if not line.strip():
+                        continue
+
+                    parts = line.strip().split(self.delimiter)
+                    if len(parts) < 7:
+                        continue
+
+                    tags.append({
+                        "object_type": parts[0],
+                        "object_id": parts[1],
+                        "tag": parts[2],
+                        "applied_at": parts[3],
+                        "applied_by": parts[4],
+                        "removed_at": parts[5] if parts[5] else None,
+                        "removed_by": parts[6] if parts[6] else None,
+                        "metadata": json.loads(parts[7]) if len(parts) > 7 and parts[7] else None,
+                    })
+        except Exception as e:
+            logger.error(f"Failed to read tags file: {e}")
+            return []
+
+        return tags
+
+    def _write_all_tags(self, tags: List[Dict[str, Any]]) -> bool:
+        """Write all tags to the tags file."""
+        tags_file = self._get_tags_file_path()
+
+        try:
+            os.makedirs(os.path.dirname(tags_file), exist_ok=True)
+
+            with open(tags_file, "w", encoding=self.encoding) as f:
+                for tag in tags:
+                    parts = [
+                        tag["object_type"],
+                        tag["object_id"],
+                        tag["tag"],
+                        tag["applied_at"],
+                        tag["applied_by"],
+                        tag.get("removed_at") or "",
+                        tag.get("removed_by") or "",
+                        json.dumps(tag.get("metadata")) if tag.get("metadata") else "",
+                    ]
+                    f.write(self.delimiter.join(parts) + "\n")
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to write tags file: {e}")
+            return False
+
     def create_storage(self, form_path: str, spec: Dict[str, Any]) -> bool:
         """Create storage (empty text file) for the form."""
         file_path = self._get_file_path(form_path)
@@ -107,18 +174,34 @@ class TxtRepository(BaseRepository):
                 continue
 
             values = line.strip().split(self.delimiter)
-            if len(values) != len(field_names):
+
+            # Check if we have the expected number of fields
+            # New format: record_id + field values (len = 1 + len(field_names))
+            # Old format: just field values (len = len(field_names))
+            expected_with_id = len(field_names) + 1
+            expected_without_id = len(field_names)
+
+            if len(values) == expected_with_id:
+                # New format with record_id
+                record_id = values[0]
+                field_values = values[1:]
+            elif len(values) == expected_without_id:
+                # Old format without record_id (backwards compatibility)
+                record_id = ""
+                field_values = values
+            else:
                 logger.warning(
                     f"Skipping malformed line {line_num} in {file_path}: "
-                    f"expected {len(field_names)} fields, got {len(values)}"
+                    f"expected {expected_with_id} or {expected_without_id} fields, got {len(values)}"
                 )
                 continue
 
             form_data = {}
+
             for i, field in enumerate(spec["fields"]):
                 field_name = field["name"]
                 field_type = field["type"]
-                value = values[i]
+                value = field_values[i]
 
                 # Convert value based on field type
                 if field_type == "checkbox":
@@ -134,6 +217,10 @@ class TxtRepository(BaseRepository):
                         form_data[field_name] = 0
                 else:
                     form_data[field_name] = value
+
+            # Store record_id internally for ID-based operations (not exposed in read_all)
+            if record_id:
+                form_data["_record_id"] = record_id
 
             forms.append(form_data)
 
@@ -154,16 +241,24 @@ class TxtRepository(BaseRepository):
 
     def create(
         self, form_path: str, spec: Dict[str, Any], data: Dict[str, Any]
-    ) -> bool:
-        """Insert a new record."""
+    ) -> Optional[str]:
+        """Insert a new record and return its UUID."""
+        # Generate UUID
+        record_id = generate_id()
+
         # Read existing records
         forms = self.read_all(form_path, spec)
 
+        # Add record_id to data
+        data_with_id = {**data, "_record_id": record_id}
+
         # Append new record
-        forms.append(data)
+        forms.append(data_with_id)
 
         # Write all records back
-        return self._write_all(form_path, spec, forms)
+        if self._write_all(form_path, spec, forms):
+            return record_id
+        return None
 
     def update(
         self, form_path: str, spec: Dict[str, Any], idx: int, data: Dict[str, Any]
@@ -175,8 +270,14 @@ class TxtRepository(BaseRepository):
             logger.error(f"Cannot update: index {idx} out of bounds for {form_path}")
             return False
 
+        # Preserve the record_id when updating
+        record_id = forms[idx].get("_record_id", "")
+        updated_data = {**data}
+        if record_id:
+            updated_data["_record_id"] = record_id
+
         # Update the record
-        forms[idx] = data
+        forms[idx] = updated_data
 
         # Write all records back
         return self._write_all(form_path, spec, forms)
@@ -217,6 +318,12 @@ class TxtRepository(BaseRepository):
             with open(file_path, "w", encoding=self.encoding) as f:
                 for form_data in forms:
                     values = []
+
+                    # First, write record_id (or empty if not present for backwards compatibility)
+                    record_id = form_data.get("_record_id", "")
+                    values.append(record_id)
+
+                    # Then write field values
                     for field in spec["fields"]:
                         field_name = field["name"]
                         value = form_data.get(field_name, "")
@@ -744,8 +851,15 @@ class TxtRepository(BaseRepository):
     def read_by_id(
         self, form_path: str, spec: Dict[str, Any], record_id: str
     ) -> Optional[Dict[str, Any]]:
-        """Read a single record by its unique ID. (Stub - FASE 3)"""
-        raise NotImplementedError("ID-based methods will be implemented in FASE 3")
+        """Read a single record by its unique ID."""
+        forms = self.read_all(form_path, spec)
+
+        for form in forms:
+            if form.get("_record_id") == record_id:
+                return form
+
+        logger.debug(f"No record found with ID {record_id} in {form_path}")
+        return None
 
     def update_by_id(
         self,
@@ -754,14 +868,46 @@ class TxtRepository(BaseRepository):
         record_id: str,
         data: Dict[str, Any],
     ) -> bool:
-        """Update an existing record by its ID. (Stub - FASE 3)"""
-        raise NotImplementedError("ID-based methods will be implemented in FASE 3")
+        """Update an existing record by its ID."""
+        forms = self.read_all(form_path, spec)
+
+        # Find and update the record
+        found = False
+        for i, form in enumerate(forms):
+            if form.get("_record_id") == record_id:
+                # Preserve record_id when updating
+                updated_data = {**data, "_record_id": record_id}
+                forms[i] = updated_data
+                found = True
+                break
+
+        if not found:
+            logger.warning(f"No record found with ID {record_id} in {form_path}")
+            return False
+
+        # Write all records back
+        return self._write_all(form_path, spec, forms)
 
     def delete_by_id(
         self, form_path: str, spec: Dict[str, Any], record_id: str
     ) -> bool:
-        """Delete a record by its unique ID. (Stub - FASE 3)"""
-        raise NotImplementedError("ID-based methods will be implemented in FASE 3")
+        """Delete a record by its unique ID."""
+        forms = self.read_all(form_path, spec)
+
+        # Find and remove the record
+        found = False
+        for i, form in enumerate(forms):
+            if form.get("_record_id") == record_id:
+                forms.pop(i)
+                found = True
+                break
+
+        if not found:
+            logger.warning(f"No record found with ID {record_id} in {form_path}")
+            return False
+
+        # Write remaining records back
+        return self._write_all(form_path, spec, forms)
 
     # =========================================================================
     # TAG MANAGEMENT METHODS (Stub implementations for FASE 3)
@@ -775,37 +921,153 @@ class TxtRepository(BaseRepository):
         applied_by: str,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> bool:
-        """Add a tag to an object. (Stub - FASE 3)"""
-        raise NotImplementedError("Tag methods will be implemented in FASE 3")
+        """Add a tag to an object."""
+        # Check if tag already exists and is active
+        if self.has_tag(object_type, object_id, tag):
+            logger.debug(f"Tag '{tag}' already exists for {object_type}:{object_id}")
+            return False
+
+        tags = self._read_all_tags()
+
+        new_tag = {
+            "object_type": object_type,
+            "object_id": object_id,
+            "tag": tag,
+            "applied_at": datetime.now().isoformat(),
+            "applied_by": applied_by,
+            "removed_at": None,
+            "removed_by": None,
+            "metadata": metadata,
+        }
+
+        tags.append(new_tag)
+
+        if self._write_all_tags(tags):
+            logger.debug(f"Added tag '{tag}' to {object_type}:{object_id}")
+            return True
+
+        return False
 
     def remove_tag(
         self, object_type: str, object_id: str, tag: str, removed_by: str
     ) -> bool:
-        """Remove a tag from an object. (Stub - FASE 3)"""
-        raise NotImplementedError("Tag methods will be implemented in FASE 3")
+        """Remove a tag from an object."""
+        # Check if tag exists and is active
+        if not self.has_tag(object_type, object_id, tag):
+            logger.debug(f"Tag '{tag}' not found for {object_type}:{object_id}")
+            return False
+
+        tags = self._read_all_tags()
+
+        # Find and mark tag as removed
+        found = False
+        for t in tags:
+            if (t["object_type"] == object_type and
+                t["object_id"] == object_id and
+                t["tag"] == tag and
+                t["removed_at"] is None):
+                t["removed_at"] = datetime.now().isoformat()
+                t["removed_by"] = removed_by
+                found = True
+                break
+
+        if found and self._write_all_tags(tags):
+            logger.debug(f"Removed tag '{tag}' from {object_type}:{object_id}")
+            return True
+
+        return False
 
     def get_tags(
         self, object_type: str, object_id: str, active_only: bool = True
     ) -> List[Dict[str, Any]]:
-        """Get all tags for an object. (Stub - FASE 3)"""
-        raise NotImplementedError("Tag methods will be implemented in FASE 3")
+        """Get all tags for an object."""
+        all_tags = self._read_all_tags()
+
+        result = []
+        for t in all_tags:
+            if t["object_type"] == object_type and t["object_id"] == object_id:
+                if active_only and t["removed_at"] is not None:
+                    continue
+
+                tag_data = {
+                    "tag": t["tag"],
+                    "applied_at": t["applied_at"],
+                    "applied_by": t["applied_by"],
+                    "metadata": t.get("metadata"),
+                }
+
+                if not active_only:
+                    tag_data["removed_at"] = t.get("removed_at")
+                    tag_data["removed_by"] = t.get("removed_by")
+
+                result.append(tag_data)
+
+        return result
 
     def has_tag(self, object_type: str, object_id: str, tag: str) -> bool:
-        """Check if an object has a specific tag. (Stub - FASE 3)"""
-        raise NotImplementedError("Tag methods will be implemented in FASE 3")
+        """Check if an object has a specific tag."""
+        tags = self._read_all_tags()
+
+        for t in tags:
+            if (t["object_type"] == object_type and
+                t["object_id"] == object_id and
+                t["tag"] == tag and
+                t["removed_at"] is None):
+                return True
+
+        return False
 
     def get_objects_by_tag(
         self, object_type: str, tag: str, active_only: bool = True
     ) -> List[str]:
-        """Get all object IDs with a specific tag. (Stub - FASE 3)"""
-        raise NotImplementedError("Tag methods will be implemented in FASE 3")
+        """Get all object IDs with a specific tag."""
+        all_tags = self._read_all_tags()
+
+        object_ids = set()
+        for t in all_tags:
+            if t["object_type"] == object_type and t["tag"] == tag:
+                if active_only and t["removed_at"] is not None:
+                    continue
+
+                object_ids.add(t["object_id"])
+
+        return list(object_ids)
 
     def get_tag_history(
         self, object_type: str, object_id: str, tag: Optional[str] = None
     ) -> List[Dict[str, Any]]:
-        """Get complete tag history for an object. (Stub - FASE 3)"""
-        raise NotImplementedError("Tag methods will be implemented in FASE 3")
+        """Get complete tag history for an object."""
+        all_tags = self._read_all_tags()
+
+        history = []
+        for t in all_tags:
+            if t["object_type"] == object_type and t["object_id"] == object_id:
+                if tag and t["tag"] != tag:
+                    continue
+
+                history.append({
+                    "tag": t["tag"],
+                    "applied_at": t["applied_at"],
+                    "applied_by": t["applied_by"],
+                    "removed_at": t.get("removed_at"),
+                    "removed_by": t.get("removed_by"),
+                    "metadata": t.get("metadata"),
+                    "is_active": t.get("removed_at") is None,
+                })
+
+        return history
 
     def get_tag_statistics(self, object_type: str) -> Dict[str, int]:
-        """Get statistics about tag usage. (Stub - FASE 3)"""
-        raise NotImplementedError("Tag methods will be implemented in FASE 3")
+        """Get statistics about tag usage."""
+        all_tags = self._read_all_tags()
+
+        stats = {}
+        for t in all_tags:
+            if t["object_type"] == object_type and t["removed_at"] is None:
+                tag_name = t["tag"]
+                if tag_name not in stats:
+                    stats[tag_name] = 0
+                stats[tag_name] += 1
+
+        # Sort by count descending, then by tag name
+        return dict(sorted(stats.items(), key=lambda x: (-x[1], x[0])))

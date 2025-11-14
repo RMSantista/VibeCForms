@@ -10,11 +10,13 @@ import os
 import sqlite3
 import shutil
 import logging
+import json
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 from datetime import datetime
 from persistence.base import BaseRepository
 from persistence.schema_detector import SchemaChangeDetector, ChangeType
+from utils.crockford import generate_id
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +107,40 @@ class SQLiteRepository(BaseRepository):
         # Replace slashes with underscores for SQL table names
         return form_path.replace("/", "_")
 
+    def _ensure_tags_table(self) -> None:
+        """Ensure the tags table exists in the database."""
+        create_sql = """
+        CREATE TABLE IF NOT EXISTS tags (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            object_type TEXT NOT NULL,
+            object_id TEXT NOT NULL,
+            tag TEXT NOT NULL,
+            applied_at TEXT NOT NULL,
+            applied_by TEXT NOT NULL,
+            removed_at TEXT,
+            removed_by TEXT,
+            metadata TEXT
+        )
+        """
+
+        index_sql = """
+        CREATE INDEX IF NOT EXISTS idx_tags_object ON tags(object_type, object_id);
+        CREATE INDEX IF NOT EXISTS idx_tags_tag ON tags(object_type, tag);
+        CREATE INDEX IF NOT EXISTS idx_tags_active ON tags(object_type, object_id, removed_at);
+        """
+
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute(create_sql)
+            cursor.executescript(index_sql)
+            conn.commit()
+            conn.close()
+            logger.debug("Tags table ensured")
+        except Exception as e:
+            logger.error(f"Failed to ensure tags table: {e}")
+            raise
+
     def create_storage(self, form_path: str, spec: Dict[str, Any]) -> bool:
         """Create storage (table) for the form."""
         table_name = self._get_table_name(form_path)
@@ -114,7 +150,10 @@ class SQLiteRepository(BaseRepository):
             return False
 
         # Build CREATE TABLE statement
-        columns = ["id INTEGER PRIMARY KEY AUTOINCREMENT"]
+        columns = [
+            "id INTEGER PRIMARY KEY AUTOINCREMENT",
+            "record_id TEXT UNIQUE NOT NULL",  # UUID Crockford Base32
+        ]
 
         for field in spec["fields"]:
             field_name = field["name"]
@@ -134,6 +173,12 @@ class SQLiteRepository(BaseRepository):
             conn = self._get_connection()
             cursor = conn.cursor()
             cursor.execute(create_sql)
+
+            # Create index on record_id for fast lookups
+            cursor.execute(
+                f"CREATE INDEX idx_{table_name}_record_id ON {table_name}(record_id)"
+            )
+
             conn.commit()
             conn.close()
 
@@ -155,7 +200,7 @@ class SQLiteRepository(BaseRepository):
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
-            cursor.execute(f"SELECT * FROM {table_name}")
+            cursor.execute(f"SELECT * FROM {table_name} ORDER BY id")
             rows = cursor.fetchall()
             conn.close()
 
@@ -203,22 +248,25 @@ class SQLiteRepository(BaseRepository):
 
     def create(
         self, form_path: str, spec: Dict[str, Any], data: Dict[str, Any]
-    ) -> bool:
-        """Insert a new record into the table."""
+    ) -> Optional[str]:
+        """Insert a new record into the table and return its UUID."""
         table_name = self._get_table_name(form_path)
 
         if not self.exists(form_path):
             self.create_storage(form_path, spec)
 
-        # Build INSERT statement
-        field_names = [field["name"] for field in spec["fields"]]
+        # Generate UUID
+        record_id = generate_id()
+
+        # Build INSERT statement (include record_id)
+        field_names = ["record_id"] + [field["name"] for field in spec["fields"]]
         placeholders = ", ".join(["?" for _ in field_names])
         columns = ", ".join(field_names)
 
         insert_sql = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
 
-        # Extract values in correct order
-        values = []
+        # Extract values (record_id first, then field values)
+        values = [record_id]
         for field in spec["fields"]:
             field_name = field["name"]
             field_type = field["type"]
@@ -242,12 +290,12 @@ class SQLiteRepository(BaseRepository):
             conn.commit()
             conn.close()
 
-            logger.debug(f"Inserted record into {table_name}")
-            return True
+            logger.debug(f"Inserted record {record_id} into {table_name}")
+            return record_id
 
         except Exception as e:
             logger.error(f"Failed to insert into {table_name}: {e}")
-            return False
+            return None
 
     def update(
         self, form_path: str, spec: Dict[str, Any], idx: int, data: Dict[str, Any]
@@ -266,7 +314,7 @@ class SQLiteRepository(BaseRepository):
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
-            cursor.execute(f"SELECT id FROM {table_name} LIMIT 1 OFFSET {idx}")
+            cursor.execute(f"SELECT id FROM {table_name} ORDER BY id LIMIT 1 OFFSET {idx}")
             row = cursor.fetchone()
 
             if not row:
@@ -323,7 +371,7 @@ class SQLiteRepository(BaseRepository):
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
-            cursor.execute(f"SELECT id FROM {table_name} LIMIT 1 OFFSET {idx}")
+            cursor.execute(f"SELECT id FROM {table_name} ORDER BY id LIMIT 1 OFFSET {idx}")
             row = cursor.fetchone()
 
             if not row:
@@ -1036,8 +1084,50 @@ class SQLiteRepository(BaseRepository):
     def read_by_id(
         self, form_path: str, spec: Dict[str, Any], record_id: str
     ) -> Optional[Dict[str, Any]]:
-        """Read a single record by its unique ID. (Stub - FASE 3)"""
-        raise NotImplementedError("ID-based methods will be implemented in FASE 3")
+        """Read a single record by its unique ID."""
+        table_name = self._get_table_name(form_path)
+
+        if not self.exists(form_path):
+            logger.debug(f"Table does not exist: {table_name}")
+            return None
+
+        # Build SELECT statement
+        field_names = [field["name"] for field in spec["fields"]]
+        columns = ", ".join(["record_id"] + field_names)
+
+        select_sql = f"SELECT {columns} FROM {table_name} WHERE record_id = ?"
+
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute(select_sql, (record_id,))
+            row = cursor.fetchone()
+            conn.close()
+
+            if not row:
+                logger.debug(f"No record found with ID {record_id} in {table_name}")
+                return None
+
+            # Convert row to dictionary
+            data = {"_record_id": row["record_id"]}
+            for field in spec["fields"]:
+                field_name = field["name"]
+                field_type = field["type"]
+                value = row[field_name]
+
+                # Convert based on field type
+                if field_type == "checkbox":
+                    data[field_name] = bool(value) if value else False
+                elif field_type == "number" or field_type == "range":
+                    data[field_name] = int(value) if value else 0
+                else:
+                    data[field_name] = str(value) if value else ""
+
+            return data
+
+        except Exception as e:
+            logger.error(f"Failed to read record {record_id} from {table_name}: {e}")
+            return None
 
     def update_by_id(
         self,
@@ -1046,14 +1136,90 @@ class SQLiteRepository(BaseRepository):
         record_id: str,
         data: Dict[str, Any],
     ) -> bool:
-        """Update an existing record by its ID. (Stub - FASE 3)"""
-        raise NotImplementedError("ID-based methods will be implemented in FASE 3")
+        """Update an existing record by its ID."""
+        table_name = self._get_table_name(form_path)
+
+        if not self.exists(form_path):
+            logger.error(f"Cannot update: table does not exist: {table_name}")
+            return False
+
+        # Build UPDATE statement
+        set_clauses = []
+        values = []
+
+        for field in spec["fields"]:
+            field_name = field["name"]
+            field_type = field["type"]
+            value = data.get(field_name, "")
+
+            set_clauses.append(f"{field_name} = ?")
+
+            # Convert based on field type
+            if field_type == "checkbox":
+                values.append(1 if value else 0)
+            elif field_type == "number" or field_type == "range":
+                try:
+                    values.append(int(value) if value else 0)
+                except ValueError:
+                    values.append(0)
+            else:
+                values.append(str(value) if value else "")
+
+        # Add record_id to WHERE clause
+        values.append(record_id)
+
+        set_sql = ", ".join(set_clauses)
+        update_sql = f"UPDATE {table_name} SET {set_sql} WHERE record_id = ?"
+
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute(update_sql, values)
+            rows_affected = cursor.rowcount
+            conn.commit()
+            conn.close()
+
+            if rows_affected == 0:
+                logger.warning(f"No record found with ID {record_id} in {table_name}")
+                return False
+
+            logger.debug(f"Updated record {record_id} in {table_name}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to update record {record_id} in {table_name}: {e}")
+            return False
 
     def delete_by_id(
         self, form_path: str, spec: Dict[str, Any], record_id: str
     ) -> bool:
-        """Delete a record by its unique ID. (Stub - FASE 3)"""
-        raise NotImplementedError("ID-based methods will be implemented in FASE 3")
+        """Delete a record by its unique ID."""
+        table_name = self._get_table_name(form_path)
+
+        if not self.exists(form_path):
+            logger.error(f"Cannot delete: table does not exist: {table_name}")
+            return False
+
+        delete_sql = f"DELETE FROM {table_name} WHERE record_id = ?"
+
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute(delete_sql, (record_id,))
+            rows_affected = cursor.rowcount
+            conn.commit()
+            conn.close()
+
+            if rows_affected == 0:
+                logger.warning(f"No record found with ID {record_id} in {table_name}")
+                return False
+
+            logger.debug(f"Deleted record {record_id} from {table_name}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to delete record {record_id} from {table_name}: {e}")
+            return False
 
     # =========================================================================
     # TAG MANAGEMENT METHODS (Stub implementations for FASE 3)
@@ -1067,37 +1233,260 @@ class SQLiteRepository(BaseRepository):
         applied_by: str,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> bool:
-        """Add a tag to an object. (Stub - FASE 3)"""
-        raise NotImplementedError("Tag methods will be implemented in FASE 3")
+        """Add a tag to an object."""
+        self._ensure_tags_table()
+
+        # Check if tag is already active
+        if self.has_tag(object_type, object_id, tag):
+            logger.debug(f"Tag '{tag}' already exists for {object_type}:{object_id}")
+            return False
+
+        applied_at = datetime.now().isoformat()
+        metadata_json = json.dumps(metadata) if metadata else None
+
+        insert_sql = """
+        INSERT INTO tags (object_type, object_id, tag, applied_at, applied_by, metadata)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """
+
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                insert_sql,
+                (object_type, object_id, tag, applied_at, applied_by, metadata_json),
+            )
+            conn.commit()
+            conn.close()
+
+            logger.debug(f"Added tag '{tag}' to {object_type}:{object_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to add tag '{tag}' to {object_type}:{object_id}: {e}")
+            return False
 
     def remove_tag(
         self, object_type: str, object_id: str, tag: str, removed_by: str
     ) -> bool:
-        """Remove a tag from an object. (Stub - FASE 3)"""
-        raise NotImplementedError("Tag methods will be implemented in FASE 3")
+        """Remove a tag from an object."""
+        self._ensure_tags_table()
+
+        # Check if tag exists and is active
+        if not self.has_tag(object_type, object_id, tag):
+            logger.debug(f"Tag '{tag}' not found for {object_type}:{object_id}")
+            return False
+
+        removed_at = datetime.now().isoformat()
+
+        update_sql = """
+        UPDATE tags
+        SET removed_at = ?, removed_by = ?
+        WHERE object_type = ? AND object_id = ? AND tag = ? AND removed_at IS NULL
+        """
+
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                update_sql, (removed_at, removed_by, object_type, object_id, tag)
+            )
+            conn.commit()
+            conn.close()
+
+            logger.debug(f"Removed tag '{tag}' from {object_type}:{object_id}")
+            return True
+
+        except Exception as e:
+            logger.error(
+                f"Failed to remove tag '{tag}' from {object_type}:{object_id}: {e}"
+            )
+            return False
 
     def get_tags(
         self, object_type: str, object_id: str, active_only: bool = True
     ) -> List[Dict[str, Any]]:
-        """Get all tags for an object. (Stub - FASE 3)"""
-        raise NotImplementedError("Tag methods will be implemented in FASE 3")
+        """Get all tags for an object."""
+        self._ensure_tags_table()
+
+        if active_only:
+            query_sql = """
+            SELECT tag, applied_at, applied_by, metadata
+            FROM tags
+            WHERE object_type = ? AND object_id = ? AND removed_at IS NULL
+            ORDER BY applied_at DESC
+            """
+            params = (object_type, object_id)
+        else:
+            query_sql = """
+            SELECT tag, applied_at, applied_by, removed_at, removed_by, metadata
+            FROM tags
+            WHERE object_type = ? AND object_id = ?
+            ORDER BY applied_at DESC
+            """
+            params = (object_type, object_id)
+
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute(query_sql, params)
+            rows = cursor.fetchall()
+            conn.close()
+
+            tags = []
+            for row in rows:
+                tag_data = {
+                    "tag": row["tag"],
+                    "applied_at": row["applied_at"],
+                    "applied_by": row["applied_by"],
+                    "metadata": json.loads(row["metadata"]) if row["metadata"] else None,
+                }
+
+                if not active_only:
+                    tag_data["removed_at"] = row.get("removed_at")
+                    tag_data["removed_by"] = row.get("removed_by")
+
+                tags.append(tag_data)
+
+            return tags
+
+        except Exception as e:
+            logger.error(f"Failed to get tags for {object_type}:{object_id}: {e}")
+            return []
 
     def has_tag(self, object_type: str, object_id: str, tag: str) -> bool:
-        """Check if an object has a specific tag. (Stub - FASE 3)"""
-        raise NotImplementedError("Tag methods will be implemented in FASE 3")
+        """Check if an object has a specific tag."""
+        self._ensure_tags_table()
+
+        query_sql = """
+        SELECT COUNT(*) FROM tags
+        WHERE object_type = ? AND object_id = ? AND tag = ? AND removed_at IS NULL
+        """
+
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute(query_sql, (object_type, object_id, tag))
+            count = cursor.fetchone()[0]
+            conn.close()
+
+            return count > 0
+
+        except Exception as e:
+            logger.error(f"Failed to check tag '{tag}' for {object_type}:{object_id}: {e}")
+            return False
 
     def get_objects_by_tag(
         self, object_type: str, tag: str, active_only: bool = True
     ) -> List[str]:
-        """Get all object IDs with a specific tag. (Stub - FASE 3)"""
-        raise NotImplementedError("Tag methods will be implemented in FASE 3")
+        """Get all object IDs with a specific tag."""
+        self._ensure_tags_table()
+
+        if active_only:
+            query_sql = """
+            SELECT DISTINCT object_id
+            FROM tags
+            WHERE object_type = ? AND tag = ? AND removed_at IS NULL
+            ORDER BY applied_at DESC
+            """
+        else:
+            query_sql = """
+            SELECT DISTINCT object_id
+            FROM tags
+            WHERE object_type = ? AND tag = ?
+            ORDER BY applied_at DESC
+            """
+
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute(query_sql, (object_type, tag))
+            rows = cursor.fetchall()
+            conn.close()
+
+            return [row["object_id"] for row in rows]
+
+        except Exception as e:
+            logger.error(f"Failed to get objects by tag '{tag}' for {object_type}: {e}")
+            return []
 
     def get_tag_history(
         self, object_type: str, object_id: str, tag: Optional[str] = None
     ) -> List[Dict[str, Any]]:
-        """Get complete tag history for an object. (Stub - FASE 3)"""
-        raise NotImplementedError("Tag methods will be implemented in FASE 3")
+        """Get complete tag history for an object."""
+        self._ensure_tags_table()
+
+        if tag:
+            query_sql = """
+            SELECT tag, applied_at, applied_by, removed_at, removed_by, metadata
+            FROM tags
+            WHERE object_type = ? AND object_id = ? AND tag = ?
+            ORDER BY applied_at DESC
+            """
+            params = (object_type, object_id, tag)
+        else:
+            query_sql = """
+            SELECT tag, applied_at, applied_by, removed_at, removed_by, metadata
+            FROM tags
+            WHERE object_type = ? AND object_id = ?
+            ORDER BY applied_at DESC
+            """
+            params = (object_type, object_id)
+
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute(query_sql, params)
+            rows = cursor.fetchall()
+            conn.close()
+
+            history = []
+            for row in rows:
+                history.append(
+                    {
+                        "tag": row["tag"],
+                        "applied_at": row["applied_at"],
+                        "applied_by": row["applied_by"],
+                        "removed_at": row["removed_at"],
+                        "removed_by": row["removed_by"],
+                        "metadata": json.loads(row["metadata"])
+                        if row["metadata"]
+                        else None,
+                        "is_active": row["removed_at"] is None,
+                    }
+                )
+
+            return history
+
+        except Exception as e:
+            logger.error(f"Failed to get tag history for {object_type}:{object_id}: {e}")
+            return []
 
     def get_tag_statistics(self, object_type: str) -> Dict[str, int]:
-        """Get statistics about tag usage. (Stub - FASE 3)"""
-        raise NotImplementedError("Tag methods will be implemented in FASE 3")
+        """Get statistics about tag usage."""
+        self._ensure_tags_table()
+
+        query_sql = """
+        SELECT tag, COUNT(DISTINCT object_id) as count
+        FROM tags
+        WHERE object_type = ? AND removed_at IS NULL
+        GROUP BY tag
+        ORDER BY count DESC, tag ASC
+        """
+
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute(query_sql, (object_type,))
+            rows = cursor.fetchall()
+            conn.close()
+
+            statistics = {}
+            for row in rows:
+                statistics[row["tag"]] = row["count"]
+
+            return statistics
+
+        except Exception as e:
+            logger.error(f"Failed to get tag statistics for {object_type}: {e}")
+            return {}

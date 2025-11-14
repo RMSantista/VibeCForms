@@ -38,7 +38,10 @@ def test_write_and_read_forms(tmp_path):
 
     write_forms(forms, spec, str(test_file))
     result = read_forms(spec, str(test_file))
-    assert result == forms
+
+    # Filter out _record_id from results for comparison (UUID field added in FASE 3)
+    result_clean = [{k: v for k, v in r.items() if k != "_record_id"} for r in result]
+    assert result_clean == forms
 
 
 def test_update_form(tmp_path):

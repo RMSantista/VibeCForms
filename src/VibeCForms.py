@@ -723,7 +723,24 @@ def index(form_name):
 
         # Save the form
         try:
-            forms = read_forms(spec, form_name)
+            # Use repository directly to create new record
+            repo = RepositoryFactory.get_repository(form_name)
+
+            # Auto-create storage if it doesn't exist
+            if not repo.exists(form_name):
+                repo.create_storage(form_name, spec)
+
+            # Create the new record
+            record_id = repo.create(form_name, spec, form_data)
+
+            if record_id:
+                logger.info(f"Created new record {record_id} in {form_name}")
+            else:
+                logger.error(f"Failed to create record in {form_name}")
+
+            # Update tracking
+            update_form_tracking(form_name, spec, len(repo.read_all(form_name, spec)))
+
         except Exception as e:
             # Check if migration is required
             if str(e).startswith("MIGRATION_REQUIRED:"):
@@ -731,8 +748,6 @@ def index(form_name):
                 return redirect(f"/migrate/confirm/{form_path}")
             raise
 
-        forms.append(form_data)
-        write_forms(forms, spec, form_name)
         return redirect(f"/{form_name}")
 
     # GET request - show the form
@@ -1008,8 +1023,14 @@ def edit(form_name, idx):
             )
 
         # Update the form
-        forms[idx] = form_data
-        write_forms(forms, spec, form_name)
+        repo = RepositoryFactory.get_repository(form_name)
+        success = repo.update(form_name, spec, idx, form_data)
+
+        if success:
+            logger.info(f"Updated record {idx} in {form_name}")
+        else:
+            logger.error(f"Failed to update record {idx} in {form_name}")
+
         return redirect(f"/{form_name}")
 
     # GET request - show edit form
@@ -1028,13 +1049,23 @@ def edit(form_name, idx):
 @app.route("/<path:form_name>/delete/<int:idx>")
 def delete(form_name, idx):
     spec = load_spec(form_name)
-    forms = read_forms(spec, form_name)
 
+    # Use repository directly to delete record
+    repo = RepositoryFactory.get_repository(form_name)
+
+    # Verify record exists
+    forms = repo.read_all(form_name, spec)
     if idx < 0 or idx >= len(forms):
         return "Formulário não encontrado", 404
 
-    forms.pop(idx)
-    write_forms(forms, spec, form_name)
+    # Delete the record
+    success = repo.delete(form_name, spec, idx)
+
+    if success:
+        logger.info(f"Deleted record {idx} from {form_name}")
+    else:
+        logger.error(f"Failed to delete record {idx} from {form_name}")
+
     return redirect(f"/{form_name}")
 
 
