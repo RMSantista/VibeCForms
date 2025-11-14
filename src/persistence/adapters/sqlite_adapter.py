@@ -65,7 +65,7 @@ class SQLiteRepository(BaseRepository):
                 - timeout: Connection timeout in seconds (default: 10)
                 - check_same_thread: SQLite check_same_thread parameter
         """
-        self.database = config.get("database", "src/vibecforms.db")
+        self.database = config.get("database", "data/sqlite/vibecforms.db")
         self.timeout = config.get("timeout", 10)
         self.check_same_thread = config.get("check_same_thread", False)
 

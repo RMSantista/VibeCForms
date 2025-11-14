@@ -38,12 +38,12 @@ class TxtRepository(BaseRepository):
 
         Args:
             config: Configuration dictionary with:
-                - path: Directory for data files (default: 'src/')
+                - path: Directory for data files (default: 'data/txt/')
                 - delimiter: Field delimiter (default: ';')
                 - encoding: File encoding (default: 'utf-8')
                 - extension: File extension (default: '.txt')
         """
-        self.path = config.get("path", "src/")
+        self.path = config.get("path", "data/txt/")
         self.delimiter = config.get("delimiter", ";")
         self.encoding = config.get("encoding", "utf-8")
         self.extension = config.get("extension", ".txt")
