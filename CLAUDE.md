@@ -527,6 +527,56 @@ All operations use the index position in the forms list (not a unique ID) to ide
 
 ---
 
+### Business Case Architecture
+
+VibeCForms supports multiple isolated business cases, each with its own configuration, data, and form specifications.
+
+**Business Case Structure:**
+```
+examples/<business-case-name>/
+├── specs/              # Form specifications (JSON files)
+│   ├── form1.json
+│   ├── form2.json
+│   └── folder/
+│       └── nested_form.json
+├── config/             # Configuration files
+│   ├── persistence.json
+│   └── schema_history.json
+├── templates/          # Custom templates (optional, falls back to src/templates/)
+│   ├── index.html
+│   ├── form.html
+│   └── fields/
+│       └── *.html
+├── data/               # Data storage
+│   ├── *.txt           # TXT backend files
+│   └── vibecforms.db   # SQLite database
+└── backups/            # Migration backups
+    └── migrations/
+
+```
+
+**Available Business Cases:**
+- `examples/ponto-de-vendas/` - Point of Sale system (produtos, contatos, financeiro)
+- `examples/processo-seletivo/` - Recruitment process (rh/funcionarios, rh/departamentos)
+- `examples/demo/` - Demo forms (formulario_completo, usuarios)
+- `examples/analise-laboratorial/` - Laboratory analysis (empty template)
+
+**Key Features:**
+- Complete isolation between business cases
+- Each case has its own data, specs, and configuration
+- Templates can be customized per business case
+- Easy to create new business cases by copying structure
+
+**Creating a New Business Case:**
+1. Create directory structure: `examples/my-business-case/{specs,config,data,backups/migrations}`
+2. Copy templates (optional): `cp -r src/templates examples/my-business-case/`
+3. Create `config/persistence.json` with backend configuration
+4. Create `config/schema_history.json` (empty `{}` initially)
+5. Add form specs to `specs/` directory
+6. Run: `uv run app examples/my-business-case`
+
+---
+
 ## Development Commands
 
 ### Install dependencies
@@ -537,15 +587,25 @@ uv run pre-commit install  # Install git hooks for code quality checks
 
 ### Run the application (development mode)
 ```bash
-uv run hatch run dev
+uv run app examples/ponto-de-vendas
+# or
+uv run dev examples/processo-seletivo
+# or
+python src/VibeCForms.py examples/demo
 ```
 The server starts on `http://0.0.0.0:5000` with debug mode enabled
 
+**Note:** You must specify a business case path. The application will show an error and list available business cases if you don't provide one.
+
 ### Run the application (production mode with Gunicorn)
 ```bash
-uv run hatch run serve
+BUSINESS_CASE_PATH=examples/ponto-de-vendas uv run hatch run serve
+# or
+BUSINESS_CASE_PATH=examples/demo gunicorn -w 4 -b 0.0.0.0:5000 wsgi:app
 ```
 Runs with 4 workers on `http://0.0.0.0:5000`
+
+**Note:** For production, set the `BUSINESS_CASE_PATH` environment variable to specify which business case to run.
 
 ### Run all tests
 ```bash

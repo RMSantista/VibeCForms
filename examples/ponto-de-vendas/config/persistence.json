@@ -1,0 +1,33 @@
+{
+  "version": "1.0",
+  "default_backend": "txt",
+
+  "backends": {
+    "txt": {
+      "type": "txt",
+      "path": "data/",
+      "delimiter": ";",
+      "encoding": "utf-8",
+      "extension": ".txt"
+    },
+
+    "sqlite": {
+      "type": "sqlite",
+      "database": "data/vibecforms.db",
+      "timeout": 10,
+      "check_same_thread": false
+    }
+  },
+
+  "form_mappings": {
+    "contatos": "sqlite",
+    "produtos": "sqlite",
+    "financeiro/pagamentos": "sqlite",
+    "*": "default_backend"
+  },
+
+  "auto_create_storage": true,
+  "auto_migrate_schema": true,
+  "backup_before_migrate": true,
+  "backup_path": "backups/migrations/"
+}
