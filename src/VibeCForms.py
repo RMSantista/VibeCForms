@@ -4,6 +4,7 @@ import json
 import logging
 import argparse
 from pathlib import Path
+from typing import Optional, Dict, Any, List
 from flask import (
     Flask,
     render_template,
@@ -25,6 +26,9 @@ from persistence.change_manager import (
     ChangeManager,
 )
 from persistence.migration_manager import MigrationManager
+from utils.spec_loader import load_spec, set_specs_dir
+from services.tag_service import TagService
+from services.kanban_service import get_kanban_service
 
 load_dotenv()
 
@@ -32,11 +36,20 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Global variables for business case paths (set during initialization)
-BUSINESS_CASE_ROOT = None
-SPECS_DIR = None
-TEMPLATE_DIR = None
+# Default fallback directories (src-relative)
+DATA_FILE = os.path.join(os.path.dirname(__file__), "registros.txt")
+FALLBACK_SPECS_DIR = os.path.join(os.path.dirname(__file__), "specs")
 FALLBACK_TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")
+
+# Active directories (will be set by initialize_app or default to fallback)
+SPECS_DIR = FALLBACK_SPECS_DIR
+TEMPLATE_DIR = FALLBACK_TEMPLATE_DIR
+BUSINESS_CASE_ROOT = None
+
+# Table column widths (percentage)
+TABLE_FIELDS_TOTAL_WIDTH = 60
+TABLE_TAGS_WIDTH = 15
+TABLE_ACTIONS_WIDTH = 25
 
 # Create app with fallback template directory (will be updated during initialization)
 app = Flask(__name__, template_folder=FALLBACK_TEMPLATE_DIR)
@@ -92,6 +105,9 @@ def initialize_app(business_case_path):
     if not os.path.isdir(SPECS_DIR):
         print(f"Error: specs/ directory not found in {BUSINESS_CASE_ROOT}")
         sys.exit(1)
+
+    # Configure spec loader to use business case specs directory
+    set_specs_dir(SPECS_DIR)
 
     # Template directory is optional (will fallback to src/templates)
     if not os.path.isdir(TEMPLATE_DIR):
@@ -158,37 +174,6 @@ def read_template(template_name):
         return f.read()
 
 
-def load_spec(form_path):
-    """Load and validate a form specification file.
-
-    Args:
-        form_path: Path to form (can include subdirectories, e.g., 'financeiro/contas')
-    """
-    spec_path = os.path.join(SPECS_DIR, f"{form_path}.json")
-    if not os.path.exists(spec_path):
-        abort(404, description=f"Form specification '{form_path}' not found")
-
-    with open(spec_path, "r", encoding="utf-8") as f:
-        spec = json.load(f)
-
-    # Validate required spec fields
-    if "title" not in spec or "fields" not in spec:
-        abort(500, description=f"Invalid spec file for '{form_path}'")
-
-    return spec
-
-
-def get_data_file(form_path):
-    """Get the data file path for a given form.
-
-    Args:
-        form_path: Path to form (can include subdirectories, e.g., 'financeiro/contas')
-    """
-    # Replace slashes with underscores for flat file storage
-    safe_name = form_path.replace("/", "_")
-    return os.path.join(os.path.dirname(__file__), f"{safe_name}.txt")
-
-
 def get_folder_icon(folder_name):
     """Get an intuitive icon for a folder based on its name."""
     icons = {
@@ -204,7 +189,7 @@ def get_folder_icon(folder_name):
     return icons.get(folder_name.lower(), "fa-folder")
 
 
-def load_folder_config(folder_path):
+def load_folder_config(folder_path: str) -> Optional[Dict[str, Any]]:
     """Load folder configuration from _folder.json if it exists.
 
     Args:
@@ -218,7 +203,14 @@ def load_folder_config(folder_path):
         try:
             with open(config_path, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except Exception:
+        except FileNotFoundError:
+            logger.warning(f"Config file not found: {config_path}")
+            return None
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON in config {config_path}: {e}")
+            return None
+        except PermissionError as e:
+            logger.error(f"Permission denied reading {config_path}: {e}")
             return None
     return None
 
@@ -357,7 +349,7 @@ def get_all_forms_flat(menu_items=None, prefix=""):
     return forms
 
 
-def read_forms(spec, form_path):
+def read_forms(spec: Dict[str, Any], form_path: str) -> List[Dict[str, Any]]:
     """Read forms using configured persistence backend.
 
     Args:
@@ -601,23 +593,49 @@ def generate_form_field(field, form_data=None):
         )
 
 
-def generate_table_headers(spec):
+def generate_table_headers(spec: Dict[str, Any]) -> str:
     """Generate table headers from spec."""
     headers = ""
+
+    # Calculate width for fields (TABLE_FIELDS_TOTAL_WIDTH% total, divided by number of fields)
     num_fields = len(spec["fields"])
-    col_width = int(75 / num_fields)  # Reserve 25% for actions
+    col_width = (
+        int(TABLE_FIELDS_TOTAL_WIDTH / num_fields)
+        if num_fields > 0
+        else TABLE_FIELDS_TOTAL_WIDTH
+    )
 
     for field in spec["fields"]:
         headers += f'<th style="width: {col_width}%;">{field["label"]}</th>\n'
 
-    headers += '<th style="width: 25%;">Ações</th>'
+    # Tags column (TABLE_TAGS_WIDTH% width)
+    headers += f'<th style="width: {TABLE_TAGS_WIDTH}%;">Tags</th>\n'
+
+    # Actions column (TABLE_ACTIONS_WIDTH% width)
+    headers += f'<th style="width: {TABLE_ACTIONS_WIDTH}%;">Ações</th>'
     return headers
 
 
-def generate_table_row(form_data, spec, idx, form_name):
-    """Generate a table row from form data."""
+def generate_table_row(
+    form_data: Dict[str, Any], spec: Dict[str, Any], form_name: str
+) -> str:
+    """
+    Generate a table row from form data.
+
+    Args:
+        form_data: Dictionary with form field values (must include '_record_id')
+        spec: Form specification
+        form_name: Path to the form
+
+    Returns:
+        HTML string for table row
+    """
     cells = ""
 
+    # Extract record_id from form data (used for edit/delete/tags links)
+    record_id = form_data.get("_record_id", "")
+
+    # Generate cells for each field
     for field in spec["fields"]:
         field_name = field["name"]
         field_type = field["type"]
@@ -647,11 +665,29 @@ def generate_table_row(form_data, spec, idx, form_name):
 
         cells += f"<td>{display_value}</td>\n"
 
+    # Tags column with add/remove functionality
+    tags_html = f"""<td class="tags-cell" data-record-id="{record_id}" data-form-name="{form_name}">
+        <div class="tags-container" id="tags-{record_id}" style="margin-bottom:5px;">
+            <!-- Tags will be loaded here -->
+        </div>
+        <div style="display:flex;gap:3px;">
+            <input type="text" class="tag-input" placeholder="Nova tag"
+                   style="flex:1;padding:3px 5px;font-size:11px;border:1px solid #bbb;border-radius:3px;"
+                   onkeypress="if(event.key===\\'Enter\\'){{event.preventDefault();addTag(\\'{record_id}\\',\\'{form_name}\\',this.value);this.value=\\'\\';}}">
+            <button class="icon-btn" onclick="event.preventDefault();var input=this.previousElementSibling;addTag(\\'{record_id}\\',\\'{form_name}\\',input.value);input.value=\\'\\'"
+                    style="padding:3px 6px;font-size:11px;" title="Adicionar tag">
+                <i class="fa fa-plus"></i>
+            </button>
+        </div>
+    </td>"""
+    cells += tags_html
+
+    # Use record_id instead of index for edit/delete links
     cells += f"""<td>
-        <form action="/{form_name}/edit/{idx}" method="get" style="display:inline;">
+        <form action="/{form_name}/edit/{record_id}" method="get" style="display:inline;">
             <button class="icon-btn edit" title="Editar"><i class="fa fa-pencil-alt"></i></button>
         </form>
-        <form action="/{form_name}/delete/{idx}" method="get" style="display:inline;" onsubmit="return confirm('Confirma exclusão?');">
+        <form action="/{form_name}/delete/{record_id}" method="get" style="display:inline;" onsubmit="return confirm('Confirma exclusão?');">
             <button class="icon-btn delete" title="Excluir"><i class="fa fa-trash"></i></button>
         </form>
     </td>"""
@@ -762,6 +798,15 @@ def main_page():
     return render_template("index.html", forms=forms)
 
 
+@app.route("/tags/manager")
+def tags_manager():
+    """Display the tags management page."""
+    forms = get_all_forms_flat()
+    menu_items = scan_specs_directory()
+    menu_html = generate_menu_html(menu_items, "")
+    return render_template("tags_manager.html", forms=forms, menu_html=menu_html)
+
+
 @app.route("/<path:form_name>", methods=["GET", "POST"])
 def index(form_name):
     spec = load_spec(form_name)
@@ -802,10 +847,7 @@ def index(form_name):
             )
             table_headers = generate_table_headers(spec)
             table_rows = "".join(
-                [
-                    generate_table_row(forms[i], spec, i, form_name)
-                    for i in range(len(forms))
-                ]
+                [generate_table_row(form, spec, form_name) for form in forms]
             )
 
             return render_template(
@@ -821,7 +863,24 @@ def index(form_name):
 
         # Save the form
         try:
-            forms = read_forms(spec, form_name)
+            # Use repository directly to create new record
+            repo = RepositoryFactory.get_repository(form_name)
+
+            # Auto-create storage if it doesn't exist
+            if not repo.exists(form_name):
+                repo.create_storage(form_name, spec)
+
+            # Create the new record
+            record_id = repo.create(form_name, spec, form_data)
+
+            if record_id:
+                logger.info(f"Created new record {record_id} in {form_name}")
+            else:
+                logger.error(f"Failed to create record in {form_name}")
+
+            # Update tracking
+            update_form_tracking(form_name, spec, len(repo.read_all(form_name, spec)))
+
         except Exception as e:
             # Check if migration is required
             if str(e).startswith("MIGRATION_REQUIRED:"):
@@ -829,8 +888,6 @@ def index(form_name):
                 return redirect(f"/migrate/confirm/{form_path}")
             raise
 
-        forms.append(form_data)
-        write_forms(forms, spec, form_name)
         return redirect(f"/{form_name}")
 
     # GET request - show the form
@@ -845,9 +902,7 @@ def index(form_name):
 
     form_fields = "".join([generate_form_field(f) for f in spec["fields"]])
     table_headers = generate_table_headers(spec)
-    table_rows = "".join(
-        [generate_table_row(forms[i], spec, i, form_name) for i in range(len(forms))]
-    )
+    table_rows = "".join([generate_table_row(form, spec, form_name) for form in forms])
 
     return render_template(
         "form.html",
@@ -1045,36 +1100,57 @@ def migrate_execute(form_path):
 
         # Update tracking
         if success:
-            update_form_tracking(form_path, spec, record_count)
-            logger.info(f"Migration completed successfully for '{form_path}'")
+            logger.info(f"Updating form tracking for '{form_path}'...")
+            tracking_updated = update_form_tracking(form_path, spec, record_count)
+            if tracking_updated:
+                logger.info(f"✅ Form tracking updated successfully for '{form_path}'")
+            else:
+                logger.warning(f"⚠️  Failed to update form tracking for '{form_path}'")
+            logger.info(f"✅ Migration completed successfully for '{form_path}'")
 
     except Exception as e:
         success = False
         error_message = f"Erro durante migração: {str(e)}"
-        logger.error(error_message)
+        logger.error(f"❌ Migration error: {error_message}")
 
     # Redirect back to form with success/error message
-    # TODO: Add flash messages for better UX
     if success:
+        logger.info(f"Redirecting to /{form_path}...")
         return redirect(f"/{form_path}")
     else:
-        # For now, just show error in logs and redirect
         logger.error(f"Migration failed: {error_message}")
         return redirect(f"/{form_path}")
 
 
-@app.route("/<path:form_name>/edit/<int:idx>", methods=["GET", "POST"])
-def edit(form_name, idx):
+@app.route("/<path:form_name>/edit/<record_id>", methods=["GET", "POST"])
+def edit(form_name, record_id):
+    """
+    Edit a record by UUID.
+
+    Args:
+        form_name: Path to the form
+        record_id: 27-character Crockford Base32 UUID of the record
+    """
+    # Validate ID format (27 characters, valid Crockford Base32)
+    from utils.crockford import validate_id
+
+    if not validate_id(record_id):
+        return "ID inválido (formato ou checksum incorreto)", 400
+
     spec = load_spec(form_name)
-    forms = read_forms(spec, form_name)
     error = ""
 
     # Generate dynamic menu
     menu_items = scan_specs_directory()
     menu_html = generate_menu_html(menu_items, form_name)
 
-    if idx < 0 or idx >= len(forms):
-        return "Formulário não encontrado", 404
+    # Get repository
+    repo = RepositoryFactory.get_repository(form_name)
+
+    # Read the record by ID
+    record = repo.read_by_id(form_name, spec, record_id)
+    if not record:
+        return "Registro não encontrado", 404
 
     if request.method == "POST":
         # Collect form data
@@ -1103,15 +1179,21 @@ def edit(form_name, idx):
                 menu_html=menu_html,
                 error=error,
                 form_fields=form_fields,
+                record_id=record_id,
             )
 
-        # Update the form
-        forms[idx] = form_data
-        write_forms(forms, spec, form_name)
+        # Update the record by ID
+        success = repo.update_by_id(form_name, spec, record_id, form_data)
+
+        if success:
+            logger.info(f"Updated record {record_id} in {form_name}")
+        else:
+            logger.error(f"Failed to update record {record_id} in {form_name}")
+
         return redirect(f"/{form_name}")
 
     # GET request - show edit form
-    form_fields = "".join([generate_form_field(f, forms[idx]) for f in spec["fields"]])
+    form_fields = "".join([generate_form_field(f, record) for f in spec["fields"]])
 
     return render_template(
         "edit.html",
@@ -1120,31 +1202,430 @@ def edit(form_name, idx):
         menu_html=menu_html,
         error="",
         form_fields=form_fields,
+        record_id=record_id,
     )
 
 
-@app.route("/<path:form_name>/delete/<int:idx>")
-def delete(form_name, idx):
+@app.route("/<path:form_name>/delete/<record_id>")
+def delete(form_name, record_id):
+    """
+    Delete a record by UUID.
+
+    Args:
+        form_name: Path to the form
+        record_id: 27-character Crockford Base32 UUID of the record
+    """
+    # Validate ID format (27 characters, valid Crockford Base32)
+    from utils.crockford import validate_id
+
+    if not validate_id(record_id):
+        return "ID inválido (formato ou checksum incorreto)", 400
+
     spec = load_spec(form_name)
-    forms = read_forms(spec, form_name)
 
-    if idx < 0 or idx >= len(forms):
-        return "Formulário não encontrado", 404
+    # Get repository
+    repo = RepositoryFactory.get_repository(form_name)
 
-    forms.pop(idx)
-    write_forms(forms, spec, form_name)
+    # Verify record exists by trying to read it
+    record = repo.read_by_id(form_name, spec, record_id)
+    if not record:
+        return "Registro não encontrado", 404
+
+    # Delete the record by ID
+    success = repo.delete_by_id(form_name, spec, record_id)
+
+    if success:
+        logger.info(f"Deleted record {record_id} from {form_name}")
+    else:
+        logger.error(f"Failed to delete record {record_id} from {form_name}")
+
     return redirect(f"/{form_name}")
 
 
-# Keep old routes for backward compatibility
-@app.route("/edit/<int:idx>", methods=["GET", "POST"])
-def old_edit(idx):
-    return redirect(f"/contatos/edit/{idx}")
+# Old index-based routes removed - all forms now use UUID-based routes
+# Use /<form_name>/edit/<record_id> and /<form_name>/delete/<record_id>
 
 
-@app.route("/delete/<int:idx>")
-def old_delete(idx):
-    return redirect(f"/contatos/delete/{idx}")
+# =============================================================================
+# TAG MANAGEMENT API ENDPOINTS (FASE 6 - Phase 3: Tag API & Service Layer)
+# =============================================================================
+
+# Initialize TagService
+tag_service = TagService()
+
+# Initialize KanbanService
+kanban_service = get_kanban_service()
+
+
+@app.route("/api/<path:form_name>/tags/<record_id>", methods=["POST"])
+def api_add_tag(form_name, record_id):
+    """
+    Add a tag to a record.
+
+    POST /api/contatos/tags/5FQR8V9JMF8SKT2EGTC90X7G1WW
+    Body: {"tag": "importante", "applied_by": "user123", "metadata": {"reason": "vip"}}
+
+    Returns:
+        JSON response with success status
+    """
+    try:
+        data = request.get_json()
+        tag = data.get("tag")
+        applied_by = data.get("applied_by", "unknown")
+        metadata = data.get("metadata", None)
+
+        if not tag:
+            return jsonify({"success": False, "error": "Tag is required"}), 400
+
+        # Validate ID format
+        from utils.crockford import validate_id
+
+        if not validate_id(record_id):
+            return jsonify({"success": False, "error": "Invalid ID format"}), 400
+
+        success = tag_service.add_tag(form_name, record_id, tag, applied_by, metadata)
+
+        if success:
+            logger.info(f"Tag '{tag}' added to {form_name}:{record_id} by {applied_by}")
+            return jsonify({"success": True, "tag": tag, "record_id": record_id})
+        else:
+            return (
+                jsonify(
+                    {"success": False, "error": "Tag already exists or failed to add"}
+                ),
+                409,
+            )
+
+    except Exception as e:
+        logger.error(f"Error adding tag: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/<path:form_name>/tags/<record_id>/<tag>", methods=["DELETE"])
+def api_remove_tag(form_name, record_id, tag):
+    """
+    Remove a tag from a record.
+
+    DELETE /api/contatos/tags/5FQR8V9JMF8SKT2EGTC90X7G1WW/importante
+
+    Returns:
+        JSON response with success status
+    """
+    try:
+        # Validate ID format
+        from utils.crockford import validate_id
+
+        if not validate_id(record_id):
+            return jsonify({"success": False, "error": "Invalid ID format"}), 400
+
+        # Get removed_by from query param or default to 'unknown'
+        removed_by = request.args.get("removed_by", "unknown")
+
+        success = tag_service.remove_tag(form_name, record_id, tag, removed_by)
+
+        if success:
+            logger.info(
+                f"Tag '{tag}' removed from {form_name}:{record_id} by {removed_by}"
+            )
+            return jsonify({"success": True, "tag": tag, "record_id": record_id})
+        else:
+            return jsonify({"success": False, "error": "Tag not found"}), 404
+
+    except Exception as e:
+        logger.error(f"Error removing tag: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/<path:form_name>/tags/<record_id>", methods=["GET"])
+def api_get_tags(form_name, record_id):
+    """
+    Get all tags for a record.
+
+    GET /api/contatos/tags/5FQR8V9JMF8SKT2EGTC90X7G1WW
+
+    Returns:
+        JSON response with list of tags
+    """
+    try:
+        # Validate ID format
+        from utils.crockford import validate_id
+
+        if not validate_id(record_id):
+            return jsonify({"success": False, "error": "Invalid ID format"}), 400
+
+        tags = tag_service.get_tags(form_name, record_id)
+
+        return jsonify({"success": True, "record_id": record_id, "tags": tags})
+
+    except Exception as e:
+        logger.error(f"Error getting tags: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/<path:form_name>/tags/<record_id>/history", methods=["GET"])
+def api_get_tag_history(form_name, record_id):
+    """
+    Get tag history for a record (including removed tags).
+
+    GET /api/contatos/tags/5FQR8V9JMF8SKT2EGTC90X7G1WW/history
+
+    Returns:
+        JSON response with full tag history
+    """
+    try:
+        # Validate ID format
+        from utils.crockford import validate_id
+
+        if not validate_id(record_id):
+            return jsonify({"success": False, "error": "Invalid ID format"}), 400
+
+        # Get all tags including removed ones
+        tags = tag_service.get_tags(form_name, record_id, active_only=False)
+
+        return jsonify({"success": True, "record_id": record_id, "history": tags})
+
+    except Exception as e:
+        logger.error(f"Error getting tag history: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/<path:form_name>/search/tags", methods=["GET"])
+def api_search_by_tag(form_name):
+    """
+    Search for objects by tag.
+
+    GET /api/contatos/search/tags?tag=importante
+
+    Returns:
+        JSON response with list of object IDs that have the tag
+    """
+    try:
+        tag = request.args.get("tag", "").strip()
+
+        if not tag:
+            return (
+                jsonify({"success": False, "error": "Tag parameter is required"}),
+                400,
+            )
+
+        # Get all objects with this tag
+        object_ids = tag_service.get_objects_with_tag(form_name, tag)
+
+        # If we need full object data, fetch it from repository
+        include_data = request.args.get("include_data", "false").lower() == "true"
+
+        if include_data:
+            spec = load_spec(form_name)
+            repo = RepositoryFactory.get_repository(form_name)
+            objects = []
+
+            for obj_id in object_ids:
+                obj_data = repo.read_by_id(form_name, spec, obj_id)
+                if obj_data:
+                    objects.append(obj_data)
+
+            return jsonify(
+                {"success": True, "tag": tag, "count": len(objects), "objects": objects}
+            )
+        else:
+            return jsonify(
+                {
+                    "success": True,
+                    "tag": tag,
+                    "count": len(object_ids),
+                    "object_ids": object_ids,
+                }
+            )
+
+    except Exception as e:
+        logger.error(f"Error searching by tag: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# =============================================================================
+# KANBAN BOARD ENDPOINTS (FASE 8 - Sistema de Kanban Visual)
+# =============================================================================
+
+
+@app.route("/kanban/<board_name>")
+def kanban_board(board_name):
+    """
+    Display a Kanban board.
+
+    GET /kanban/sales_pipeline
+
+    Returns:
+        Rendered Kanban board HTML page
+    """
+    try:
+        # Load board configuration
+        board_config = kanban_service.load_board_config(board_name)
+
+        if not board_config:
+            return f"Board '{board_name}' not found", 404
+
+        # Render kanban template
+        return render_template(
+            "kanban.html",
+            board_name=board_name,
+            board_title=board_config.get("title", board_name.replace("_", " ").title()),
+            board_config=board_config,
+        )
+
+    except Exception as e:
+        logger.error(f"Error displaying Kanban board '{board_name}': {e}")
+        return f"Error loading board: {str(e)}", 500
+
+
+@app.route("/api/kanban/boards")
+def api_kanban_boards():
+    """
+    List all available Kanban boards.
+
+    GET /api/kanban/boards
+
+    Returns:
+        JSON response with list of boards
+    """
+    try:
+        boards = kanban_service.get_available_boards()
+
+        return jsonify({"success": True, "boards": boards})
+
+    except Exception as e:
+        logger.error(f"Error listing Kanban boards: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/kanban/<board_name>/cards")
+def api_kanban_cards(board_name):
+    """
+    Get all cards for a Kanban board organized by columns.
+
+    GET /api/kanban/sales_pipeline/cards
+
+    Returns:
+        JSON response with cards organized by column tags
+    """
+    try:
+        # Load board configuration
+        board_config = kanban_service.load_board_config(board_name)
+
+        if not board_config:
+            return (
+                jsonify({"success": False, "error": f"Board '{board_name}' not found"}),
+                404,
+            )
+
+        # Get all cards organized by column
+        cards = kanban_service.get_all_board_cards(board_name)
+
+        return jsonify({"success": True, "board": board_name, "cards": cards})
+
+    except Exception as e:
+        logger.error(f"Error getting cards for board '{board_name}': {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/kanban/<board_name>/move", methods=["POST"])
+def api_kanban_move(board_name):
+    """
+    Move a card between columns (tag transition).
+
+    POST /api/kanban/sales_pipeline/move
+    Body: {
+        "record_id": "5FQR8V9JMF8SKT2EGTC90X7G1WW",
+        "from_tag": "qualified",
+        "to_tag": "proposal",
+        "actor": "user123"
+    }
+
+    Returns:
+        JSON response with success status
+    """
+    try:
+        # Load board configuration
+        board_config = kanban_service.load_board_config(board_name)
+
+        if not board_config:
+            return (
+                jsonify({"success": False, "error": f"Board '{board_name}' not found"}),
+                404,
+            )
+
+        # Get request data
+        data = request.get_json()
+        record_id = data.get("record_id")
+        from_tag = data.get("from_tag")
+        to_tag = data.get("to_tag")
+        actor = data.get("actor", "unknown")
+
+        # Validate required fields
+        if not record_id or not from_tag or not to_tag:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "error": "Missing required fields: record_id, from_tag, to_tag",
+                    }
+                ),
+                400,
+            )
+
+        # Validate ID format
+        from utils.crockford import validate_id
+
+        if not validate_id(record_id):
+            return jsonify({"success": False, "error": "Invalid ID format"}), 400
+
+        # Validate move is allowed on this board
+        if not kanban_service.validate_move(board_name, from_tag, to_tag):
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "error": f"Invalid move: {from_tag} -> {to_tag} not allowed on this board",
+                    }
+                ),
+                400,
+            )
+
+        # Get form path from board config
+        form_path = board_config.get("form")
+        if not form_path:
+            return (
+                jsonify({"success": False, "error": "Board has no form configured"}),
+                500,
+            )
+
+        # Move the card
+        success = kanban_service.move_card(
+            form_path,
+            record_id,
+            from_tag,
+            to_tag,
+            actor,
+            metadata={"board": board_name},
+        )
+
+        if success:
+            logger.info(
+                f"Card moved on board '{board_name}': {record_id} from {from_tag} to {to_tag} by {actor}"
+            )
+            return jsonify(
+                {
+                    "success": True,
+                    "record_id": record_id,
+                    "from_tag": from_tag,
+                    "to_tag": to_tag,
+                }
+            )
+        else:
+            return jsonify({"success": False, "error": "Failed to move card"}), 500
+
+    except Exception as e:
+        logger.error(f"Error moving card on board '{board_name}': {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 if __name__ == "__main__":

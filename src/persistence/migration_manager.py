@@ -100,37 +100,48 @@ class MigrationManager:
             return False
 
         try:
+            import time
+
+            migration_start = time.time()
+
             # Step 1: Read all data from old backend
-            logger.info(f"Reading data from {old_backend} backend...")
+            logger.info(f"⏱️  Reading data from {old_backend} backend...")
+            step_start = time.time()
             old_data = old_repo.read_all(form_path, spec)
+            read_time = time.time() - step_start
 
             if not old_data:
                 logger.info("No data to migrate")
                 # Still successful - just no data
                 return True
 
-            logger.info(f"Read {len(old_data)} records from {old_backend}")
+            logger.info(
+                f"✅ Read {len(old_data)} records from {old_backend} in {read_time:.2f}s"
+            )
 
             # Step 2: Create storage in new backend if needed
             if not new_repo.exists(form_path):
-                logger.info(f"Creating storage in {new_backend} backend...")
+                logger.info(f"⏱️  Creating storage in {new_backend} backend...")
+                step_start = time.time()
                 if not new_repo.create_storage(form_path, spec):
                     raise Exception(
                         f"Failed to create storage in {new_backend} backend"
                     )
+                create_time = time.time() - step_start
+                logger.info(f"✅ Created storage in {create_time:.2f}s")
 
-            # Step 3: Migrate each record to new backend
-            logger.info(f"Migrating records to {new_backend} backend...")
-            migration_errors = 0
+            # Step 3: Migrate records to new backend using bulk operation
+            logger.info(
+                f"⏱️  Migrating {len(old_data)} records to {new_backend} backend..."
+            )
+            step_start = time.time()
 
-            for i, record in enumerate(old_data):
-                try:
-                    if not new_repo.create(form_path, spec, record):
-                        migration_errors += 1
-                        logger.warning(f"Failed to migrate record {i}")
-                except Exception as e:
-                    migration_errors += 1
-                    logger.warning(f"Error migrating record {i}: {e}")
+            # Use bulk_create for significantly better performance
+            migrated_ids = new_repo.bulk_create(form_path, spec, old_data)
+            migrate_time = time.time() - step_start
+
+            # Count errors (None values in result)
+            migration_errors = sum(1 for id in migrated_ids if id is None)
 
             # Check if too many errors occurred
             total_records = len(old_data)
@@ -141,10 +152,15 @@ class MigrationManager:
                         f"Too many migration errors: {migration_errors}/{total_records} "
                         f"({error_rate*100:.1f}%)"
                     )
+                logger.warning(f"⚠️  {migration_errors} records failed to migrate")
+
+            logger.info(f"✅ Migrated in {migrate_time:.2f}s")
 
             # Step 4: Verify migration
-            logger.info(f"Verifying migration...")
+            logger.info(f"⏱️  Verifying migration...")
+            step_start = time.time()
             new_data = new_repo.read_all(form_path, spec)
+            verify_time = time.time() - step_start
 
             if len(new_data) != len(old_data):
                 raise Exception(
@@ -152,10 +168,13 @@ class MigrationManager:
                     f"got {len(new_data)}"
                 )
 
+            total_time = time.time() - migration_start
+            logger.info(f"✅ Verified in {verify_time:.2f}s")
+
             # Migration successful
             logger.info(
-                f"Successfully migrated {len(old_data)} records from {old_backend} to {new_backend} "
-                f"({migration_errors} warnings)"
+                f"✅ Successfully migrated {len(old_data)} records from {old_backend} to {new_backend} "
+                f"in {total_time:.2f}s total ({migration_errors} warnings)"
             )
 
             # Optional: Drop old storage (commented out for safety)

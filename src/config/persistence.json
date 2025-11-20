@@ -1,23 +1,21 @@
 {
   "version": "1.0",
   "default_backend": "txt",
-
+  "data_root": "data",
   "backends": {
     "txt": {
       "type": "txt",
-      "path": "src/",
+      "path": "data/txt/",
       "delimiter": ";",
       "encoding": "utf-8",
       "extension": ".txt"
     },
-
     "sqlite": {
       "type": "sqlite",
-      "database": "src/vibecforms.db",
+      "database": "data/sqlite/vibecforms.db",
       "timeout": 10,
       "check_same_thread": false
     },
-
     "mysql": {
       "type": "mysql",
       "host": "localhost",
@@ -28,7 +26,6 @@
       "charset": "utf8mb4",
       "pool_size": 5
     },
-
     "postgres": {
       "type": "postgres",
       "host": "localhost",
@@ -39,7 +36,6 @@
       "schema": "public",
       "pool_size": 5
     },
-
     "mongodb": {
       "type": "mongodb",
       "host": "localhost",
@@ -48,40 +44,34 @@
       "user": "",
       "password": "${MONGO_PASSWORD}"
     },
-
     "csv": {
       "type": "csv",
-      "path": "src/data/csv/",
+      "path": "data/csv/",
       "delimiter": ",",
       "encoding": "utf-8",
       "quoting": "minimal"
     },
-
     "json": {
       "type": "json",
-      "path": "src/data/json/",
+      "path": "data/json/",
       "encoding": "utf-8",
       "indent": 2
     },
-
     "xml": {
       "type": "xml",
-      "path": "src/data/xml/",
+      "path": "data/xml/",
       "encoding": "utf-8",
       "pretty_print": true
     }
   },
-
   "form_mappings": {
-    "contatos": "sqlite",
     "produtos": "sqlite",
-    "rh/departamentos/areas": "sqlite",
     "financeiro/pagamentos": "sqlite",
-    "*": "default_backend"
+    "*": "default_backend",
+    "usuarios": "sqlite"
   },
-
   "auto_create_storage": true,
   "auto_migrate_schema": true,
   "backup_before_migrate": true,
-  "backup_path": "src/backups/"
+  "backup_path": "data/backups/migrations/"
 }

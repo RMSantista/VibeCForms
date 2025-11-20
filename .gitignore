@@ -29,6 +29,13 @@ _private_*
 # Pasta de testes do pytest
 htmlcov/
 .cache/
+data/txt/tests/
+_tmp_pytest*
+
+# Banco de dados SQLite (dados dinâmicos)
+data/sqlite/*.db
+data/sqlite/*.db-journal
+data/sqlite/*.db-wal
 
 # Claude Code - manter skills e commands versionados
 # mas ignorar arquivos temporários/gerados

@@ -2214,3 +2214,276 @@ A suite de testes garante a **qualidade e confiabilidade** do sistema de persist
 
 ---
 
+## Prompt 24 - Plano Arquitetural: Tags as State + UUID Migration (Versão 4.0)
+
+**Ferramenta:** Claude Code (claude.ai/code) + Skill Arquiteto
+**Modelo:** Claude Sonnet 4.5
+**Data:** Janeiro 2025
+**Branch:** dev-wk-essential
+
+### Contexto:
+
+O VibeCForms v3.0 implementou com sucesso o sistema de persistência plugável, mas ainda utiliza:
+- **IDs baseados em índice** (anti-pattern identificado em TECH_DEBT.md #5)
+- **Nenhum suporte a Tags** (Convenção #4 não implementada)
+- **Dados em `src/`** (violação de separação de responsabilidades)
+
+### Solicitação Original:
+
+"Efetue um plano usando a Skill Arquiteto, para implementar o task-tag-as-state.md e o TECH_DEBIT.md. Siga a filosofia contida no README.md"
+
+**Requisitos Específicos:**
+
+**Cuidados no Desenvolvimento:**
+- Desenvolvimento em etapas
+- Todos os métodos com IDs sequenciais devem migrar para UUID
+- Cada etapa: codificar → testar → corrigir → revisar → testar geral (100% pass) → homologar → aprovar → documentar → lint → commit → push
+
+**Cuidados de Migração:**
+- Sistema não trabalhará mais com IDs sequenciais
+- Formulários no SQLite: IDs sequenciais → UUID
+- Formulários em TXT: recebem mesmo UUID do SQLite (se existir) ou novo UUID
+- Formulários sem BD: ganham novo UUID como primeiro campo
+
+**Cuidado com a Arquitetura:**
+- Criar pasta `data/` no mesmo nível de `src/`
+- Mover TODOS os arquivos de dados para `data/`
+- Atualizar todas as referências
+
+### Plano Arquitetural Gerado:
+
+**Documento Completo:** `docs/planning/workflow/essential/tags-as-state-uuid-migration-plan.md`
+
+**Visão Geral - 7 Fases:**
+
+**FASE 0: Reorganização da Arquitetura de Dados** (1 dia)
+- Criar estrutura `data/txt/`, `data/sqlite/`, `data/backups/`
+- Mover todos `.txt` e `.db` de `src/` para `data/`
+- Atualizar `persistence.json` com novos caminhos
+- Atualizar adapters e VibeCForms.py
+- Critério: Todos os 16 testes passam
+
+**FASE 1: Implementar Sistema Crockford Base32** (2 dias)
+- Criar `src/utils/crockford.py`
+- Funções: encode_uuid(), generate_id(), validate_id(), decode_id()
+- Formato: 27 caracteres (26 UUID + 1 check digit mod 32)
+- Exemplo: `3HNMQR8PJSG0C9VWBYTE12K`
+- Critério: 15+ testes unitários passando
+
+**FASE 2: Atualizar BaseRepository Interface** (1 dia)
+- REMOVER: read_one(idx), update(idx), delete(idx)
+- ADICIONAR: read_by_id(id), update_by_id(id), delete_by_id(id)
+- ADICIONAR: add_tag(), remove_tag(), get_tags(), has_tag(), get_objects_by_tag()
+
+**FASE 3: Implementar Adapters com UUID e Tags** (3 dias)
+- TxtAdapter: Formato `ID;nome;telefone;...`
+- SQLiteAdapter: `id TEXT PRIMARY KEY` + tabela `tags`
+- Criar arquivos `<form>_tags.txt` para TXT backend
+- Schema tags: object_type, object_id, tag, applied_at, applied_by, metadata
+
+**FASE 4: Scripts de Migração de Dados** (2 dias)
+- `migrate_sqlite_to_uuids.py` - Migra tabelas SQLite
+- `migrate_txt_to_uuids.py` - Migra arquivos TXT
+- `sync_txt_sqlite_ids.py` - Sincroniza IDs entre backends
+- Gerar `id_mapping.json` para rastreabilidade
+- Múltiplos backups em cada etapa
+
+**FASE 5: Atualizar Application Layer** (2 dias)
+- Criar `src/services/tag_service.py`
+- Atualizar rotas: `/<form>/edit/<id>` (não mais `<int:idx>`)
+- Criar rotas API: POST/GET/DELETE `/api/<form>/tags/<id>`
+- Validar IDs Crockford em todas as operações
+
+**FASE 6: Atualizar Templates** (1 dia)
+- Adicionar coluna "ID" nas tabelas
+- Adicionar coluna "Tags" com badges
+- Mostrar IDs em fonte monospace
+- Interface para adicionar/remover tags
+
+**FASE 7: Testes e Validação** (2 dias)
+- Atualizar 16 testes existentes (idx → id)
+- Criar 20+ testes de tags
+- Criar 10+ testes de migração
+- Validação manual: count antes = count depois
+
+**Total Estimado:** 14 dias úteis (~3 semanas)
+
+### Arquitetura de Dados Proposta:
+
+**Sistema de IDs Crockford Base32:**
+```
+Formato: 27 caracteres
+Exemplo: 3HNMQR8PJSG0C9VWBYTE12K
+         └────────┬────────┘└┘
+           26 UUID chars    1 check digit
+
+Character Set: 0123456789ABCDEFGHJKMNPQRSTVWXYZ (sem I, L, O, U)
+Check Digit: Módulo 32 (variação VibeCForms - sem símbolos especiais)
+```
+
+**Nova Estrutura de Diretórios:**
+```
+VibeCForms/
+├── src/                    # Código APENAS
+│   ├── VibeCForms.py
+│   ├── persistence/
+│   ├── services/          # NOVO: tag_service.py
+│   ├── utils/             # NOVO: crockford.py
+│   ├── templates/
+│   ├── specs/
+│   └── config/
+├── data/                   # NOVO: Dados APENAS
+│   ├── txt/               # Arquivos TXT com UUIDs
+│   ├── sqlite/            # Bancos SQLite
+│   └── backups/           # Backups de migrações
+├── scripts/               # Scripts de migração
+└── tests/                 # 45+ testes novos
+```
+
+**Schema Tags (SQLite):**
+```sql
+CREATE TABLE tags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    object_type TEXT NOT NULL,     -- 'contatos', 'produtos'
+    object_id TEXT NOT NULL,        -- Crockford ID
+    tag TEXT NOT NULL,              -- 'lead', 'qualified'
+    applied_at TEXT NOT NULL,       -- ISO 8601
+    applied_by TEXT NOT NULL,       -- 'user_123' ou 'ai_agent'
+    metadata TEXT,                  -- JSON
+    UNIQUE(object_type, object_id, tag)
+);
+
+CREATE INDEX idx_tags_object_id ON tags(object_id);
+CREATE INDEX idx_tags_tag ON tags(tag);
+CREATE INDEX idx_tags_object_type_tag ON tags(object_type, tag);
+```
+
+**Formato TXT com Tags:**
+```
+# contatos.txt
+3HNMQR8PJSG0C9VWBYTE12K;Nicole Carvalho;+55 31 4736 1125;True
+
+# contatos_tags.txt
+3HNMQR8PJSG0C9VWBYTE12K;lead;2025-01-15T10:30:00;user_123;{}
+3HNMQR8PJSG0C9VWBYTE12K;qualified;2025-01-16T14:20:00;ai_agent;{"confidence":0.85}
+```
+
+### Estratégia de Migração:
+
+**Prioridades:**
+1. SEGURANÇA MÁXIMA - Múltiplos backups
+2. RASTREABILIDADE - Logs detalhados
+3. VALIDAÇÃO - Verificações em cada etapa
+4. ROLLBACK - Plano de reversão
+
+**Sincronização TXT-SQLite:**
+- SQLite é fonte verdade para IDs
+- Registros TXT recebem mesmo UUID do SQLite (match por campos)
+- Se não houver match, gerar novo UUID
+- Salvar `id_mapping.json` para auditoria
+
+**Backups por Fase:**
+```
+data/backups/migrations/
+├── pre_reorganization/           # Fase 0
+├── pre_uuid_sqlite/              # Fase 4.1
+├── pre_uuid_txt/                 # Fase 4.2
+├── pre_sync/                     # Fase 4.3
+├── contatos_id_mapping.json      # Rastreabilidade
+└── migration_log.json            # Log completo
+```
+
+### Métricas de Sucesso:
+
+- ✅ 100% dos dados migrados (nenhum registro perdido)
+- ✅ Todos os IDs válidos (Crockford + checksum)
+- ✅ Zero duplicação de IDs
+- ✅ Dados em `data/` (nenhum em `src/`)
+- ✅ Tags funcionais (TXT + SQLite)
+- ✅ Todos os testes passando (40+ testes)
+- ✅ Sincronização TXT-SQLite (mesmos IDs para mesmos registros)
+- ✅ Backward compatibility = 0 (sem suporte a índices)
+
+### Deliverables:
+
+**Código (7 novos arquivos):**
+1. `src/utils/crockford.py`
+2. `src/services/tag_service.py`
+3. `scripts/migrate_data_folder.py`
+4. `scripts/migrate_sqlite_to_uuids.py`
+5. `scripts/migrate_txt_to_uuids.py`
+6. `scripts/sync_txt_sqlite_ids.py`
+7. `scripts/validate_migration.py`
+
+**Código (7 modificações):**
+1. `src/persistence/base.py`
+2. `src/persistence/adapters/txt_adapter.py`
+3. `src/persistence/adapters/sqlite_adapter.py`
+4. `src/VibeCForms.py`
+5. `src/templates/form.html`
+6. `src/templates/edit.html`
+7. `src/config/persistence.json`
+
+**Testes (45+ novos):**
+1. `tests/test_crockford.py` (15+)
+2. `tests/test_tags.py` (20+)
+3. `tests/test_migration.py` (10+)
+4. Atualização de `tests/test_form.py` (16 existentes)
+
+**Documentação (6 novos/atualizados):**
+1. `docs/crockford_ids.md` (novo)
+2. `docs/tags_guide.md` (novo)
+3. `docs/migration_guide.md` (novo)
+4. `docs/planning/workflow/essential/tags-as-state-uuid-migration-plan.md` (novo)
+5. `README.md` (atualizado - Convenção #4)
+6. `TECH_DEBT.md` (itens 1, 4, 5 marcados como completos)
+7. `docs/prompts.md` (este prompt)
+
+### Processo de Desenvolvimento:
+
+Cada fase segue rigorosamente:
+
+1. **Codificar** → Implementar funcionalidade
+2. **Testar** → Criar/executar testes específicos
+3. **Corrigir** → Resolver erros encontrados
+4. **Revisar** → Verificar qualidade do código
+5. **Testar Geral** → Executar TODOS os testes (100% pass)
+6. **Homologar** → Revisão humana
+7. **Aprovar** → Marcar como concluída
+8. **Documentar** → Atualizar docs relevantes
+9. **Lint** → Formatar código (ruff/black)
+10. **Commit** → Mensagem descritiva
+11. **Push** → Enviar para GitHub
+
+### Riscos e Mitigações:
+
+| Risco | Probabilidade | Mitigação |
+|-------|---------------|-----------|
+| Perda de dados | Baixa | Múltiplos backups automáticos |
+| IDs duplicados | Média | Validação em cada etapa |
+| Testes não passam | Alta | Atualização incremental |
+| Incompatibilidade TXT-SQLite | Média | Script dedicado de sync |
+
+### Próximos Passos Pós-Implementação:
+
+Após completar este plano, implementar:
+1. **Convenção #5**: Kanbans para State Transitions
+2. **Convenção #6**: Uniform Actor Interface (API Python para IA)
+3. **Convenção #7**: Tag-Based Notifications
+4. **Convenção #3**: Relationship Tables completo
+
+### Status Atual:
+
+**Fase 0:** 🔄 EM PROGRESSO
+- Criação de estrutura `data/`
+- Script de migração de diretórios
+- Atualização de configurações
+
+**Fases 1-7:** ⏳ PENDENTE
+
+### Impacto:
+
+A **Versão 4.0** transformará o VibeCForms de um sistema CRUD com persistência plugável para um **framework completo de process tracking com Tags as State**, implementando a Convenção #4 e resolvendo o anti-pattern de IDs baseados em índice (TECH_DEBT.md #5), mantendo a filosofia "Convention → Configuration → Code".
+
+---
+
