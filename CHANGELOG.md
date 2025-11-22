@@ -1,5 +1,385 @@
 # Changelog
 
+## Version 4.0.0 - UUID System, Tags as State & Kanban Visual (2025-11-22)
+
+### Overview
+Esta versão marca uma evolução fundamental no VibeCForms, implementando três pilares essenciais da arquitetura de workflow: **sistema de identificação único (UUID)**, **tags como estados (Tags as State - Convention #4)** e **interface visual Kanban**. Estas features transformam o VibeCForms de um sistema CRUD simples para uma plataforma completa de rastreamento de processos colaborativos entre humanos, agentes de IA e código.
+
+**Merged via PR #23** - dev-wk-essential → main (2025-11-19)
+
+**Estatísticas**:
+- 13.410 linhas adicionadas, 922 deletadas
+- 79 arquivos modificados
+- 138 testes passando (0 falhando, 4 skipped)
+- 100% backward compatible
+
+---
+
+### 🆔 Feature #1: UUID System (Crockford Base32)
+
+#### Identificação Única de Registros
+Migração completa de índices para IDs únicos baseados em UUID com encoding Crockford Base32, eliminando race conditions e permitindo sistemas distribuídos.
+
+**Formato do ID:**
+- 27 caracteres (26 UUID + 1 check digit)
+- Character set: `0123456789ABCDEFGHJKMNPQRSTVWXYZ` (exclui I, L, O, U)
+- Exemplo: `3HNMQR8PJSG0C9VWBYTE12K`
+- URL-safe, human-readable, case-insensitive input
+
+**Arquivos Criados:**
+- `src/utils/crockford.py` (316 linhas) - Encoder/decoder Crockford Base32
+- `src/utils/__init__.py` - Utils package
+- `docs/crockford_ids.md` (500 linhas) - Documentação completa do sistema
+- `tests/test_crockford.py` (288 linhas) - Suite completa de testes
+- `scripts/demo_crockford.py` (286 linhas) - Script de demonstração
+- `scripts/migrate_add_uuids.py` (173 linhas) - Script de migração
+
+**Implementação:**
+
+**BaseRepository Interface** (`src/persistence/base.py`):
+- ✅ Novos métodos UUID-based:
+  - `read_by_id(form_path, spec, record_id)` - Leitura por ID
+  - `update_by_id(form_path, spec, record_id, data)` - Atualização por ID
+  - `delete_by_id(form_path, spec, record_id)` - Deleção por ID
+  - `id_exists(form_path, record_id)` - Verificação de existência
+- ⚠️ Métodos index-based marcados como deprecated:
+  - `read_one(idx)` → usar `read_by_id()`
+  - `update(idx, data)` → usar `update_by_id()`
+  - `delete(idx)` → usar `delete_by_id()`
+
+**TXT Backend** (`src/persistence/adapters/txt_adapter.py`):
+- Novo formato: `UUID;field1;field2;...` (ID na primeira coluna)
+- Suporte completo a operações UUID
+- Mantém backward compatibility para leitura
+
+**SQLite Backend** (`src/persistence/adapters/sqlite_adapter.py`):
+- Schema: `id TEXT PRIMARY KEY` (27 caracteres)
+- Remoção de AUTOINCREMENT
+- Índices otimizados para busca por ID
+
+**Application Layer** (`src/VibeCForms.py`):
+- Rotas atualizadas: `/<form>/edit/<id>`, `/<form>/delete/<id>`
+- Validação de check digit antes de operações
+- Display de IDs em fonte monospace (copyable)
+
+**Benefits:**
+- ✅ Eliminação de race conditions
+- ✅ Suporte a sistemas distribuídos
+- ✅ IDs podem ser gerados offline
+- ✅ Detecção de erros via check digit
+- ✅ URLs mais descritivos e debugáveis
+
+---
+
+### 🏷️ Feature #2: Tags as State System (Convention #4)
+
+#### Sistema Completo de Tags para Workflow
+Implementação da Convention #4 do VibeCForms: "Tags as State" - objetos movem através de estados representados por tags, permitindo colaboração entre humanos, AI agents e subsistemas.
+
+**Arquivos Criados:**
+- `src/services/tag_service.py` (522 linhas) - Serviço de gerenciamento de tags
+- `src/templates/tags_manager.html` (517 linhas) - Interface web de gerenciamento
+- `docs/tags_guide.md` (747 linhas) - Guia completo de uso
+- `docs/homologacao_tags.md` (537 linhas) - Documentação de homologação
+- `tests/test_tags_api.py` (468 linhas) - 18 testes de API
+- `tests/test_tags_e2e.py` (441 linhas) - 21 testes end-to-end
+
+**TagService API:**
+
+**Core Operations:**
+```python
+tag_service.add_tag(form_path, object_id, tag, applied_by, metadata=None)
+tag_service.remove_tag(form_path, object_id, tag, removed_by)
+tag_service.has_tag(form_path, object_id, tag) → bool
+tag_service.get_tags(form_path, object_id) → List[Dict]
+tag_service.get_objects_by_tag(form_path, tag) → List[str]
+tag_service.transition(form_path, object_id, from_tag, to_tag, applied_by)
+```
+
+**REST Endpoints:**
+- `GET /tags/manager` - Interface de gerenciamento completa
+- `GET /api/<form>/tags/<id>` - Obter todas as tags de um objeto
+- `POST /api/<form>/tags/<id>` - Adicionar tag (body: `{"tag": "qualified", "applied_by": "user"}`)
+- `DELETE /api/<form>/tags/<id>/<tag>` - Remover tag específica
+- `GET /api/<form>/tags/<id>/history` - Histórico completo de tags (incluindo removidas)
+- `GET /api/<form>/search/tags?tag=<tag>` - Buscar objetos por tag
+
+**BaseRepository Interface Extensions:**
+- `add_tag(object_type, object_id, tag, applied_by, metadata)` - Adicionar tag
+- `remove_tag(object_type, object_id, tag, removed_by)` - Remover tag
+- `has_tag(object_type, object_id, tag)` - Verificar tag
+- `get_tags(object_type, object_id)` - Obter tags ativas
+- `get_objects_by_tag(object_type, tag)` - Buscar por tag
+- `get_tag_history(object_type, object_id)` - Histórico completo
+
+**TXT Backend - Tags Storage:**
+- Arquivo: `<form>_tags.txt`
+- Formato: `object_id;tag;applied_at;applied_by;removed_at;removed_by;metadata_json`
+- Preserva histórico completo de tags
+
+**SQLite Backend - Tags Storage:**
+- Tabela global: `tags`
+- Schema: `id, object_type, object_id, tag, applied_at, applied_by, removed_at, removed_by, metadata`
+- Índices: `idx_object_id`, `idx_tag`, `idx_object_type_tag`
+
+**Features:**
+- ✅ Tags representam estados de workflow (lead → qualified → proposal → closed)
+- ✅ Múltiplas tags por objeto
+- ✅ Histórico completo preservado (audit trail)
+- ✅ Validação de nomes (lowercase, números, underscore apenas)
+- ✅ Metadata opcional para contexto adicional
+- ✅ State transitions atômicas
+- ✅ Interface web dedicada para gerenciamento
+
+---
+
+### 📊 Feature #3: Kanban Visual System
+
+#### Interface Visual Drag & Drop para Workflow
+Sistema completo de Kanban boards configuráveis para visualizar e gerenciar transições de estado via tags.
+
+**Arquivos Criados:**
+- `src/services/kanban_service.py` (368 linhas) - Lógica de negócio Kanban
+- `src/templates/kanban.html` (426 linhas) - Interface visual drag & drop
+- `src/config/kanban_boards.json` (40 linhas) - Configuração de boards
+- `docs/KANBAN_README.md` (323 linhas) - Documentação completa
+- `tests/test_kanban.py` (336 linhas) - 25 testes unitários
+
+**KanbanService (Singleton):**
+```python
+kanban_service.load_board(board_name) → Dict
+kanban_service.get_column_cards(board_name, column_tag, form_path) → List[Dict]
+kanban_service.move_card(board_name, object_id, from_column, to_column, moved_by) → bool
+kanban_service.validate_transition(board_name, from_column, to_column) → bool
+```
+
+**Configuration** (`kanban_boards.json`):
+```json
+{
+  "sales_pipeline": {
+    "name": "Sales Pipeline",
+    "description": "Manage deals through sales stages",
+    "object_type": "deals",
+    "columns": [
+      {"tag": "lead", "label": "Leads", "color": "#6c757d"},
+      {"tag": "qualified", "label": "Qualified", "color": "#0d6efd"},
+      {"tag": "proposal", "label": "Proposal", "color": "#ffc107"},
+      {"tag": "closed", "label": "Closed Won", "color": "#198754"}
+    ]
+  }
+}
+```
+
+**REST Endpoints:**
+- `GET /kanban/<board_name>` - Interface visual do board
+- `POST /api/kanban/<board_name>/move` - Mover card (body: `{"object_id": "...", "from_column": "lead", "to_column": "qualified", "moved_by": "user"}`)
+
+**Features:**
+- ✅ Drag & drop nativo para mover cards entre colunas
+- ✅ Configuração declarativa via JSON
+- ✅ Colunas representam tags (estados)
+- ✅ Cards mostram informações do objeto
+- ✅ Cores customizáveis por coluna
+- ✅ Validação de transições permitidas
+- ✅ Singleton pattern para consistência
+- ✅ Integração total com TagService
+
+---
+
+### 🔧 Feature #4: Data Architecture Reorganization
+
+#### Migração src/ → data/
+Reorganização da estrutura de dados para separar código fonte de dados persistidos.
+
+**Nova Estrutura:**
+```
+data/
+├── txt/                    # TXT backend files
+│   ├── contatos.txt
+│   ├── produtos.txt
+│   └── ...
+├── sqlite/                 # SQLite databases
+│   └── vibecforms.db
+└── backups/               # Backup files
+    ├── migrations/        # Migration backups
+    └── full_backup_*/     # Full system backups
+```
+
+**Script de Migração:**
+- `scripts/migrate_data_folder.py` (324 linhas)
+- Backup automático antes da migração
+- Log detalhado em JSON
+- Rollback capability
+
+**Benefits:**
+- ✅ Separação clara entre código e dados
+- ✅ Facilita backups
+- ✅ Simplifica .gitignore
+- ✅ Melhor organização multi-backend
+
+---
+
+### 🏢 Feature #5: Multi-Business Case Architecture
+
+#### Suporte a Múltiplos Casos de Uso Isolados
+Sistema para executar múltiplas instâncias isoladas do VibeCForms, cada uma com suas próprias specs, dados e configurações.
+
+**Business Case Structure:**
+```
+examples/<business-case-name>/
+├── specs/              # Form specifications
+├── config/             # Configuration files
+│   ├── persistence.json
+│   ├── kanban_boards.json
+│   └── schema_history.json
+├── templates/          # Custom templates (optional)
+├── data/              # Data storage
+│   ├── txt/
+│   ├── sqlite/
+│   └── backups/
+```
+
+**Available Business Cases:**
+- `examples/ponto-de-vendas/` - Point of Sale system
+- `examples/processo-seletivo/` - Recruitment process
+- `examples/demo/` - Demo forms with Kanban and Tags
+- `examples/analise-laboratorial/` - Laboratory analysis (template)
+
+**Running a Business Case:**
+```bash
+uv run app examples/ponto-de-vendas
+# or
+python src/VibeCForms.py examples/demo
+```
+
+**Features:**
+- ✅ Complete isolation between cases
+- ✅ Independent data, specs, and configuration
+- ✅ Template customization per case
+- ✅ Easy to create new cases
+
+---
+
+### 🐛 Bug Fixes & Improvements
+
+#### Critical Performance Fix
+- **Issue**: Browser freezing on pages with 23+ records
+- **Cause**: Automatic inline tag loading doing simultaneous AJAX for all records
+- **Fix**: Disabled automatic inline loading, users use dedicated Tags Manager
+- **File**: `src/templates/form.html:194-212`
+
+#### SQLite Adapter Fixes
+- Fixed `delete_by_id` using list comprehension (critical bug)
+- Added field name validation against SQL injection
+- Improved exception handling (specific vs generic)
+- Added type hints for critical methods
+
+#### Code Quality
+- 10 arquivos reformatados com Black
+- Constantes nomeadas para legibilidade
+- Melhoria em documentação inline
+- Remoção de código morto
+
+---
+
+### 📈 Testing & Quality
+
+**Test Coverage:**
+- 138 testes passando, 0 falhando, 4 skipped
+- 25 testes de Kanban (unit tests)
+- 18 testes de Tags API (endpoint tests)
+- 21 testes de Tags E2E (end-to-end tests)
+- 33 testes de Crockford encoding
+- Performance benchmarks inclusos
+
+**Benchmark Results** (`tests/benchmark_performance.py`):
+- Tag operations: < 10ms (SQLite), < 5ms (TXT)
+- UUID generation: < 1ms
+- Kanban load: < 50ms (100 cards)
+
+---
+
+### 📚 Documentation
+
+**New Documentation Files:**
+- `docs/crockford_ids.md` (500 linhas) - UUID system guide
+- `docs/tags_guide.md` (747 linhas) - Tags as State complete guide
+- `docs/KANBAN_README.md` (323 linhas) - Kanban system guide
+- `docs/homologacao_tags.md` (537 linhas) - Tags homologation docs
+- `docs/MIGRATION.md` (658 linhas) - Migration guide
+- `docs/essential/tags-as-state-uuid-migration-plan.md` (454 linhas) - Planning docs
+
+**Updated Documentation:**
+- `CLAUDE.md` - Extended with UUID, Tags, and Kanban conventions
+- `README.md` - Updated with new features and examples
+- `ARCHITECTURE.md` → `docs/ARCHITECTURE.md` (reorganized)
+
+---
+
+### 🔄 Breaking Changes
+
+**NONE** - Esta versão é 100% backward compatible:
+- ✅ Métodos index-based ainda funcionam (deprecated)
+- ✅ Formato TXT antigo pode ser lido
+- ✅ Rotas antigas continuam funcionando
+- ✅ Todos os 138 testes passando
+
+**Deprecation Warnings:**
+- Index-based methods (`read_one`, `update`, `delete`) serão removidos na v5.0
+- Recomendado migrar para UUID-based methods
+
+---
+
+### 🎯 Migration Path
+
+**Para Migrar de v3.0 para v4.0:**
+
+1. **Sem ação necessária** - sistema é backward compatible
+2. **Opcional**: Migrar dados para usar UUIDs:
+   ```bash
+   python scripts/migrate_add_uuids.py
+   ```
+3. **Opcional**: Configurar Tags para seus formulários
+4. **Opcional**: Criar Kanban boards em `config/kanban_boards.json`
+
+---
+
+### 🚀 Upgrade Instructions
+
+**Atualizar VibeCForms:**
+```bash
+git pull origin main
+uv sync
+uv run hatch run test  # Verificar que tudo está OK
+```
+
+**Explorar Novas Features:**
+```bash
+# Executar demo business case com Kanban e Tags
+uv run app examples/demo
+
+# Acessar:
+# - http://127.0.0.1:5000/tags/manager - Tags Manager
+# - http://127.0.0.1:5000/kanban/sales_pipeline - Kanban Board
+```
+
+---
+
+### 🎉 Summary
+
+**Version 4.0.0** transforma VibeCForms de um framework CRUD simples para uma **plataforma completa de rastreamento de processos colaborativos**:
+
+✅ **UUID System** - Identificação única, distribuída e confiável
+✅ **Tags as State** - Estados explícitos, queryable e auditáveis
+✅ **Kanban Visual** - Interface intuitiva para gerenciar workflows
+✅ **Multi-Business Cases** - Suporte a múltiplos casos de uso isolados
+✅ **138 Testes** - Cobertura completa e qualidade garantida
+✅ **Zero Breaking Changes** - Migração suave e segura
+
+**Próximos Passos**: Implementação de notificações baseadas em tags e interfaces de AI agents (v5.0)
+
+---
+
 ## Version 3.0 - Sistema de Persistência Plugável
 
 ### Overview
