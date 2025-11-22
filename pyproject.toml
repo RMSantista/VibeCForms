@@ -53,3 +53,8 @@ addopts = [
 ]
 # Pytest exit codes: 0 (all passed), 1 (tests failed), 5 (no tests collected)
 # Skipped tests will still result in exit code 0
+# Ignore scripts directory (contains development test scripts, not unit tests)
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
