@@ -93,6 +93,25 @@
             </div>
             {% endif %}
             <form method="post">
+                {% if record_tags %}
+                <div class="record-tags-display" style="background: #f0fdf4; border-left: 4px solid #27ae60; padding: 12px 15px; margin-bottom: 20px; border-radius: 4px;">
+                    <strong style="color: #2c3e50; display: block; margin-bottom: 8px;">
+                        <i class="fa fa-tags"></i> Tags Atuais:
+                    </strong>
+                    <div style="display: flex; flex-wrap: wrap; gap: 5px;">
+                        {% for tag_data in record_tags %}
+                        {% set tag = tag_data.tag if tag_data is mapping else tag_data %}
+                        <span class="tag tag-color-{{ loop.index0 % 10 }}" style="cursor: default;">
+                            {{ tag }}
+                        </span>
+                        {% endfor %}
+                    </div>
+                    <p style="font-size: 11px; color: #7f8c8d; margin: 8px 0 0; font-style: italic;">
+                        Use o Gerenciador de Tags (menu) para adicionar ou remover tags.
+                    </p>
+                </div>
+                {% endif %}
+
                 {{ form_fields|safe }}
                 <div class="form-actions">
                     <button type="submit"><i class="fa fa-save"></i> Salvar</button>

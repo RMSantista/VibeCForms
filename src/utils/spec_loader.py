@@ -54,4 +54,21 @@ def load_spec(form_path):
     if "title" not in spec or "fields" not in spec:
         abort(500, description=f"Invalid spec file for '{form_path}'")
 
+    # Validate default_tags if present
+    if "default_tags" in spec:
+        if not isinstance(spec["default_tags"], list):
+            abort(500, description=f"Invalid spec: default_tags must be an array")
+
+        import re
+
+        tag_pattern = r"^[a-z0-9_]+$"
+        for tag in spec["default_tags"]:
+            if not isinstance(tag, str):
+                abort(500, description=f"Invalid tag in default_tags: must be string")
+            if not re.match(tag_pattern, tag):
+                abort(
+                    500,
+                    description=f"Invalid tag name '{tag}': use lowercase, numbers, underscores only",
+                )
+
     return spec

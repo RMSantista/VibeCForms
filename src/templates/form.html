@@ -93,14 +93,17 @@
             const container = document.getElementById(`tags-${recordId}`);
             if (!container) return;
 
+            if (tags.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+
+            // Display tags without remove buttons
             container.innerHTML = tags.map(tagData => {
-                const tag = tagData.tag || tagData; // Support both formats
+                const tag = tagData.tag || tagData;
                 const colorClass = getTagColorClass(tag);
-                return `<span class="tag ${colorClass}">
+                return `<span class="tag ${colorClass}" style="cursor: default;" title="Tag: ${tag}">
                     ${tag}
-                    <span class="remove-tag" onclick="removeTag('${recordId}', '${formName}', '${tag}')" title="Remover tag">
-                        <i class="fa fa-times"></i>
-                    </span>
                 </span>`;
             }).join('');
         }
@@ -191,25 +194,14 @@
                 });
             });
 
-            // Tags loading disabled to prevent browser freeze with many records
-            // Use the dedicated Tags Manager (/tags/manager) to manage tags
-            // Or uncomment below to enable on-demand loading (click to load)
-
-            // document.querySelectorAll('.tags-cell').forEach(function(cell) {
-            //     const recordId = cell.dataset.recordId;
-            //     const formName = cell.dataset.formName;
-            //     if (recordId && formName) {
-            //         // Load tags only when cell is clicked
-            //         cell.style.cursor = 'pointer';
-            //         cell.title = 'Clique para carregar tags';
-            //         cell.addEventListener('click', function() {
-            //             if (!this.dataset.loaded) {
-            //                 loadTags(recordId, formName);
-            //                 this.dataset.loaded = 'true';
-            //             }
-            //         }, { once: false });
-            //     }
-            // });
+            // Load tags automatically for all records (read-only display)
+            document.querySelectorAll('.tags-cell').forEach(function(cell) {
+                const recordId = cell.dataset.recordId;
+                const formName = cell.dataset.formName;
+                if (recordId && formName) {
+                    loadTags(recordId, formName);
+                }
+            });
         };
     </script>
 </head>
@@ -230,12 +222,22 @@
     <div class="main-content">
         <div class="container">
             <h2>{{ title }}</h2>
+            {% if default_tags %}
+            <div style="text-align: center; margin: -15px 0 20px;">
+                {% for tag in default_tags %}
+                <span class="tag tag-color-{{ loop.index0 % 10 }}" style="cursor: default;">
+                    {{ tag }}
+                </span>
+                {% endfor %}
+            </div>
+            {% endif %}
             {% if error %}
             <div style="color:#e74c3c; background:#ffeaea; border:1px solid #e74c3c; padding:10px; margin-bottom:15px; border-radius:5px;">
                 <i class="fa fa-exclamation-triangle"></i> {{error}}
             </div>
             {% endif %}
             <form method="post" id="cadastroForm">
+
                 {{ form_fields|safe }}
                 <div class="form-actions">
                     <button type="submit"><i class="fa fa-plus"></i> Cadastrar</button>

@@ -16,5 +16,11 @@
     "last_backend": "sqlite",
     "last_updated": "2025-11-19T21:33:28.037759",
     "record_count": 0
+  },
+  "financeiro/pagamentos": {
+    "last_spec_hash": "31a89c6f61ac4fe2b4441601460e163f",
+    "last_backend": "sqlite",
+    "last_updated": "2025-11-25T21:02:16.675609",
+    "record_count": 4
   }
 }

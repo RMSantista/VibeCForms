@@ -597,6 +597,9 @@ def generate_table_headers(spec: Dict[str, Any]) -> str:
     """Generate table headers from spec."""
     headers = ""
 
+    # Tags column first (TABLE_TAGS_WIDTH% width) - no title
+    headers += f'<th style="width: {TABLE_TAGS_WIDTH}%;"></th>\n'
+
     # Calculate width for fields (TABLE_FIELDS_TOTAL_WIDTH% total, divided by number of fields)
     num_fields = len(spec["fields"])
     col_width = (
@@ -607,9 +610,6 @@ def generate_table_headers(spec: Dict[str, Any]) -> str:
 
     for field in spec["fields"]:
         headers += f'<th style="width: {col_width}%;">{field["label"]}</th>\n'
-
-    # Tags column (TABLE_TAGS_WIDTH% width)
-    headers += f'<th style="width: {TABLE_TAGS_WIDTH}%;">Tags</th>\n'
 
     # Actions column (TABLE_ACTIONS_WIDTH% width)
     headers += f'<th style="width: {TABLE_ACTIONS_WIDTH}%;">Ações</th>'
@@ -634,6 +634,14 @@ def generate_table_row(
 
     # Extract record_id from form data (used for edit/delete/tags links)
     record_id = form_data.get("_record_id", "")
+
+    # Tags column first (read-only display)
+    tags_html = f"""<td class="tags-cell" data-record-id="{record_id}" data-form-name="{form_name}">
+        <div class="tags-container" id="tags-{record_id}">
+            <!-- Tags will be loaded here -->
+        </div>
+    </td>"""
+    cells += tags_html
 
     # Generate cells for each field
     for field in spec["fields"]:
@@ -664,23 +672,6 @@ def generate_table_row(
             display_value = value
 
         cells += f"<td>{display_value}</td>\n"
-
-    # Tags column with add/remove functionality
-    tags_html = f"""<td class="tags-cell" data-record-id="{record_id}" data-form-name="{form_name}">
-        <div class="tags-container" id="tags-{record_id}" style="margin-bottom:5px;">
-            <!-- Tags will be loaded here -->
-        </div>
-        <div style="display:flex;gap:3px;">
-            <input type="text" class="tag-input" placeholder="Nova tag"
-                   style="flex:1;padding:3px 5px;font-size:11px;border:1px solid #bbb;border-radius:3px;"
-                   onkeypress="if(event.key===\\'Enter\\'){{event.preventDefault();addTag(\\'{record_id}\\',\\'{form_name}\\',this.value);this.value=\\'\\';}}">
-            <button class="icon-btn" onclick="event.preventDefault();var input=this.previousElementSibling;addTag(\\'{record_id}\\',\\'{form_name}\\',input.value);input.value=\\'\\'"
-                    style="padding:3px 6px;font-size:11px;" title="Adicionar tag">
-                <i class="fa fa-plus"></i>
-            </button>
-        </div>
-    </td>"""
-    cells += tags_html
 
     # Use record_id instead of index for edit/delete links
     cells += f"""<td>
@@ -828,6 +819,10 @@ def index(form_name):
             else:
                 form_data[field_name] = request.form.get(field_name, "").strip()
 
+        # Include the pre-generated UUID from hidden field
+        if "_record_id" in request.form:
+            form_data["_record_id"] = request.form.get("_record_id")
+
         # Validate
         error = validate_form_data(spec, form_data)
 
@@ -875,6 +870,26 @@ def index(form_name):
 
             if record_id:
                 logger.info(f"Created new record {record_id} in {form_name}")
+
+                # Apply default tags if configured in spec
+                default_tags = spec.get("default_tags", [])
+                if default_tags:
+                    for tag in default_tags:
+                        success = tag_service.add_tag(
+                            form_name,
+                            record_id,
+                            tag,
+                            applied_by="system",
+                            metadata={"auto_applied": True, "source": "default_tags"},
+                        )
+                        if success:
+                            logger.info(
+                                f"Auto-applied default tag '{tag}' to {record_id}"
+                            )
+                        else:
+                            logger.warning(
+                                f"Failed to auto-apply tag '{tag}' to {record_id}"
+                            )
             else:
                 logger.error(f"Failed to create record in {form_name}")
 
@@ -900,7 +915,27 @@ def index(form_name):
             return redirect(f"/migrate/confirm/{form_path}")
         raise
 
-    form_fields = "".join([generate_form_field(f) for f in spec["fields"]])
+    # Generate UUID for new record (will be submitted with form)
+    from utils.crockford import generate_id
+
+    new_record_id = generate_id()
+
+    # Hidden field to submit the UUID
+    hidden_uuid = f'<input type="hidden" name="_record_id" value="{new_record_id}">'
+
+    # Visible UUID display (disabled, read-only)
+    uuid_field_html = render_template_string(
+        read_template("fields/uuid_display.html"),
+        field_name="_display_record_id",
+        field_label="ID do Registro",
+        value=new_record_id,
+    )
+
+    form_fields = (
+        hidden_uuid
+        + uuid_field_html
+        + "".join([generate_form_field(f) for f in spec["fields"]])
+    )
     table_headers = generate_table_headers(spec)
     table_rows = "".join([generate_table_row(form, spec, form_name) for form in forms])
 
@@ -913,6 +948,7 @@ def index(form_name):
         form_fields=form_fields,
         table_headers=table_headers,
         table_rows=table_rows,
+        default_tags=spec.get("default_tags", []),
     )
 
 
@@ -1152,6 +1188,9 @@ def edit(form_name, record_id):
     if not record:
         return "Registro não encontrado", 404
 
+    # Load current tags for display
+    record_tags = tag_service.get_tags(form_name, record_id, active_only=True)
+
     if request.method == "POST":
         # Collect form data
         form_data = {}
@@ -1169,7 +1208,15 @@ def edit(form_name, record_id):
 
         if error:
             # Re-render with error
-            form_fields = "".join(
+            # Generate UUID field display
+            uuid_field_html = render_template_string(
+                read_template("fields/uuid_display.html"),
+                field_name="_record_id",
+                field_label="ID do Registro",
+                value=record_id,
+            )
+
+            form_fields = uuid_field_html + "".join(
                 [generate_form_field(f, form_data) for f in spec["fields"]]
             )
             return render_template(
@@ -1180,6 +1227,7 @@ def edit(form_name, record_id):
                 error=error,
                 form_fields=form_fields,
                 record_id=record_id,
+                record_tags=record_tags,
             )
 
         # Update the record by ID
@@ -1193,7 +1241,17 @@ def edit(form_name, record_id):
         return redirect(f"/{form_name}")
 
     # GET request - show edit form
-    form_fields = "".join([generate_form_field(f, record) for f in spec["fields"]])
+    # Generate UUID field display with actual ID
+    uuid_field_html = render_template_string(
+        read_template("fields/uuid_display.html"),
+        field_name="_record_id",
+        field_label="ID do Registro",
+        value=record_id,
+    )
+
+    form_fields = uuid_field_html + "".join(
+        [generate_form_field(f, record) for f in spec["fields"]]
+    )
 
     return render_template(
         "edit.html",
@@ -1203,6 +1261,7 @@ def edit(form_name, record_id):
         error="",
         form_fields=form_fields,
         record_id=record_id,
+        record_tags=record_tags,
     )
 
 
