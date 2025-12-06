@@ -29,6 +29,27 @@ VibeCForms provides well-defined conventions that builders can rely on:
 
 ---
 
+## 🏛️ Architectural Pattern: Cork Board
+
+VibeCForms implements the **Cork Board Pattern** - an architectural approach where autonomous actors coordinate multi-step processes through a shared, observable state board. Like a physical cork board where people independently post and read notes, actors (humans, AI agents, subsystems) monitor the tags table and take actions based on what they observe, achieving emergent coordination without a central orchestrator.
+
+**Core Principles:**
+- **Centralized Board**: Single tags table stores all process state
+- **Decentralized Actors**: Multiple independent actors post/read state
+- **No Orchestrator**: Coordination emerges from actors monitoring the board
+- **Uniform Interface**: All actors use the same operations (add_tag, remove_tag, has_tag)
+- **Flexible Processing**: Supports both event-driven and batch processing
+
+**Why Cork Board?**
+Unlike workflow engines with rigid process definitions, the Cork Board Pattern enables:
+- ✓ Flexible state (multiple tags per object, like multiple notes)
+- ✓ Easy extensibility (add actors without rewiring coordination)
+- ✓ Natural human-AI collaboration (same interface for all)
+- ✓ Resilient operation (no single point of failure)
+- ✓ Emergent workflows (not pre-defined state machines)
+
+---
+
 ## 💼 Use Cases
 
 VibeCForms excels at systems that need process tracking with multiple actors:

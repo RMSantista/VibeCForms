@@ -13,6 +13,56 @@ This creates a development hierarchy where builders use:
 
 ---
 
+## Core Architectural Pattern: Cork Board
+
+### Pattern Classification
+VibeCForms implements the **Cork Board Pattern**, enabling multi-actor collaboration through centralized observable state. Like a physical cork board where people independently post and read notes, the system maintains a shared tags table that multiple autonomous actors (humans via Kanban, AI agents via API, subsystems via automated processes) monitor and update without central orchestration.
+
+### Pattern Definition
+The Cork Board Pattern is an architectural approach for multi-step process tracking where coordination emerges from independent actors observing and modifying shared state. The "board" (tags table) stores object states as mutable tags with complete audit trails (what, when, who). Actors query the board to find work ("all deals tagged 'qualified'"), execute domain logic, and update state by posting new tags or removing old ones. Unlike traditional workflow engines with explicit orchestration, the Cork Board Pattern achieves coordination emergently through actors independently monitoring state changes.
+
+### Pattern Components
+1. **The Board (State Store)**: Tags table with schema: `object_type`, `object_id`, `tag`, `applied_at`, `applied_by`, `metadata`
+2. **Actors (Independent Observers)**:
+   - Humans: Kanban UI for drag-and-drop tag changes
+   - AI Agents: Python API for intelligent state monitoring
+   - Subsystems: Automated processes triggered by tag patterns
+3. **Operations (Uniform Interface)**: `add_tag()`, `remove_tag()`, `has_tag()`, `get_objects_with_tag()`
+4. **Notifications (Optional)**: Event-driven reactions to tag changes or batch polling
+
+### Implementation in VibeCForms
+- **Board Storage**: SQLite/MySQL `tags` table
+- **Service Layer**: `TagService` provides uniform interface for all actors
+- **Visual Interface**: Kanban boards map columns to tags, drag-and-drop updates state
+- **Actor Examples**:
+  - Human: Moves deal card from "Qualified" to "Proposal" column → `remove_tag(deal_id, "qualified")` + `add_tag(deal_id, "proposal", user_id)`
+  - AI Agent: Scans `get_objects_with_tag("qualified")` → runs qualification logic → `add_tag(deal_id, "ready_for_proposal", "ai_agent")`
+  - Email System: Polls `get_objects_with_tag("proposal")` → sends follow-ups for deals needing attention
+
+### Comparison to Related Patterns
+
+**vs. Blackboard Pattern**
+- Cork Board: Process state tracking with workflow focus
+- Blackboard: Knowledge integration and problem-solving
+- Key Difference: Cork Board tracks mutable current state for coordination; Blackboard accumulates immutable facts for synthesis
+
+**vs. Event Sourcing**
+- Cork Board: Current state stored directly (mutable tags table)
+- Event Sourcing: State derived from immutable event log
+- Key Difference: Cork Board optimizes for workflow queries; Event Sourcing for audit trails and temporal queries
+
+**vs. State Machine**
+- Cork Board: Flexible tag operations, multiple tags simultaneously
+- State Machine: Rigid transitions, single state at a time
+- Key Difference: Cork Board has emergent coordination; State Machine enforces pre-defined transitions
+
+**vs. Publish/Subscribe**
+- Cork Board: Shared state observation with rich queries
+- Pub/Sub: Message passing with temporal decoupling
+- Key Difference: Cork Board stores queryable state; Pub/Sub routes ephemeral messages
+
+---
+
 ## Architectural Patterns
 
 ### 1. Model-View-Controller (MVC)
@@ -840,11 +890,24 @@ VibeCForms types map to backend-specific types:
 - Configuration loading: `persistence/config.py`
 - Custom code only in route handlers for unique logic
 
-### 4-7. Tags, Kanbans, Uniform Actor Interface, Tag-Based Notifications
+### 4-7. Cork Board Pattern Implementation (Tags, Kanbans, Actors, Notifications)
 
-**Status**: Not yet implemented (see TECH_DEBT.md)
+**Pattern Status**: Core architecture implemented, workflow features in development
 
-These are core conventions described in README but not yet built in the codebase.
+**Convention**: Process coordination through the Cork Board Pattern.
+
+**Current Implementation**:
+- Tags table schema designed and ready
+- TagService provides uniform actor interface
+- Kanban visual interface for human actors
+- Foundation for AI agents and subsystem actors
+
+**Implementation Files**:
+- `src/services/tag_service.py` - Uniform interface (add_tag, remove_tag, has_tag)
+- `src/services/kanban_service.py` - Visual board for human actors
+- Database: `tags` table with audit trail (object_type, object_id, tag, applied_at, applied_by)
+
+See [Roadmap](docs/roadmap.md) for planned workflow automation features.
 
 ---
 
