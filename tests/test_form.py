@@ -8,7 +8,6 @@ from src.VibeCForms import (
     get_folder_icon,
     scan_specs_directory,
     get_all_forms_flat,
-    generate_menu_html,
 )
 
 
@@ -160,10 +159,12 @@ def test_load_spec():
 
 def test_get_folder_icon():
     """Test folder icon assignment."""
-    assert get_folder_icon("financeiro") == "fa-dollar-sign"
-    assert get_folder_icon("rh") == "fa-users"
-    assert get_folder_icon("departamentos") == "fa-sitemap"
-    # produtos is not in the icon mapping, so it returns the default
+    # Icon comes from first child form spec found (alphabetically)
+    # financeiro/contas.json has "fa-file-invoice-dollar"
+    assert get_folder_icon("financeiro") == "fa-file-invoice-dollar"
+    # rh/funcionarios.json has "fa-id-card"
+    assert get_folder_icon("rh") == "fa-id-card"
+    # Unknown or empty folder returns the default
     assert get_folder_icon("desconhecido") == "fa-folder"
 
 
@@ -223,46 +224,6 @@ def test_get_all_forms_flat():
             assert form["category"] != ""
 
 
-def test_generate_menu_html():
-    """Test menu HTML generation."""
-    # Create sample menu structure
-    menu_items = [
-        {
-            "type": "form",
-            "name": "contatos",
-            "path": "contatos",
-            "title": "Agenda Pessoal",
-            "icon": "fa-address-book",
-        },
-        {
-            "type": "folder",
-            "name": "financeiro",
-            "path": "financeiro",
-            "icon": "fa-dollar-sign",
-            "children": [
-                {
-                    "type": "form",
-                    "name": "contas",
-                    "path": "financeiro/contas",
-                    "title": "Contas",
-                    "icon": "fa-dollar-sign",
-                }
-            ],
-        },
-    ]
-
-    html = generate_menu_html(menu_items)
-
-    # Check if HTML contains expected elements (note: outer <ul> is added in template)
-    assert "fa-address-book" in html
-    assert "Agenda Pessoal" in html
-    assert "fa-dollar-sign" in html
-    assert "financeiro" in html
-    assert "has-submenu" in html
-    assert "submenu" in html
-    assert "Contas" in html
-
-
 def test_load_spec_nested():
     """Test loading nested spec files."""
     spec = load_spec("financeiro/contas")
@@ -271,24 +232,6 @@ def test_load_spec_nested():
     assert len(spec["fields"]) == 4
     assert spec["fields"][0]["name"] == "descricao"
     assert spec["fields"][1]["name"] == "valor"
-
-
-def test_generate_menu_html_with_active():
-    """Test menu HTML generation with active item."""
-    menu_items = [
-        {
-            "type": "form",
-            "name": "contatos",
-            "path": "contatos",
-            "title": "Agenda Pessoal",
-            "icon": "fa-address-book",
-        }
-    ]
-
-    html = generate_menu_html(menu_items, current_form_path="contatos")
-
-    # Check if active class is present
-    assert "active" in html
 
 
 def test_icon_from_spec():

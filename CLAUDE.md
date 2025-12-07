@@ -374,30 +374,305 @@ Schema history is tracked automatically in `src/config/schema_history.json`:
 
 ---
 
-### Template System (Shared Metadata Implementation)
+### XSLT Rendering Engine (Shared Metadata Implementation)
 
-The application uses Flask's Jinja2 templates, implementing the **Shared Metadata** convention by reading the same spec for both UI and data operations.
+The application uses **XSLT 3.0 exclusively** with Tailwind CSS for rendering, implementing the **Shared Metadata** convention by transforming spec-based XML into HTML with utility-first styling.
 
-**Main Templates** (`src/templates/`):
-- `index.html` - Landing page with form cards grid (99 lines)
-- `form.html` - Main CRUD form page with sidebar navigation (124 lines)
-- `edit.html` - Edit form page (101 lines)
+#### Architecture Overview
 
-**Field Templates** (`src/templates/fields/`):
-Form fields are rendered using individual templates:
-- `input.html` - Simple input types (text, tel, email, number, password, date, url, search, datetime-local, time, month, week, hidden)
-- `textarea.html` - Textarea fields
-- `checkbox.html` - Checkbox fields
-- `select.html` - Dropdown selection fields
-- `radio.html` - Radio button groups
-- `color.html` - Color picker with live hex display
-- `range.html` - Slider with live value display
+The rendering system uses four key components:
 
-The `generate_form_field()` function loads the appropriate template based on field type from the **spec** and renders it using `render_template_string()`. This provides:
-- Complete separation of HTML from Python code
-- UI automatically reflects spec changes
-- Consistent field rendering across all forms
-- Better maintainability and testability
+1. **XMLBuilder** (`src/rendering/xml_builder.py`): Converts JSON specs and data to XML
+2. **XSLTRenderer** (`src/rendering/xslt_renderer.py`): Orchestrates transformations using Saxon HE
+3. **TemplateResolver** (`src/rendering/template_resolver.py`): Handles template override resolution
+4. **CacheManager** (`src/rendering/cache_manager.py`): Caches compiled stylesheets with mtime tracking
+
+#### XML → HTML Transformation Pipeline
+
+```
+JSON Spec + Data
+    ↓
+XMLBuilder (src/rendering/xml_builder.py)
+    ↓
+XML Document
+    ↓
+XSLTRenderer + TemplateResolver
+    ↓
+Saxon HE Processor (saxonche)
+    ↓
+XSLT Templates (src/xslt/)
+    ↓
+HTML (Tailwind CSS)
+```
+
+#### XSLT Directory Structure
+
+```
+src/xslt/
+├── base/
+│   └── html-shell.xslt          - Base HTML5 layout with head/body
+├── pages/
+│   ├── form.xslt                - Main form/list page
+│   ├── index.xslt               - Landing page with form cards
+│   ├── edit.xslt                - Record edit page
+│   ├── kanban.xslt              - Kanban board view
+│   ├── tags-manager.xslt        - Tag management interface
+│   └── migration-confirm.xslt   - Schema migration confirmation
+├── components/
+│   ├── menu.xslt                - Sidebar navigation with recursive items
+│   ├── table-header.xslt        - Table column headers
+│   ├── table-row.xslt           - Table data rows with transformations
+│   ├── form-card.xslt           - Form cards on landing page
+│   ├── error-message.xslt       - Error display
+│   └── tag-badge.xslt           - Tag visual badges
+└── fields/
+    ├── input.xslt               - text, tel, email, number, password, date, url, search, datetime-local, time, month, week
+    ├── textarea.xslt            - Multi-line text
+    ├── select.xslt              - Dropdown selection
+    ├── radio.xslt               - Radio button groups
+    ├── checkbox.xslt            - Boolean checkboxes
+    ├── color.xslt               - Color picker
+    ├── range.xslt               - Slider control
+    ├── uuid-display.xslt        - UUID display (read-only)
+    ├── search-autocomplete.xslt - Search with autocomplete
+    └── hidden.xslt              - Hidden fields
+```
+
+#### Business Case Template Overrides
+
+Templates can be customized per business case without modifying the core `src/xslt/` directory:
+
+```
+examples/<business-case-name>/
+└── xslt/
+    ├── pages/
+    │   ├── form.xslt            - Override main form page
+    │   └── index.xslt           - Override landing page
+    ├── components/
+    │   └── menu.xslt            - Override navigation
+    └── fields/
+        └── custom.xslt          - Custom field type
+```
+
+**Resolution Priority:**
+1. Business case XSLT: `examples/<case>/xslt/<template>`
+2. Default XSLT: `src/xslt/<template>`
+
+**Example Override:** To customize the form page layout for a business case:
+```bash
+# Create override directory
+mkdir -p examples/ponto-de-vendas/xslt/pages
+
+# Copy and modify
+cp src/xslt/pages/form.xslt examples/ponto-de-vendas/xslt/pages/form.xslt
+# Edit examples/ponto-de-vendas/xslt/pages/form.xslt with custom styling/layout
+```
+
+The `TemplateResolver` class automatically detects and uses the override on next render.
+
+#### Key Components
+
+**XMLBuilder** - Converts JSON to XML:
+```python
+# Converts form spec + records into XML structure
+xml_elem = XMLBuilder.build_form_page_xml(
+    spec=spec,              # Form specification
+    form_name="contatos",   # Form path
+    records=records,        # List of records
+    menu_items=menu_items,  # Navigation structure
+    error="",               # Error message
+    new_record_id="uuid-123",  # Pre-generated record ID
+    form_data={...}         # Form values for validation errors
+)
+```
+
+**XSLTRenderer** - Orchestrates transformations:
+```python
+renderer = XSLTRenderer(
+    business_case_root="examples/ponto-de-vendas",
+    src_root="src"
+)
+
+# Render form page
+html = renderer.render_form_page(
+    spec=spec,
+    form_name="contatos",
+    records=records,
+    menu_items=menu_items
+)
+
+# Render index/landing page
+html = renderer.render_index_page(forms=forms, menu_items=menu_items)
+
+# Render edit page
+html = renderer.render_edit_page(
+    spec=spec,
+    form_name="contatos",
+    record=record,
+    menu_items=menu_items,
+    record_tags=tags
+)
+```
+
+**TemplateResolver** - Handles override logic:
+```python
+resolver = TemplateResolver(
+    business_case_root="examples/ponto-de-vendas",
+    src_root="src"
+)
+
+# Returns path to template (with fallback)
+template_path = resolver.resolve("pages/form.xslt")
+# → examples/ponto-de-vendas/xslt/pages/form.xslt (if exists)
+# → src/xslt/pages/form.xslt (fallback)
+
+# List all business case overrides
+overrides = resolver.list_overrides()
+```
+
+**CacheManager** - Caches compiled stylesheets:
+```python
+cache = CacheManager()
+
+# Get cached stylesheet (checks file mtime)
+stylesheet = cache.get(template_path)
+
+# Cache compiled stylesheet
+cache.set(template_path, stylesheet)
+
+# Clear cache during development
+cache.clear()
+```
+
+#### Template Modes (Pattern Matching)
+
+XSLT templates use mode-based pattern matching for different rendering contexts:
+
+**Form Mode** (`mode="form"`):
+Renders input fields for data entry
+```xml
+<xsl:apply-templates select="spec/fields/field" mode="form"/>
+```
+
+**Table Mode** (`mode="table"`):
+Renders field values in read-only table cells with transformations (labels, masks, etc.)
+```xml
+<xsl:apply-templates select="field" mode="table"/>
+```
+
+**Display Mode** (`mode="display"`):
+Renders field values for read-only display
+```xml
+<xsl:apply-templates select="field" mode="display"/>
+```
+
+**Menu Modes**:
+- `mode="sidebar"` - Main sidebar menu container
+- `mode="menu-item"` - Top-level menu items
+- `mode="submenu-item"` - Nested submenu items
+
+#### Template Structure Example
+
+Each field type template supports multiple modes:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<xsl:stylesheet version="3.0"
+    xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema"
+    exclude-result-prefixes="xs">
+
+  <!-- Form mode: render input field -->
+  <xsl:template match="field[@type='text']" mode="form">
+    <div class="mb-4 flex items-center gap-2">
+      <label for="{@name}" class="w-48 font-semibold text-gray-700">
+        <xsl:value-of select="@label"/>:
+      </label>
+      <input
+        type="text"
+        name="{@name}"
+        value="{@value}"
+        class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none"/>
+    </div>
+  </xsl:template>
+
+  <!-- Table mode: render table cell -->
+  <xsl:template match="field[@type='text']" mode="table">
+    <xsl:value-of select="."/>
+  </xsl:template>
+
+</xsl:stylesheet>
+```
+
+#### Adding Custom Field Types
+
+To add a new field type (e.g., `custom-field`):
+
+1. Create template file (`src/xslt/fields/custom-field.xslt`):
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<xsl:stylesheet version="3.0"
+    xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema"
+    exclude-result-prefixes="xs">
+
+  <xsl:template match="field[@type='custom-field']" mode="form">
+    <!-- Form rendering with Tailwind CSS -->
+    <div class="mb-4 flex items-center gap-2">
+      <label for="{@name}" class="w-48 font-semibold text-gray-700">
+        <xsl:value-of select="@label"/>:
+      </label>
+      <!-- Custom input element -->
+    </div>
+  </xsl:template>
+
+  <xsl:template match="field[@type='custom-field']" mode="table">
+    <!-- Table cell display -->
+  </xsl:template>
+
+</xsl:stylesheet>
+```
+
+2. Include in page templates (`src/xslt/pages/form.xslt`):
+```xml
+<xsl:include href="../fields/custom-field.xslt"/>
+```
+
+3. Use in form spec:
+```json
+{
+  "name": "my_custom",
+  "label": "My Custom Field",
+  "type": "custom-field"
+}
+```
+
+#### Tailwind CSS Integration
+
+All templates use Tailwind CSS utility classes for styling:
+
+```xml
+<!-- Form container -->
+<div class="mb-4 flex items-center gap-2">
+
+<!-- Label -->
+<label class="w-48 font-semibold text-gray-700">Label:</label>
+
+<!-- Input -->
+<input class="flex-1 px-3 py-2 border border-gray-300 rounded-md
+              focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"/>
+
+<!-- Button -->
+<button class="bg-blue-500 text-white px-4 py-2 rounded
+               hover:bg-blue-600 transition-colors">Save</button>
+
+<!-- Table -->
+<table class="w-full border-collapse min-w-[600px]">
+  <th class="px-4 py-3 text-center bg-blue-500 text-white">Header</th>
+  <td class="px-4 py-3 text-center align-middle whitespace-nowrap
+            overflow-hidden text-ellipsis">Data</td>
+</table>
+```
 
 ---
 
@@ -422,34 +697,37 @@ Forms are defined by JSON specification files in `src/specs/`, implementing **Co
 
 **Supported Field Types (20 HTML5 types):**
 
+Each field type is rendered by XSLT templates in `src/xslt/fields/` and supports form, table, and display modes:
+
 **Basic Input Types:**
-- `text` - Single-line text input
-- `tel` - Telephone number input
-- `email` - Email address input with validation
-- `number` - Numeric input
-- `password` - Password input (masked characters, not displayed in tables)
-- `url` - URL input with validation
-- `search` - Search input with enhanced UX
+- `text` - Single-line text input (rendered by `input.xslt`)
+- `tel` - Telephone number input (rendered by `input.xslt`)
+- `email` - Email address input with validation (rendered by `input.xslt`)
+- `number` - Numeric input (rendered by `input.xslt`)
+- `password` - Password input (masked characters, not displayed in tables, rendered by `input.xslt`)
+- `url` - URL input with validation (rendered by `input.xslt`)
+- `search` - Search input with autocomplete (rendered by `search-autocomplete.xslt`)
 
 **Date and Time Types:**
-- `date` - Date picker input
-- `time` - Time picker input
-- `datetime-local` - Combined date and time picker
-- `month` - Month and year picker
-- `week` - Week picker
+- `date` - Date picker input (rendered by `input.xslt`)
+- `time` - Time picker input (rendered by `input.xslt`)
+- `datetime-local` - Combined date and time picker (rendered by `input.xslt`)
+- `month` - Month and year picker (rendered by `input.xslt`)
+- `week` - Week picker (rendered by `input.xslt`)
 
 **Selection Types:**
-- `select` - Dropdown selection list (requires `options` array)
-- `radio` - Radio button group (requires `options` array)
-- `checkbox` - Boolean checkbox input
+- `select` - Dropdown selection list, requires `options` array (rendered by `select.xslt`)
+- `radio` - Radio button group, requires `options` array (rendered by `radio.xslt`)
+- `checkbox` - Boolean checkbox input (rendered by `checkbox.xslt`)
 
 **Advanced Types:**
-- `color` - Color picker with live hex value display
-- `range` - Slider with live value display (supports `min`, `max`, `step` attributes)
+- `color` - Color picker with live hex value display (rendered by `color.xslt`)
+- `range` - Slider with live value display, supports `min`, `max`, `step` attributes (rendered by `range.xslt`)
+- `uuid-display` - UUID display in read-only mode (rendered by `uuid-display.xslt`)
 
 **Other Types:**
-- `textarea` - Multi-line text input
-- `hidden` - Hidden field (not displayed in forms or tables)
+- `textarea` - Multi-line text input (rendered by `textarea.xslt`)
+- `hidden` - Hidden field, not displayed in forms or tables (rendered by `hidden.xslt`)
 
 **Field Options Format (for select/radio):**
 ```json
@@ -511,19 +789,106 @@ Folders can be customized via `_folder.json` files - demonstrating **Configurati
 
 ---
 
-### Route Structure
+### JSON API Support
 
-- `/` (GET): Main landing page with all forms as cards
-- `/<path:form_name>` (GET/POST): Dynamic form page (supports nested paths)
-- `/<path:form_name>/edit/<int:idx>` (GET/POST): Edit form entry
-- `/<path:form_name>/delete/<int:idx>` (GET): Delete form entry
+All page routes support optional `.json` suffix for JSON responses alongside HTML rendering:
+
+#### HTML vs JSON Routes
+
+**Without `.json` suffix** - XSLT rendering returns HTML:
+```
+GET  /                          → HTML landing page
+GET  /contatos                  → HTML form page
+GET  /contatos/edit/uuid-123    → HTML edit page
+POST /contatos                  → Redirect to /contatos (HTML)
+POST /contatos/edit/uuid-123    → Redirect to form (HTML)
+```
+
+**With `.json` suffix** - Return JSON data:
+```
+GET  /index.json                                → JSON with forms and menu
+POST /contatos.json                            → JSON with success/error
+GET  /contatos.json                            → JSON with records and specs
+POST /contatos/edit/uuid-123.json             → JSON with success/error
+GET  /contatos/edit/uuid-123.json             → JSON with record and specs
+```
+
+#### JSON Response Examples
+
+**Form page JSON** (`GET /contatos.json`):
+```json
+{
+  "success": true,
+  "spec": {
+    "title": "Contatos",
+    "icon": "fa-address-book",
+    "fields": [...]
+  },
+  "records": [
+    {
+      "_record_id": "uuid-1",
+      "nome": "João Silva",
+      "email": "joao@example.com"
+    }
+  ],
+  "menu": [...]
+}
+```
+
+**Create/Update JSON** (`POST /contatos.json`):
+```json
+{
+  "success": true,
+  "record_id": "uuid-123",
+  "message": "Record created successfully"
+}
+```
+
+**Error JSON** (on validation failure):
+```json
+{
+  "success": false,
+  "error": "Field 'email' is required",
+  "form_data": {
+    "nome": "João Silva"
+  }
+}
+```
+
+**Tag API JSON** (`POST /api/<form>/tags/<record_id>`):
+```json
+{
+  "success": true,
+  "tag": "lead",
+  "record_id": "uuid-123"
+}
+```
+
+#### Route Structure
+
+- `GET /` - Main landing page with all forms as cards
+- `GET /index.json` - JSON with forms list and menu
+- `GET /<path:form_name>` - Dynamic form page (supports nested paths)
+- `GET /<path:form_name>.json` - Form data and specs as JSON
+- `POST /<path:form_name>` - Create record (HTML redirect)
+- `POST /<path:form_name>.json` - Create record (JSON response)
+- `GET /<path:form_name>/edit/<record_id>` - Edit form entry
+- `GET /<path:form_name>/edit/<record_id>.json` - Record and specs as JSON
+- `POST /<path:form_name>/edit/<record_id>` - Update record (HTML redirect)
+- `POST /<path:form_name>/edit/<record_id>.json` - Update record (JSON response)
+- `GET /<path:form_name>/delete/<record_id>` - Delete record entry
+- `POST /api/<form_name>/tags/<record_id>` - Add/remove tags (JSON)
 
 **Examples:**
-- `/contatos` - Root level form
-- `/financeiro/contas` - Nested form
-- `/rh/departamentos/areas` - Multi-level nested form
+- `/contatos` - Root level form (HTML)
+- `/contatos.json` - Root level form (JSON)
+- `/financeiro/contas` - Nested form (HTML)
+- `/financeiro/contas.json` - Nested form (JSON)
+- `/rh/departamentos/areas` - Multi-level nested form (HTML)
+- `/rh/departamentos/areas/edit/uuid-456` - Edit nested record (HTML)
+- `/rh/departamentos/areas/edit/uuid-456.json` - Edit nested record (JSON)
 
-All operations use the index position in the forms list (not a unique ID) to identify records.
+All operations use record UUIDs (not index positions) to identify records.
 
 ---
 
@@ -542,11 +907,14 @@ examples/<business-case-name>/
 ├── config/             # Configuration files
 │   ├── persistence.json
 │   └── schema_history.json
-├── templates/          # Custom templates (optional, falls back to src/templates/)
-│   ├── index.html
-│   ├── form.html
+├── xslt/               # Custom XSLT templates (optional, falls back to src/xslt/)
+│   ├── pages/
+│   │   ├── form.xslt
+│   │   └── index.xslt
+│   ├── components/
+│   │   └── menu.xslt
 │   └── fields/
-│       └── *.html
+│       └── custom.xslt
 ├── data/               # Data storage
 │   ├── *.txt           # TXT backend files
 │   └── vibecforms.db   # SQLite database

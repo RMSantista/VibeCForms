@@ -7,8 +7,6 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List
 from flask import (
     Flask,
-    render_template,
-    render_template_string,
     request,
     redirect,
     abort,
@@ -29,6 +27,7 @@ from persistence.migration_manager import MigrationManager
 from utils.spec_loader import load_spec, set_specs_dir
 from services.tag_service import TagService
 from services.kanban_service import get_kanban_service
+from rendering.xslt_renderer import XSLTRenderer
 
 load_dotenv()
 
@@ -39,20 +38,21 @@ logger = logging.getLogger(__name__)
 # Default fallback directories (src-relative)
 DATA_FILE = os.path.join(os.path.dirname(__file__), "registros.txt")
 FALLBACK_SPECS_DIR = os.path.join(os.path.dirname(__file__), "specs")
-FALLBACK_TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")
 
 # Active directories (will be set by initialize_app or default to fallback)
 SPECS_DIR = FALLBACK_SPECS_DIR
-TEMPLATE_DIR = FALLBACK_TEMPLATE_DIR
 BUSINESS_CASE_ROOT = None
+
+# XSLT renderer (will be initialized in initialize_app)
+xslt_renderer = None
 
 # Table column widths (percentage)
 TABLE_FIELDS_TOTAL_WIDTH = 60
 TABLE_TAGS_WIDTH = 15
 TABLE_ACTIONS_WIDTH = 25
 
-# Create app with fallback template directory (will be updated during initialization)
-app = Flask(__name__, template_folder=FALLBACK_TEMPLATE_DIR)
+# Create Flask app
+app = Flask(__name__)
 
 
 def parse_arguments():
@@ -80,7 +80,7 @@ def initialize_app(business_case_path):
     Args:
         business_case_path: Path to the business case directory
     """
-    global BUSINESS_CASE_ROOT, SPECS_DIR, TEMPLATE_DIR
+    global BUSINESS_CASE_ROOT, SPECS_DIR, xslt_renderer
 
     # Convert to absolute path
     BUSINESS_CASE_ROOT = os.path.abspath(business_case_path)
@@ -99,7 +99,6 @@ def initialize_app(business_case_path):
 
     # Set up directory paths
     SPECS_DIR = os.path.join(BUSINESS_CASE_ROOT, "specs")
-    TEMPLATE_DIR = os.path.join(BUSINESS_CASE_ROOT, "templates")
 
     # Validate required directories exist
     if not os.path.isdir(SPECS_DIR):
@@ -108,14 +107,6 @@ def initialize_app(business_case_path):
 
     # Configure spec loader to use business case specs directory
     set_specs_dir(SPECS_DIR)
-
-    # Template directory is optional (will fallback to src/templates)
-    if not os.path.isdir(TEMPLATE_DIR):
-        logger.info(f"templates/ not found in business case, using fallback templates")
-        TEMPLATE_DIR = FALLBACK_TEMPLATE_DIR
-
-    # Update Flask app template folder
-    app.template_folder = TEMPLATE_DIR
 
     # Initialize persistence configuration with business case config path
     from persistence.config import get_config, reset_config
@@ -128,65 +119,39 @@ def initialize_app(business_case_path):
     get_config(config_path)  # Initialize with business case config
     get_history(history_path)  # Initialize with business case history
 
+    # Initialize XSLT renderer
+    xslt_renderer = XSLTRenderer(
+        business_case_root=BUSINESS_CASE_ROOT, src_root=os.path.dirname(__file__)
+    )
+
     logger.info(f"Initialized VibeCForms with business case: {BUSINESS_CASE_ROOT}")
     logger.info(f"  - Specs: {SPECS_DIR}")
-    logger.info(f"  - Templates: {TEMPLATE_DIR}")
     logger.info(f"  - Config: {config_path}")
     logger.info(f"  - History: {history_path}")
 
 
-def get_template_path(template_name):
-    """Get template path with fallback support.
-
-    First tries business case templates, then falls back to src/templates.
-
-    Args:
-        template_name: Name of the template file (can include subdirectory, e.g., "fields/input.html")
-
-    Returns:
-        Full path to the template file
-    """
-    # Check business case templates first
-    business_template = os.path.join(TEMPLATE_DIR, template_name)
-    if os.path.exists(business_template):
-        return business_template
-
-    # Fallback to src/templates
-    fallback_template = os.path.join(FALLBACK_TEMPLATE_DIR, template_name)
-    if os.path.exists(fallback_template):
-        return fallback_template
-
-    # Neither exists, return business case path (will fail appropriately)
-    return business_template
-
-
-def read_template(template_name):
-    """Read template content with fallback support.
-
-    Args:
-        template_name: Name of the template file (can include subdirectory)
-
-    Returns:
-        Template content as string
-    """
-    template_path = get_template_path(template_name)
-    with open(template_path, "r", encoding="utf-8") as f:
-        return f.read()
-
-
 def get_folder_icon(folder_name):
-    """Get an intuitive icon for a folder based on its name."""
-    icons = {
-        "financeiro": "fa-dollar-sign",
-        "rh": "fa-users",
-        "departamentos": "fa-sitemap",
-        "vendas": "fa-shopping-cart",
-        "estoque": "fa-boxes",
-        "clientes": "fa-user-tie",
-        "relatorios": "fa-chart-bar",
-        "configuracoes": "fa-cog",
-    }
-    return icons.get(folder_name.lower(), "fa-folder")
+    """Get an icon for a folder based on the icons of its child forms (from specs).
+
+    If any child form in the folder has an 'icon' in its spec, use the first one found.
+    Otherwise, fallback to a default folder icon.
+    """
+    # Scan the folder for form specs
+    folder_path = os.path.join(SPECS_DIR, folder_name)
+    if not os.path.isdir(folder_path):
+        return "fa-folder"
+
+    for entry in sorted(os.listdir(folder_path)):
+        if entry.endswith(".json"):
+            form_name = entry[:-5]
+            try:
+                spec = load_spec(os.path.join(folder_name, form_name))
+                icon = spec.get("icon")
+                if icon:
+                    return icon
+            except Exception:
+                continue
+    return "fa-folder"
 
 
 def load_folder_config(folder_path: str) -> Optional[Dict[str, Any]]:
@@ -466,226 +431,6 @@ def write_forms(forms, spec, form_path):
         repo.create(form_path, spec, form_data)
 
 
-def generate_form_field(field, form_data=None):
-    """Generate HTML for a single form field based on spec using templates."""
-    field_name = field["name"]
-    field_label = field["label"]
-    field_type = field["type"]
-    required = field.get("required", False)
-
-    value = ""
-    if form_data:
-        value = form_data.get(field_name, "")
-
-    if field_type == "checkbox":
-        template_content = read_template("fields/checkbox.html")
-        checked = form_data and form_data.get(field_name)
-        return render_template_string(
-            template_content,
-            field_name=field_name,
-            field_label=field_label,
-            checked=checked,
-        )
-
-    elif field_type == "textarea":
-        template_content = read_template("fields/textarea.html")
-        return render_template_string(
-            template_content,
-            field_name=field_name,
-            field_label=field_label,
-            required=required,
-            value=value,
-        )
-
-    elif field_type == "select":
-        template_content = read_template("fields/select.html")
-        options = field.get("options", [])
-        return render_template_string(
-            template_content,
-            field_name=field_name,
-            field_label=field_label,
-            required=required,
-            value=value,
-            options=options,
-        )
-
-    elif field_type == "radio":
-        template_content = read_template("fields/radio.html")
-        options = field.get("options", [])
-        return render_template_string(
-            template_content,
-            field_name=field_name,
-            field_label=field_label,
-            required=required,
-            value=value,
-            options=options,
-        )
-
-    elif field_type == "color":
-        template_content = read_template("fields/color.html")
-        return render_template_string(
-            template_content,
-            field_name=field_name,
-            field_label=field_label,
-            required=required,
-            value=value,
-        )
-
-    elif field_type == "range":
-        template_content = read_template("fields/range.html")
-        min_value = field.get("min", 0)
-        max_value = field.get("max", 100)
-        step_value = field.get("step", 1)
-
-        return render_template_string(
-            template_content,
-            field_name=field_name,
-            field_label=field_label,
-            required=required,
-            value=value,
-            min_value=min_value,
-            max_value=max_value,
-            step_value=step_value,
-        )
-
-    elif field_type == "search" and field.get("datasource"):
-        # Search field with autocomplete from datasource
-        template_content = read_template("fields/search_autocomplete.html")
-        return render_template_string(
-            template_content,
-            field_name=field_name,
-            field_label=field_label,
-            required=required,
-            value=value,
-        )
-
-    else:
-        # Input types: text, tel, email, number, password, date, url, search, datetime-local, time, month, week, hidden
-        template_content = read_template("fields/input.html")
-        input_type = (
-            field_type
-            if field_type
-            in [
-                "text",
-                "tel",
-                "email",
-                "number",
-                "password",
-                "date",
-                "url",
-                "search",
-                "datetime-local",
-                "time",
-                "month",
-                "week",
-                "hidden",
-            ]
-            else "text"
-        )
-
-        return render_template_string(
-            template_content,
-            field_name=field_name,
-            field_label=field_label,
-            input_type=input_type,
-            required=required,
-            value=value,
-        )
-
-
-def generate_table_headers(spec: Dict[str, Any]) -> str:
-    """Generate table headers from spec."""
-    headers = ""
-
-    # Tags column first (TABLE_TAGS_WIDTH% width) - no title
-    headers += f'<th style="width: {TABLE_TAGS_WIDTH}%;"></th>\n'
-
-    # Calculate width for fields (TABLE_FIELDS_TOTAL_WIDTH% total, divided by number of fields)
-    num_fields = len(spec["fields"])
-    col_width = (
-        int(TABLE_FIELDS_TOTAL_WIDTH / num_fields)
-        if num_fields > 0
-        else TABLE_FIELDS_TOTAL_WIDTH
-    )
-
-    for field in spec["fields"]:
-        headers += f'<th style="width: {col_width}%;">{field["label"]}</th>\n'
-
-    # Actions column (TABLE_ACTIONS_WIDTH% width)
-    headers += f'<th style="width: {TABLE_ACTIONS_WIDTH}%;">Ações</th>'
-    return headers
-
-
-def generate_table_row(
-    form_data: Dict[str, Any], spec: Dict[str, Any], form_name: str
-) -> str:
-    """
-    Generate a table row from form data.
-
-    Args:
-        form_data: Dictionary with form field values (must include '_record_id')
-        spec: Form specification
-        form_name: Path to the form
-
-    Returns:
-        HTML string for table row
-    """
-    cells = ""
-
-    # Extract record_id from form data (used for edit/delete/tags links)
-    record_id = form_data.get("_record_id", "")
-
-    # Tags column first (read-only display)
-    tags_html = f"""<td class="tags-cell" data-record-id="{record_id}" data-form-name="{form_name}">
-        <div class="tags-container" id="tags-{record_id}">
-            <!-- Tags will be loaded here -->
-        </div>
-    </td>"""
-    cells += tags_html
-
-    # Generate cells for each field
-    for field in spec["fields"]:
-        field_name = field["name"]
-        field_type = field["type"]
-        value = form_data.get(field_name, "")
-
-        if field_type == "checkbox":
-            display_value = "Sim" if value else "Não"
-        elif field_type == "select" or field_type == "radio":
-            # Find label for the selected value
-            options = field.get("options", [])
-            display_value = value
-            for option in options:
-                if option.get("value") == value:
-                    display_value = option.get("label", value)
-                    break
-        elif field_type == "color":
-            # Display color swatch alongside hex value
-            display_value = f'<span style="display:inline-block;width:20px;height:20px;background-color:{value};border:1px solid #ccc;vertical-align:middle;margin-right:5px;"></span>{value}'
-        elif field_type == "password":
-            # Don't display password values
-            display_value = "••••••••"
-        elif field_type == "hidden":
-            # Don't display hidden values
-            display_value = ""
-        else:
-            display_value = value
-
-        cells += f"<td>{display_value}</td>\n"
-
-    # Use record_id instead of index for edit/delete links
-    cells += f"""<td>
-        <form action="/{form_name}/edit/{record_id}" method="get" style="display:inline;">
-            <button class="icon-btn edit" title="Editar"><i class="fa fa-pencil-alt"></i></button>
-        </form>
-        <form action="/{form_name}/delete/{record_id}" method="get" style="display:inline;" onsubmit="return confirm('Confirma exclusão?');">
-            <button class="icon-btn delete" title="Excluir"><i class="fa fa-trash"></i></button>
-        </form>
-    </td>"""
-
-    return f"<tr>{cells}</tr>"
-
-
 def validate_form_data(spec, form_data):
     """Validate form data based on spec. Returns error message or empty string."""
     validation_messages = spec.get("validation_messages", {})
@@ -717,76 +462,20 @@ def validate_form_data(spec, form_data):
     return ""
 
 
-def generate_menu_html(menu_items, current_form_path="", level=0):
-    """Generate HTML for menu items recursively with submenu support.
-
-    Args:
-        menu_items: List of menu items from scan_specs_directory()
-        current_form_path: Current form path to highlight active items
-        level: Nesting level (0 = root)
-    """
-    if not menu_items:
-        return ""
-
-    html = ""
-    for item in menu_items:
-        if item["type"] == "form":
-            # Form item
-            is_active = item["path"] == current_form_path
-            active_class = "active" if is_active else ""
-            icon_html = f'<i class="fa {item["icon"]}"></i> ' if item["icon"] else ""
-
-            html += f'<li><a href="/{item["path"]}" class="{active_class}">{icon_html}{item["title"]}</a></li>\n'
-
-        elif item["type"] == "folder":
-            # Folder item with submenu
-            # Check if any child is active
-            is_path_active = current_form_path.startswith(item["path"])
-            icon_html = f'<i class="fa {item["icon"]}"></i> '
-
-            html += f"""<li class="has-submenu">
-                <a href="javascript:void(0)" class="folder-item {'active-path' if is_path_active else ''}">
-                    {icon_html}{item["name"]}
-                    <i class="fa fa-chevron-right submenu-arrow"></i>
-                </a>
-                <ul class="submenu level-{level + 1}">
-                    {generate_menu_html(item["children"], current_form_path, level + 1)}
-                </ul>
-            </li>\n"""
-
-    return html
-
-
-@app.route("/api/search/contatos")
-def api_search_contatos():
-    """API endpoint to search contacts by name."""
-    query = request.args.get("q", "").strip().lower()
-
-    if not query:
-        return jsonify([])
-
-    try:
-        contatos_spec = load_spec("contatos")
-    except:
-        return jsonify([])
-
-    forms = read_forms(contatos_spec, "contatos")
-
-    # Filter contacts by name (case-insensitive substring match)
-    results = []
-    for form in forms:
-        nome = form.get("nome", "").lower()
-        if query in nome:
-            results.append(form.get("nome", ""))
-
-    return jsonify(results)
-
-
 @app.route("/")
+@app.route("/index")
+@app.route("/index.json")
 def main_page():
     """Display the main landing page."""
+    is_json = request.path.endswith(".json")
+
     forms = get_all_forms_flat()
-    return render_template("index.html", forms=forms)
+    menu_items = scan_specs_directory()
+
+    if is_json:
+        return jsonify({"forms": forms, "menu": menu_items})
+
+    return xslt_renderer.render_index_page(forms=forms, menu_items=menu_items)
 
 
 @app.route("/tags/manager")
@@ -794,18 +483,23 @@ def tags_manager():
     """Display the tags management page."""
     forms = get_all_forms_flat()
     menu_items = scan_specs_directory()
-    menu_html = generate_menu_html(menu_items, "")
-    return render_template("tags_manager.html", forms=forms, menu_html=menu_html)
+    return xslt_renderer.render_tags_manager(forms=forms, menu_items=menu_items)
 
 
 @app.route("/<path:form_name>", methods=["GET", "POST"])
+@app.route("/<path:form_name>.json", methods=["GET", "POST"])
 def index(form_name):
+    # Handle .json suffix
+    is_json = form_name.endswith(".json")
+    if is_json:
+        form_name = form_name[:-5]
+
     spec = load_spec(form_name)
     error = ""
+    new_record_id = None
 
     # Generate dynamic menu
     menu_items = scan_specs_directory()
-    menu_html = generate_menu_html(menu_items, form_name)
 
     if request.method == "POST":
         # Collect form data
@@ -837,23 +531,26 @@ def index(form_name):
                     return redirect(f"/migrate/confirm/{form_path}")
                 raise
 
-            form_fields = "".join(
-                [generate_form_field(f, form_data) for f in spec["fields"]]
-            )
-            table_headers = generate_table_headers(spec)
-            table_rows = "".join(
-                [generate_table_row(form, spec, form_name) for form in forms]
-            )
+            if is_json:
+                return jsonify(
+                    {
+                        "spec": spec,
+                        "records": forms,
+                        "menu": menu_items,
+                        "form_name": form_name,
+                        "error": error,
+                        "form_data": form_data,
+                    }
+                )
 
-            return render_template(
-                "form.html",
-                title=spec["title"],
+            return xslt_renderer.render_form_page(
+                spec=spec,
                 form_name=form_name,
-                menu_html=menu_html,
+                records=forms,
+                menu_items=menu_items,
                 error=error,
-                form_fields=form_fields,
-                table_headers=table_headers,
-                table_rows=table_rows,
+                new_record_id=new_record_id,
+                form_data=form_data,
             )
 
         # Save the form
@@ -867,6 +564,7 @@ def index(form_name):
 
             # Create the new record
             record_id = repo.create(form_name, spec, form_data)
+            new_record_id = record_id  # Store for potential use in response
 
             if record_id:
                 logger.info(f"Created new record {record_id} in {form_name}")
@@ -920,35 +618,26 @@ def index(form_name):
 
     new_record_id = generate_id()
 
-    # Hidden field to submit the UUID
-    hidden_uuid = f'<input type="hidden" name="_record_id" value="{new_record_id}">'
+    if is_json:
+        return jsonify(
+            {
+                "spec": spec,
+                "records": forms,
+                "menu": menu_items,
+                "form_name": form_name,
+                "error": "",
+                "new_record_id": new_record_id,
+            }
+        )
 
-    # Visible UUID display (disabled, read-only)
-    uuid_field_html = render_template_string(
-        read_template("fields/uuid_display.html"),
-        field_name="_display_record_id",
-        field_label="ID do Registro",
-        value=new_record_id,
-    )
-
-    form_fields = (
-        hidden_uuid
-        + uuid_field_html
-        + "".join([generate_form_field(f) for f in spec["fields"]])
-    )
-    table_headers = generate_table_headers(spec)
-    table_rows = "".join([generate_table_row(form, spec, form_name) for form in forms])
-
-    return render_template(
-        "form.html",
-        title=spec["title"],
+    return xslt_renderer.render_form_page(
+        spec=spec,
         form_name=form_name,
-        menu_html=menu_html,
+        records=forms,
+        menu_items=menu_items,
         error="",
-        form_fields=form_fields,
-        table_headers=table_headers,
-        table_rows=table_rows,
-        default_tags=spec.get("default_tags", []),
+        new_record_id=new_record_id,
+        form_data=None,
     )
 
 
@@ -1033,8 +722,8 @@ def migrate_confirm(form_path):
         has_warnings = True
 
     # Render confirmation page
-    return render_template(
-        "migration_confirm.html",
+    menu_items = scan_specs_directory()
+    return xslt_renderer.render_migration_confirm(
         form_path=form_path,
         form_title=spec.get("title", form_path),
         record_count=record_count,
@@ -1042,6 +731,7 @@ def migrate_confirm(form_path):
         backend_change=backend_change,
         has_destructive_changes=has_destructive_changes,
         has_warnings=has_warnings,
+        menu_items=menu_items,
     )
 
 
@@ -1159,6 +849,7 @@ def migrate_execute(form_path):
 
 
 @app.route("/<path:form_name>/edit/<record_id>", methods=["GET", "POST"])
+@app.route("/<path:form_name>/edit/<record_id>.json", methods=["GET", "POST"])
 def edit(form_name, record_id):
     """
     Edit a record by UUID.
@@ -1167,6 +858,11 @@ def edit(form_name, record_id):
         form_name: Path to the form
         record_id: 27-character Crockford Base32 UUID of the record
     """
+    # Handle .json suffix
+    is_json = record_id.endswith(".json")
+    if is_json:
+        record_id = record_id[:-5]
+
     # Validate ID format (27 characters, valid Crockford Base32)
     from utils.crockford import validate_id
 
@@ -1178,7 +874,6 @@ def edit(form_name, record_id):
 
     # Generate dynamic menu
     menu_items = scan_specs_directory()
-    menu_html = generate_menu_html(menu_items, form_name)
 
     # Get repository
     repo = RepositoryFactory.get_repository(form_name)
@@ -1208,26 +903,24 @@ def edit(form_name, record_id):
 
         if error:
             # Re-render with error
-            # Generate UUID field display
-            uuid_field_html = render_template_string(
-                read_template("fields/uuid_display.html"),
-                field_name="_record_id",
-                field_label="ID do Registro",
-                value=record_id,
-            )
+            if is_json:
+                return jsonify(
+                    {
+                        "spec": spec,
+                        "record": form_data,
+                        "tags": record_tags,
+                        "form_name": form_name,
+                        "error": error,
+                    }
+                )
 
-            form_fields = uuid_field_html + "".join(
-                [generate_form_field(f, form_data) for f in spec["fields"]]
-            )
-            return render_template(
-                "edit.html",
-                title=spec["title"],
+            return xslt_renderer.render_edit_page(
+                spec=spec,
                 form_name=form_name,
-                menu_html=menu_html,
-                error=error,
-                form_fields=form_fields,
-                record_id=record_id,
+                record=form_data,
+                menu_items=menu_items,
                 record_tags=record_tags,
+                error=error,
             )
 
         # Update the record by ID
@@ -1241,27 +934,24 @@ def edit(form_name, record_id):
         return redirect(f"/{form_name}")
 
     # GET request - show edit form
-    # Generate UUID field display with actual ID
-    uuid_field_html = render_template_string(
-        read_template("fields/uuid_display.html"),
-        field_name="_record_id",
-        field_label="ID do Registro",
-        value=record_id,
-    )
+    if is_json:
+        return jsonify(
+            {
+                "spec": spec,
+                "record": record,
+                "tags": record_tags,
+                "form_name": form_name,
+                "error": "",
+            }
+        )
 
-    form_fields = uuid_field_html + "".join(
-        [generate_form_field(f, record) for f in spec["fields"]]
-    )
-
-    return render_template(
-        "edit.html",
-        title=spec["title"],
+    return xslt_renderer.render_edit_page(
+        spec=spec,
         form_name=form_name,
-        menu_html=menu_html,
-        error="",
-        form_fields=form_fields,
-        record_id=record_id,
+        record=record,
+        menu_items=menu_items,
         record_tags=record_tags,
+        error="",
     )
 
 
@@ -1301,12 +991,8 @@ def delete(form_name, record_id):
     return redirect(f"/{form_name}")
 
 
-# Old index-based routes removed - all forms now use UUID-based routes
-# Use /<form_name>/edit/<record_id> and /<form_name>/delete/<record_id>
-
-
 # =============================================================================
-# TAG MANAGEMENT API ENDPOINTS (FASE 6 - Phase 3: Tag API & Service Layer)
+# TAG MANAGEMENT API ENDPOINTS
 # =============================================================================
 
 # Initialize TagService
@@ -1516,24 +1202,23 @@ def kanban_board(board_name):
     Returns:
         Rendered Kanban board HTML page
     """
-    try:
-        # Load board configuration
-        board_config = kanban_service.load_board_config(board_name)
+    # Load board configuration
+    board_config = kanban_service.load_board_config(board_name)
 
-        if not board_config:
-            return f"Board '{board_name}' not found", 404
+    if not board_config:
+        return f"Board '{board_name}' not found", 404
 
-        # Render kanban template
-        return render_template(
-            "kanban.html",
-            board_name=board_name,
-            board_title=board_config.get("title", board_name.replace("_", " ").title()),
-            board_config=board_config,
-        )
+    # Get cards for this board
+    cards = kanban_service.get_all_board_cards(board_name)
+    menu_items = scan_specs_directory()
 
-    except Exception as e:
-        logger.error(f"Error displaying Kanban board '{board_name}': {e}")
-        return f"Error loading board: {str(e)}", 500
+    # Render kanban using XSLT
+    return xslt_renderer.render_kanban(
+        board_name=board_name,
+        board_config=board_config,
+        cards=cards,
+        menu_items=menu_items,
+    )
 
 
 @app.route("/api/kanban/boards")

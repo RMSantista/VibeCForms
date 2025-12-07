@@ -1,0 +1,47 @@
+/*
+  PONTO-DE-VENDAS TAG COLOR DEFINITIONS
+
+  This file defines the color classes used by the tag-badge override.
+  The tag-color-hash function assigns numbers 0-9, and each gets mapped
+  to a sales-pipeline specific color.
+
+  These classes work with Tailwind's JIT compiler by using custom colors
+  that complement the blue theme used in the select field override.
+*/
+
+:root {
+  --tag-color-0: #0891b2;  /* Cyan - Active/Current */
+  --tag-color-1: #059669;  /* Emerald - Success/Won */
+  --tag-color-2: #2563eb;  /* Blue - Primary/Qualified */
+  --tag-color-3: #7c3aed;  /* Violet - Special/High Priority */
+  --tag-color-4: #db2777;  /* Rose - Critical/Urgent */
+  --tag-color-5: #ea580c;  /* Orange - Warning/Pending */
+  --tag-color-6: #16a34a;  /* Green - Approved/Active */
+  --tag-color-7: #1e40af;  /* Dark Blue - Important */
+  --tag-color-8: #9333ea;  /* Purple - Processing */
+  --tag-color-9: #dc2626;  /* Red - Closed/Lost */
+}
+
+/* Tag color classes numbered 0-9 (from hash function) */
+.tag-color-0 { @apply bg-cyan-600; }
+.tag-color-1 { @apply bg-emerald-600; }
+.tag-color-2 { @apply bg-blue-600; }
+.tag-color-3 { @apply bg-violet-600; }
+.tag-color-4 { @apply bg-rose-600; }
+.tag-color-5 { @apply bg-orange-600; }
+.tag-color-6 { @apply bg-green-600; }
+.tag-color-7 { @apply bg-blue-800; }
+.tag-color-8 { @apply bg-purple-600; }
+.tag-color-9 { @apply bg-red-600; }
+
+/* Optional: Hover effects for interactivity */
+.tag-color-0:hover { @apply bg-cyan-700; }
+.tag-color-1:hover { @apply bg-emerald-700; }
+.tag-color-2:hover { @apply bg-blue-700; }
+.tag-color-3:hover { @apply bg-violet-700; }
+.tag-color-4:hover { @apply bg-rose-700; }
+.tag-color-5:hover { @apply bg-orange-700; }
+.tag-color-6:hover { @apply bg-green-700; }
+.tag-color-7:hover { @apply bg-blue-900; }
+.tag-color-8:hover { @apply bg-purple-700; }
+.tag-color-9:hover { @apply bg-red-700; }

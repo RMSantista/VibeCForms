@@ -13,6 +13,7 @@ dependencies = [
     "flask==2.3.3",
     "python-dotenv==1.0.1",
     "gunicorn>=21.0.0",
+    "saxonche>=12.5.0",
 ]
 
 [project.optional-dependencies]
