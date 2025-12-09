@@ -2,13 +2,13 @@
   "contatos": {
     "last_spec_hash": "ee014237f822ba2d7ea15758cd6056dd",
     "last_backend": "sqlite",
-    "last_updated": "2025-11-19T21:37:54.141918",
+    "last_updated": "2025-12-07T12:26:36.127215",
     "record_count": 1
   },
   "financeiro/contas": {
     "last_spec_hash": "5b7f40de8f2d127347e9096e73db5e38",
     "last_backend": "txt",
-    "last_updated": "2025-11-19T21:37:51.978517",
+    "last_updated": "2025-12-07T12:26:17.899734",
     "record_count": 2
   },
   "produtos": {
