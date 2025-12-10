@@ -1,18 +1,27 @@
 {
   "version": "1.0",
-  "default_backend": "txt",
+  "default_backend": "sqlite",
+  "data_root": "data",
 
   "backends": {
-    "txt": {
-      "type": "txt",
-      "path": "data/",
-      "delimiter": ";",
-      "encoding": "utf-8",
-      "extension": ".txt"
+    "sqlite": {
+      "type": "sqlite",
+      "database": "data/sqlite/vibecforms.db",
+      "timeout": 10,
+      "check_same_thread": false
     }
   },
 
   "form_mappings": {
+    "clientes": "sqlite",
+    "acreditadores": "sqlite",
+    "matriz_amostras": "sqlite",
+    "tipo_amostra": "sqlite",
+    "metodologias": "sqlite",
+    "analises": "sqlite",
+    "amostras": "sqlite",
+    "ordens_servico": "sqlite",
+    "resultados": "sqlite",
     "*": "default_backend"
   },
 

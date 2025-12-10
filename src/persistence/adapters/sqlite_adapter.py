@@ -165,8 +165,7 @@ class SQLiteRepository(BaseRepository):
 
         # Build CREATE TABLE statement
         columns = [
-            "id INTEGER PRIMARY KEY AUTOINCREMENT",
-            "record_id TEXT UNIQUE NOT NULL",  # UUID Crockford Base32
+            "record_id TEXT PRIMARY KEY",  # UUID Crockford Base32 as PRIMARY KEY
         ]
 
         for field in spec["fields"]:
@@ -214,7 +213,7 @@ class SQLiteRepository(BaseRepository):
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
-            cursor.execute(f"SELECT * FROM {table_name} ORDER BY id")
+            cursor.execute(f"SELECT * FROM {table_name} ORDER BY record_id")
             rows = cursor.fetchall()
             conn.close()
 
@@ -328,12 +327,12 @@ class SQLiteRepository(BaseRepository):
             logger.error(f"Cannot update: index {idx} out of bounds for {form_path}")
             return False
 
-        # Get the row ID (we need to get it from the database)
+        # Get the record_id from the record at the given index
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
             cursor.execute(
-                f"SELECT id FROM {table_name} ORDER BY id LIMIT 1 OFFSET {idx}"
+                f"SELECT record_id FROM {table_name} ORDER BY record_id LIMIT 1 OFFSET {idx}"
             )
             row = cursor.fetchone()
 
@@ -342,7 +341,7 @@ class SQLiteRepository(BaseRepository):
                 conn.close()
                 return False
 
-            record_id = row["id"]
+            record_id = row["record_id"]
 
             # Build UPDATE statement
             set_clauses = []
@@ -369,7 +368,7 @@ class SQLiteRepository(BaseRepository):
             values.append(record_id)  # For WHERE clause
 
             update_sql = (
-                f"UPDATE {table_name} SET {', '.join(set_clauses)} WHERE id = ?"
+                f"UPDATE {table_name} SET {', '.join(set_clauses)} WHERE record_id = ?"
             )
 
             cursor.execute(update_sql, values)
@@ -387,12 +386,12 @@ class SQLiteRepository(BaseRepository):
         """Delete a record by index."""
         table_name = self._get_table_name(form_path)
 
-        # Get the row ID at the given index
+        # Get the record_id at the given index
         try:
             conn = self._get_connection()
             cursor = conn.cursor()
             cursor.execute(
-                f"SELECT id FROM {table_name} ORDER BY id LIMIT 1 OFFSET {idx}"
+                f"SELECT record_id FROM {table_name} ORDER BY record_id LIMIT 1 OFFSET {idx}"
             )
             row = cursor.fetchone()
 
@@ -401,10 +400,10 @@ class SQLiteRepository(BaseRepository):
                 conn.close()
                 return False
 
-            record_id = row["id"]
+            record_id = row["record_id"]
 
             # Delete the record
-            delete_sql = f"DELETE FROM {table_name} WHERE id = ?"
+            delete_sql = f"DELETE FROM {table_name} WHERE record_id = ?"
             cursor.execute(delete_sql, (record_id,))
             conn.commit()
             conn.close()
@@ -709,7 +708,7 @@ class SQLiteRepository(BaseRepository):
             temp_table = f"{table_name}_temp"
 
             # Build CREATE TABLE for new structure
-            columns = ["id INTEGER PRIMARY KEY AUTOINCREMENT"]
+            columns = ["record_id TEXT PRIMARY KEY"]
             for field in spec["fields"]:
                 field_name = field["name"]
                 field_type = field["type"]
@@ -729,10 +728,10 @@ class SQLiteRepository(BaseRepository):
 
             # Copy data from old table to new table
             # Build field list with old_name -> new_name mapping
-            old_fields = [
+            old_fields = ["record_id"] + [
                 old_name if f["name"] == new_name else f["name"] for f in spec["fields"]
             ]
-            new_fields = [f["name"] for f in spec["fields"]]
+            new_fields = ["record_id"] + [f["name"] for f in spec["fields"]]
 
             old_fields_sql = ", ".join(old_fields)
             new_fields_sql = ", ".join(new_fields)
@@ -808,7 +807,7 @@ class SQLiteRepository(BaseRepository):
             temp_table = f"{table_name}_temp"
 
             # Build CREATE TABLE with new field type
-            columns = ["id INTEGER PRIMARY KEY AUTOINCREMENT"]
+            columns = ["record_id TEXT PRIMARY KEY"]
             for field in spec["fields"]:
                 fname = field["name"]
                 ftype = field["type"]
@@ -824,8 +823,8 @@ class SQLiteRepository(BaseRepository):
 
             cursor.execute(create_sql)
 
-            # Convert and insert data
-            field_names = [f["name"] for f in spec["fields"]]
+            # Convert and insert data (include record_id)
+            field_names = ["record_id"] + [f["name"] for f in spec["fields"]]
             placeholders = ", ".join(["?" for _ in field_names])
             columns_insert = ", ".join(field_names)
 
@@ -835,7 +834,9 @@ class SQLiteRepository(BaseRepository):
 
             conversion_errors = 0
             for row in rows:
-                values = []
+                # Start with record_id
+                values = [row["record_id"]]
+
                 for field in spec["fields"]:
                     fname = field["name"]
                     ftype = field["type"]
@@ -926,7 +927,7 @@ class SQLiteRepository(BaseRepository):
             temp_table = f"{table_name}_temp"
 
             # Build CREATE TABLE without removed field
-            columns = ["id INTEGER PRIMARY KEY AUTOINCREMENT"]
+            columns = ["record_id TEXT PRIMARY KEY"]
             for field in spec["fields"]:
                 fname = field["name"]
                 ftype = field["type"]
@@ -942,8 +943,8 @@ class SQLiteRepository(BaseRepository):
 
             cursor.execute(create_sql)
 
-            # Copy data excluding the removed field
-            field_names = [f["name"] for f in spec["fields"]]
+            # Copy data excluding the removed field (include record_id)
+            field_names = ["record_id"] + [f["name"] for f in spec["fields"]]
             fields_sql = ", ".join(field_names)
 
             copy_sql = f"""

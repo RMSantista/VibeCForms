@@ -1,0 +1,17 @@
+{
+  "title": "Clientes",
+  "icon": "fa-building",
+  "fields": [
+    {"name": "nome", "label": "Nome/Razão Social", "type": "text", "required": true},
+    {"name": "cpf_cnpj", "label": "CPF/CNPJ", "type": "text", "required": true},
+    {"name": "sif", "label": "SIF (Serviço de Inspeção Federal)", "type": "text", "required": false},
+    {"name": "ima", "label": "IMA (Instituto Mineiro de Agropecuária)", "type": "text", "required": false},
+    {"name": "telefone", "label": "Telefone", "type": "tel", "required": false},
+    {"name": "email", "label": "E-mail", "type": "email", "required": false}
+  ],
+  "validation_messages": {
+    "all_empty": "Informe ao menos o nome e CPF/CNPJ do cliente.",
+    "nome": "O nome/razão social é obrigatório.",
+    "cpf_cnpj": "O CPF/CNPJ é obrigatório."
+  }
+}

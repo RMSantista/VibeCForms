@@ -1,1 +1,26 @@
-{}
+{
+  "clientes": {
+    "last_spec_hash": "44c23ff87b887b6d1e493840454348b4",
+    "last_backend": "sqlite",
+    "last_updated": "2025-12-10T00:22:58.873537",
+    "record_count": 3
+  },
+  "acreditadores": {
+    "last_spec_hash": "8d601478843ee8c840236b496de8c71d",
+    "last_backend": "sqlite",
+    "last_updated": "2025-12-10T00:22:52.787488",
+    "record_count": 2
+  },
+  "tipo_amostra": {
+    "last_spec_hash": "012be9a2a80b0720fd21bc53d934a7a8",
+    "last_backend": "sqlite",
+    "last_updated": "2025-12-10T00:23:34.635592",
+    "record_count": 5
+  },
+  "metodologias": {
+    "last_spec_hash": "1dd883f7625399926346a8f7383096c9",
+    "last_backend": "sqlite",
+    "last_updated": "2025-12-10T00:23:08.470740",
+    "record_count": 8
+  }
+}
