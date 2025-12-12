@@ -513,17 +513,38 @@ Folders can be customized via `_folder.json` files - demonstrating **Configurati
 
 ### Route Structure
 
-- `/` (GET): Main landing page with all forms as cards
-- `/<path:form_name>` (GET/POST): Dynamic form page (supports nested paths)
-- `/<path:form_name>/edit/<int:idx>` (GET/POST): Edit form entry
-- `/<path:form_name>/delete/<int:idx>` (GET): Delete form entry
+**Architecture:** Flask Blueprints (modular controller-based design)
+
+The application uses Flask Blueprints to organize routes into specialized controllers:
+
+- **`src/controllers/forms.py`** - Form CRUD operations
+  - `/` (GET): Main landing page with all forms as cards
+  - `/<path:form_name>` (GET/POST): Dynamic form page (supports nested paths)
+  - `/<path:form_name>/edit/<int:idx>` (GET/POST): Edit form entry
+  - `/<path:form_name>/delete/<int:idx>` (GET): Delete form entry
+
+- **`src/controllers/tags.py`** - Tag management and API
+  - `/api/tags/*` - Tag operations (add, remove, get, search)
+  - Tag history and workflow state transitions
+
+- **`src/controllers/kanban.py`** - Kanban board visualization
+  - Kanban boards for visual state management
+  - Card movement between columns (tag transitions)
+
+- **`src/controllers/migration.py`** - Data migration
+  - `/migrate/*` - Backend migration routes
+  - Schema change confirmation UI
 
 **Examples:**
 - `/contatos` - Root level form
 - `/financeiro/contas` - Nested form
 - `/rh/departamentos/areas` - Multi-level nested form
+- `/api/tags/add` - Add tag to object
+- `/api/search/<form_path>` - Search with autocomplete
 
 All operations use the index position in the forms list (not a unique ID) to identify records.
+
+**Note:** `VibeCForms.py` serves as the main application orchestrator, registering blueprints and initializing services. Core logic resides in the specialized controllers.
 
 ---
 
