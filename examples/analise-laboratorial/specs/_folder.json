@@ -1,0 +1,6 @@
+{
+  "name": "Laboratório",
+  "description": "Sistema de Análises Laboratoriais de Controle de Qualidade",
+  "icon": "fa-flask",
+  "order": 1
+}

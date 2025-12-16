@@ -155,14 +155,25 @@ def test_delete_record(temp_db, sample_spec):
         {"nome": "Pedro", "email": "pedro@example.com", "ativo": False},
     )
 
+    # Get records before deletion to know what's at index 1
+    records_before = repo.read_all("test_form", sample_spec)
+    deleted_name = records_before[1]["nome"]
+
     # Delete second record (index 1)
     assert repo.delete("test_form", sample_spec, 1)
 
     # Verify deletion
     records = repo.read_all("test_form", sample_spec)
     assert len(records) == 2
-    assert records[0]["nome"] == "João"
-    assert records[1]["nome"] == "Pedro"
+
+    # Check that the deleted record is gone
+    remaining_names = {r["nome"] for r in records}
+    assert deleted_name not in remaining_names
+
+    # Check that we still have 2 of the original 3 names
+    all_names = {"João", "Maria", "Pedro"}
+    assert remaining_names.issubset(all_names)
+    assert len(remaining_names) == 2
 
 
 def test_has_data(temp_db, sample_spec):

@@ -1,0 +1,76 @@
+{
+  "title": "Amostras",
+  "icon": "fa-flask",
+  "fields": [
+    {
+      "name": "identificacao",
+      "label": "Identificação da Amostra",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "cliente",
+      "label": "Cliente",
+      "type": "search",
+      "datasource": "clientes",
+      "required": true
+    },
+    {
+      "name": "tipo_amostra",
+      "label": "Tipo de Amostra",
+      "type": "search",
+      "datasource": "tipo_amostra",
+      "required": true
+    },
+    {
+      "name": "data_coleta",
+      "label": "Data de Coleta",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "hora_coleta",
+      "label": "Hora da Coleta",
+      "type": "time",
+      "required": false
+    },
+    {
+      "name": "data_entrada",
+      "label": "Data de Entrada no Laboratório",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "temperatura_entrada",
+      "label": "Temperatura na Entrada (°C)",
+      "type": "number",
+      "required": false
+    },
+    {
+      "name": "condicao_amostra",
+      "label": "Condição da Amostra",
+      "type": "select",
+      "required": true,
+      "options": [
+        {"value": "adequada", "label": "Adequada"},
+        {"value": "inadequada", "label": "Inadequada"},
+        {"value": "com_ressalvas", "label": "Com Ressalvas"}
+      ]
+    },
+    {
+      "name": "observacoes",
+      "label": "Observações",
+      "type": "textarea",
+      "required": false
+    }
+  ],
+  "validation_messages": {
+    "all_empty": "Por favor, preencha pelo menos: Identificação, Cliente, Tipo, Data de Coleta e Data de Entrada",
+    "identificacao": "Informe a identificação da amostra",
+    "cliente": "Selecione um cliente válido",
+    "tipo_amostra": "Selecione um tipo de amostra válido",
+    "data_coleta": "Informe a data de coleta",
+    "data_entrada": "Informe a data de entrada no laboratório",
+    "condicao_amostra": "Selecione a condição da amostra"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "title": "Tipos de Amostra",
+  "icon": "fa-vial",
+  "fields": [
+    {"name": "tipo", "label": "Tipo de Amostra", "type": "text", "required": true},
+    {"name": "temperatura_conservacao", "label": "Temperatura de Conservação (°C)", "type": "text", "required": true},
+    {"name": "descricao", "label": "Descrição", "type": "textarea", "required": false}
+  ],
+  "validation_messages": {
+    "all_empty": "Informe ao menos o tipo e a temperatura de conservação.",
+    "tipo": "O tipo de amostra é obrigatório.",
+    "temperatura_conservacao": "A temperatura de conservação é obrigatória (ex: 2-8, 0-4, -18 a -20)."
+  }
+}

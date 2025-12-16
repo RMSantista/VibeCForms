@@ -1,51 +1,181 @@
 <div class="form-row">
-    <label for="{{ field_name }}">{{ field_label }}:</label>
-    <input
-        type="search"
-        name="{{ field_name }}"
-        id="{{ field_name }}"
-        list="{{ field_name }}_datalist"
-        autocomplete="off"
-        {% if required %}required{% endif %}
-        value="{{ value }}"
-        placeholder="Digite para buscar...">
-    <datalist id="{{ field_name }}_datalist"></datalist>
+    <label for="{{ field_name }}_display">{{ field_label }}:</label>
+    <div class="autocomplete-wrapper" style="position: relative; display: inline-block; width: 100%;">
+        <!-- Campo visível: exibe o nome do registro -->
+        <input
+            type="text"
+            id="{{ field_name }}_display"
+            autocomplete="off"
+            {% if required %}required{% endif %}
+            placeholder="Digite para buscar..."
+            style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+
+        <!-- Campo oculto: armazena o UUID (este é enviado no formulário) -->
+        <input
+            type="hidden"
+            name="{{ field_name }}"
+            id="{{ field_name }}"
+            value="{{ value }}">
+
+        <!-- Dropdown de sugestões -->
+        <div id="{{ field_name }}_suggestions" class="autocomplete-suggestions" style="
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 200px;
+            overflow-y: auto;
+            background: white;
+            border: 1px solid #ccc;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 1000;
+            display: none;
+        "></div>
+    </div>
 </div>
+
+<style>
+.autocomplete-suggestions {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.autocomplete-suggestion {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.autocomplete-suggestion:hover {
+    background-color: #f0f0f0;
+}
+
+.autocomplete-suggestion.active {
+    background-color: #e0e0e0;
+}
+
+.autocomplete-suggestion:last-child {
+    border-bottom: none;
+}
+</style>
 
 <script>
 (function() {
-    const input = document.getElementById('{{ field_name }}');
-    const datalist = document.getElementById('{{ field_name }}_datalist');
+    const displayInput = document.getElementById('{{ field_name }}_display');
+    const hiddenInput = document.getElementById('{{ field_name }}');
+    const suggestionsDiv = document.getElementById('{{ field_name }}_suggestions');
     let debounceTimer;
+    let currentFocus = -1;
 
-    if (input && datalist) {
-        input.addEventListener('input', function() {
+    if (displayInput && hiddenInput && suggestionsDiv) {
+        // Input event - buscar sugestões
+        displayInput.addEventListener('input', function() {
             clearTimeout(debounceTimer);
-
             const query = this.value.trim();
 
-            if (query.length < 2) {
-                datalist.innerHTML = '';
+            if (query.length < 1) {
+                suggestionsDiv.style.display = 'none';
+                suggestionsDiv.innerHTML = '';
+                hiddenInput.value = '';  // Limpa UUID se campo foi limpo
                 return;
             }
 
-            // Debounce: wait 300ms after user stops typing
+            // Debounce: aguardar 200ms após parar de digitar
             debounceTimer = setTimeout(function() {
-                fetch('/api/search/contatos?q=' + encodeURIComponent(query))
+                fetch('/api/search/{{ datasource }}?q=' + encodeURIComponent(query))
                     .then(response => response.json())
                     .then(data => {
-                        datalist.innerHTML = '';
-                        data.forEach(nome => {
-                            const option = document.createElement('option');
-                            option.value = nome;
-                            datalist.appendChild(option);
+                        suggestionsDiv.innerHTML = '';
+
+                        if (data.length === 0) {
+                            suggestionsDiv.style.display = 'none';
+                            return;
+                        }
+
+                        data.forEach(function(item) {
+                            const div = document.createElement('div');
+                            div.className = 'autocomplete-suggestion';
+                            div.textContent = item.label;
+                            div.dataset.recordId = item.record_id;
+
+                            div.addEventListener('click', function() {
+                                // Preenche campo visível com o nome
+                                displayInput.value = item.label;
+
+                                // Preenche campo oculto com o UUID
+                                hiddenInput.value = item.record_id;
+
+                                // Fecha dropdown
+                                suggestionsDiv.style.display = 'none';
+                                suggestionsDiv.innerHTML = '';
+                                currentFocus = -1;
+                            });
+
+                            suggestionsDiv.appendChild(div);
                         });
+
+                        suggestionsDiv.style.display = 'block';
+                        currentFocus = -1;
                     })
                     .catch(error => {
-                        console.error('Erro ao buscar contatos:', error);
+                        console.error('Erro ao buscar {{ datasource }}:', error);
+                        suggestionsDiv.style.display = 'none';
                     });
-            }, 300);
+            }, 200);
         });
+
+        // Fechar dropdown ao clicar fora
+        document.addEventListener('click', function(e) {
+            if (e.target !== displayInput && !suggestionsDiv.contains(e.target)) {
+                suggestionsDiv.style.display = 'none';
+            }
+        });
+
+        // Navegação com teclado (setas e Enter)
+        displayInput.addEventListener('keydown', function(e) {
+            const suggestions = suggestionsDiv.getElementsByClassName('autocomplete-suggestion');
+
+            if (e.keyCode === 40) { // Seta para baixo
+                currentFocus++;
+                addActive(suggestions);
+                e.preventDefault();
+            } else if (e.keyCode === 38) { // Seta para cima
+                currentFocus--;
+                addActive(suggestions);
+                e.preventDefault();
+            } else if (e.keyCode === 13) { // Enter
+                e.preventDefault();
+                if (currentFocus > -1 && suggestions[currentFocus]) {
+                    suggestions[currentFocus].click();
+                }
+            } else if (e.keyCode === 27) { // ESC
+                suggestionsDiv.style.display = 'none';
+                currentFocus = -1;
+            }
+        });
+
+        function addActive(suggestions) {
+            if (!suggestions || suggestions.length === 0) return false;
+            removeActive(suggestions);
+            if (currentFocus >= suggestions.length) currentFocus = 0;
+            if (currentFocus < 0) currentFocus = (suggestions.length - 1);
+            suggestions[currentFocus].classList.add('active');
+        }
+
+        function removeActive(suggestions) {
+            for (let i = 0; i < suggestions.length; i++) {
+                suggestions[i].classList.remove('active');
+            }
+        }
+
+        // Carregar nome do registro se há UUID inicial
+        if (hiddenInput.value) {
+            // TODO: Implementar busca reversa UUID -> Nome se necessário
+            // Por enquanto, deixar campo display vazio quando editando
+        }
     }
 })();
 </script>

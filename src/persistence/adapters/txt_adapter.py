@@ -919,6 +919,90 @@ class TxtRepository(BaseRepository):
         return self._write_all(form_path, spec, forms)
 
     # =========================================================================
+    # SEARCH METHOD (for search autocomplete fields)
+    # =========================================================================
+
+    def search(
+        self,
+        form_path: str,
+        spec: Dict[str, Any],
+        field_name: str,
+        query: str,
+        limit: int = 5,
+    ) -> List[str]:
+        """
+        Search for records matching a query string in a specific field.
+
+        Uses file scanning with early termination after reaching limit.
+        Case-insensitive search optimized for TXT files.
+        """
+        if not self.exists(form_path):
+            logger.warning(f"Cannot search: file does not exist for {form_path}")
+            return []
+
+        if not query or not query.strip():
+            return []
+
+        file_path = self._get_file_path(form_path)
+        query_lower = query.lower()
+
+        # Find field index in spec
+        field_index = None
+        for i, field in enumerate(spec.get("fields", [])):
+            if field["name"] == field_name:
+                field_index = i + 1  # +1 because record_id is first column
+                break
+
+        if field_index is None:
+            logger.error(f"Field '{field_name}' not found in spec for {form_path}")
+            return []
+
+        results = []
+        seen = set()  # Track unique values
+
+        try:
+            with open(file_path, "r", encoding=self.encoding) as f:
+                for line in f:
+                    # Early termination if we have enough results
+                    if len(results) >= limit:
+                        break
+
+                    line = line.strip()
+                    if not line:
+                        continue
+
+                    parts = line.split(self.delimiter)
+
+                    # Check if field index is valid for this line
+                    if field_index >= len(parts):
+                        continue
+
+                    field_value = parts[field_index].strip()
+
+                    # Skip empty values
+                    if not field_value:
+                        continue
+
+                    # Case-insensitive substring match
+                    if query_lower in field_value.lower():
+                        # Only add if not seen before (DISTINCT)
+                        if field_value not in seen:
+                            seen.add(field_value)
+                            results.append(field_value)
+
+            # Sort results alphabetically
+            results.sort()
+
+            logger.debug(
+                f"Search '{query}' in {form_path}.{field_name}: {len(results)} results"
+            )
+            return results
+
+        except Exception as e:
+            logger.error(f"Search failed in {form_path}.{field_name}: {e}")
+            return []
+
+    # =========================================================================
     # TAG MANAGEMENT METHODS (Stub implementations for FASE 3)
     # =========================================================================
 

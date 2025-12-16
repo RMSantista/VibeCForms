@@ -1,0 +1,13 @@
+{
+  "title": "Acreditadores",
+  "icon": "fa-certificate",
+  "fields": [
+    {"name": "acreditador", "label": "Nome do Acreditador", "type": "text", "required": true},
+    {"name": "sigla", "label": "Sigla", "type": "text", "required": false},
+    {"name": "website", "label": "Website", "type": "url", "required": false}
+  ],
+  "validation_messages": {
+    "all_empty": "Informe o nome do acreditador.",
+    "acreditador": "O nome do acreditador é obrigatório."
+  }
+}

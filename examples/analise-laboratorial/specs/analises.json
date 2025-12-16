@@ -1,0 +1,56 @@
+{
+  "title": "Análises",
+  "icon": "fa-microscope",
+  "fields": [
+    {
+      "name": "nome_oficial",
+      "label": "Nome Oficial da Análise",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "matriz_amostra",
+      "label": "Matriz da Amostra",
+      "type": "search",
+      "datasource": "matriz_amostras",
+      "required": true
+    },
+    {
+      "name": "metodologia",
+      "label": "Metodologia",
+      "type": "search",
+      "datasource": "metodologias",
+      "required": true
+    },
+    {
+      "name": "tipo_analise",
+      "label": "Tipo de Análise",
+      "type": "select",
+      "required": true,
+      "options": [
+        {"value": "microbiologica", "label": "Microbiológica"},
+        {"value": "fisico_quimica", "label": "Físico-Química"},
+        {"value": "sensorial", "label": "Sensorial"}
+      ]
+    },
+    {
+      "name": "unidade_medida",
+      "label": "Unidade de Medida",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "valor_referencia",
+      "label": "Valor de Referência",
+      "type": "text",
+      "required": false
+    }
+  ],
+  "validation_messages": {
+    "all_empty": "Por favor, preencha pelo menos: Nome Oficial, Matriz, Metodologia e Tipo de Análise",
+    "nome_oficial": "Informe o nome oficial da análise",
+    "matriz_amostra": "Selecione uma matriz de amostra válida",
+    "metodologia": "Selecione uma metodologia válida",
+    "tipo_analise": "Selecione o tipo de análise"
+  }
+}

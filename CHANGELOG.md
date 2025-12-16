@@ -778,6 +778,160 @@ Ver `docs/roadmap.md` para planos futuros:
 
 ---
 
+## Version 2.4.0 - UUID Search Integration & Generic API (2025-12-15)
+
+### Overview
+This version implements a complete overhaul of the search field system, adding UUID-based relationship support and a generic API that automatically adapts to any entity. The new dual-field architecture allows users to search and select records by name while the system transparently stores UUID references, maintaining data integrity in 1:N relationships.
+
+**Key Achievements:**
+- 200 lines of duplicated code replaced with 64-line generic solution
+- Zero configuration required - auto-detects display fields from specs
+- Full keyboard navigation support (↑↓, Enter, ESC)
+- Compatible with both TXT and SQLite backends
+- All 133 tests passing (0 failures, 4 skipped)
+
+---
+
+### Enhancement #1: Generic Search API with UUID Support
+
+#### 🔍 Auto-Detecting Generic Search Endpoint
+Replaced 8+ hardcoded search endpoints with a single parameterized route that automatically detects the appropriate display field from each entity's spec.
+
+**New generic API endpoint:**
+```python
+@forms_bp.route("/api/search/<datasource>")
+def api_search_generic(datasource):
+    """Generic API endpoint to search any entity with autocomplete.
+
+    Automatically detects the primary display field from the spec
+    (first required text field) and returns results as
+    {record_id, label} pairs for UUID-based relationships.
+    """
+```
+
+**Auto-Detection Logic:**
+- Scans spec for first required text field (text, email, tel, url, search)
+- Falls back to first text field if no required text field exists
+- No hardcoded field names - works with any entity structure
+
+**UUID-based Response Format:**
+```json
+[
+  {"record_id": "5GHJJD0E2197X85MASWYNSPREYT", "label": "ANVISA"},
+  {"record_id": "7KMNPR2G4TS9X12VWBYTE45Q", "label": "INMETRO"}
+]
+```
+
+**Benefits:**
+- **Maintainability**: 200 lines of duplicated code eliminated
+- **Scalability**: Built-in LIMIT 5 for performance
+- **Flexibility**: Works automatically for new entities
+- **Data Integrity**: Stores UUIDs, not index positions
+
+**Files Modified:**
+- `src/controllers/forms.py` (lines 733-800) - Added generic search endpoint
+- Removed 8 hardcoded endpoints (contatos, clientes, fornecedores, produtos, etc.)
+
+---
+
+### Enhancement #2: Enhanced Search Autocomplete Template
+
+#### 🎨 Dual-Field Architecture with Keyboard Navigation
+Complete rewrite of search autocomplete template from HTML5 datalist (52 lines) to custom dropdown UI (182 lines) with full keyboard support.
+
+**New Features:**
+- **Dual Fields**: Visible input for display name + hidden input for UUID
+- **Real-time Dropdown**: Up to 5 suggestions in custom dropdown (not datalist)
+- **Keyboard Navigation**:
+  - ↑↓ arrow keys to navigate suggestions
+  - Enter to select highlighted suggestion
+  - ESC to close dropdown
+- **Debounced Search**: 200ms delay reduces API load
+- **Visual Feedback**: Active state highlighting during keyboard navigation
+- **Smart Clearing**: Clears UUID when display field is emptied
+
+**Template Structure:**
+```html
+<!-- Visible field: user types and selects by name -->
+<input type="text" id="field_name_display" placeholder="Digite para buscar...">
+
+<!-- Hidden field: stores UUID for form submission -->
+<input type="hidden" name="field_name" id="field_name" value="UUID">
+
+<!-- Custom dropdown with suggestions -->
+<div id="field_name_suggestions" class="autocomplete-suggestions"></div>
+```
+
+**User Experience:**
+1. User types "ANV" in visible field
+2. API returns `[{"record_id": "5GH...", "label": "ANVISA"}]`
+3. Dropdown shows "ANVISA"
+4. User selects → visible field shows "ANVISA", hidden field stores UUID
+5. Form submits UUID, maintaining referential integrity
+
+**Files Modified:**
+- `src/templates/fields/search_autocomplete.html` - Complete rewrite (52→182 lines)
+- `examples/analise-laboratorial/templates/fields/search_autocomplete.html` - Updated
+
+**Migration Note:**
+Business cases with custom templates must update their `templates/fields/search_autocomplete.html` by copying from `src/templates/fields/search_autocomplete.html`.
+
+---
+
+### Technical Implementation
+
+**Repository Integration:**
+- Uses `_record_id` field (standard from SQLiteAdapter)
+- Case-insensitive substring matching
+- Compatible with BaseRepository interface
+
+**API Example:**
+```bash
+curl "http://127.0.0.1:5000/api/search/acreditadores?q=anv"
+# Returns: [{"record_id":"5GHJJD0E2197X85MASWYNSPREYT","label":"ANVISA"}]
+```
+
+**Spec Format:**
+```json
+{
+  "name": "matriz_amostra",
+  "label": "Matriz da Amostra",
+  "type": "search",
+  "datasource": "matriz_amostras",
+  "required": true
+}
+```
+
+**How It Works:**
+1. User types in `matriz_amostra_display` field
+2. JavaScript fetches `/api/search/matriz_amostras?q=<query>`
+3. API auto-detects display field from `matriz_amostras` spec
+4. Returns up to 5 matching records with UUIDs
+5. User selects → hidden `matriz_amostra` field receives UUID
+6. Form submits UUID to maintain relationship integrity
+
+---
+
+### Testing & Validation
+
+**API Tests:**
+```bash
+✓ curl "/api/search/acreditadores?q=anv" → Returns ANVISA with UUID
+✓ curl "/api/search/clientes?q=couves" → Returns Fazenda Couves Verdes
+✓ curl "/api/search/metodologias?q=coli" → Returns 2 E. coli matches
+```
+
+**Unit Tests:**
+- 133 tests passed, 0 failures, 4 skipped
+- Zero regressions introduced
+- All existing functionality preserved
+
+**Code Quality:**
+- Linter formatted 2 files (forms.py, sqlite_adapter.py)
+- No style violations
+
+---
+
 ## Version 2.3.1 - Search Autocomplete & Responsive Tables
 
 ### Overview

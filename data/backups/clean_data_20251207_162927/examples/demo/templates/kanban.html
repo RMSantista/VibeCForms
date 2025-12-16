@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ board_title }} - VibeCForms</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+
+        .header {
+            background-color: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            color: #333;
+        }
+
+        .header a {
+            text-decoration: none;
+            color: #0066cc;
+            padding: 8px 16px;
+            border: 1px solid #0066cc;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .header a:hover {
+            background-color: #0066cc;
+            color: white;
+        }
+
+        .kanban-board {
+            display: flex;
+            gap: 20px;
+            overflow-x: auto;
+            padding-bottom: 20px;
+        }
+
+        .kanban-column {
+            flex: 0 0 300px;
+            background-color: #e8e8e8;
+            border-radius: 8px;
+            padding: 12px;
+            min-height: 500px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .column-header {
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            font-weight: 600;
+            font-size: 14px;
+            color: #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-count {
+            background-color: rgba(0,0,0,0.1);
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+        }
+
+        .cards-container {
+            flex: 1;
+            overflow-y: auto;
+            min-height: 100px;
+            padding: 4px;
+        }
+
+        .kanban-card {
+            background-color: white;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+            cursor: move;
+            transition: all 0.2s;
+            border-left: 4px solid transparent;
+        }
+
+        .kanban-card:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            transform: translateY(-2px);
+        }
+
+        .kanban-card.dragging {
+            opacity: 0.5;
+            transform: rotate(2deg);
+        }
+
+        .kanban-card.drag-over {
+            border-top: 3px solid #0066cc;
+        }
+
+        .card-title {
+            font-weight: 600;
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .card-field {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+            display: flex;
+        }
+
+        .card-field-label {
+            font-weight: 500;
+            margin-right: 4px;
+            min-width: 60px;
+        }
+
+        .card-field-value {
+            color: #333;
+        }
+
+        .card-id {
+            font-size: 10px;
+            color: #999;
+            margin-top: 8px;
+            font-family: monospace;
+        }
+
+        .empty-column {
+            text-align: center;
+            color: #999;
+            padding: 40px 20px;
+            font-size: 14px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-size: 16px;
+        }
+
+        .error {
+            background-color: #ffebee;
+            color: #c62828;
+            padding: 16px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        /* Scrollbar styling */
+        .cards-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .cards-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+
+        .cards-container::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 3px;
+        }
+
+        .cards-container::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><i class="fa fa-th"></i> {{ board_title }}</h1>
+        <a href="/"><i class="fa fa-home"></i> Voltar</a>
+    </div>
+
+    <div id="error-message" class="error" style="display:none;"></div>
+
+    <div id="kanban-board" class="kanban-board">
+        <div class="loading">
+            <i class="fa fa-spinner fa-spin"></i> Carregando board...
+        </div>
+    </div>
+
+    <script>
+        const BOARD_NAME = '{{ board_name }}';
+        const BOARD_CONFIG = {{ board_config | tojson | safe }};
+        let boardCards = {};
+
+        // Load board cards
+        async function loadBoardCards() {
+            try {
+                const response = await fetch(`/api/kanban/${BOARD_NAME}/cards`);
+                if (!response.ok) {
+                    throw new Error('Erro ao carregar cards');
+                }
+                const data = await response.json();
+                if (data.success) {
+                    boardCards = data.cards;
+                    renderBoard();
+                } else {
+                    showError(data.error || 'Erro ao carregar cards');
+                }
+            } catch (error) {
+                showError(error.message);
+            }
+        }
+
+        // Render the Kanban board
+        function renderBoard() {
+            const boardElement = document.getElementById('kanban-board');
+            boardElement.innerHTML = '';
+
+            BOARD_CONFIG.columns.forEach(column => {
+                const columnElement = createColumn(column);
+                boardElement.appendChild(columnElement);
+            });
+        }
+
+        // Create a column element
+        function createColumn(column) {
+            const columnDiv = document.createElement('div');
+            columnDiv.className = 'kanban-column';
+            columnDiv.dataset.tag = column.tag;
+
+            // Column header
+            const headerDiv = document.createElement('div');
+            headerDiv.className = 'column-header';
+            headerDiv.style.backgroundColor = column.color;
+
+            const cards = boardCards[column.tag] || [];
+
+            headerDiv.innerHTML = `
+                <span>${column.label}</span>
+                <span class="card-count">${cards.length}</span>
+            `;
+
+            columnDiv.appendChild(headerDiv);
+
+            // Cards container
+            const cardsContainer = document.createElement('div');
+            cardsContainer.className = 'cards-container';
+            cardsContainer.dataset.tag = column.tag;
+
+            // Make container a drop target
+            setupDropZone(cardsContainer);
+
+            if (cards.length === 0) {
+                const emptyDiv = document.createElement('div');
+                emptyDiv.className = 'empty-column';
+                emptyDiv.innerHTML = '<i class="fa fa-inbox"></i><br>Nenhum card';
+                cardsContainer.appendChild(emptyDiv);
+            } else {
+                cards.forEach(card => {
+                    const cardElement = createCard(card, column.tag);
+                    cardsContainer.appendChild(cardElement);
+                });
+            }
+
+            columnDiv.appendChild(cardsContainer);
+            return columnDiv;
+        }
+
+        // Create a card element
+        function createCard(cardData, tag) {
+            const cardDiv = document.createElement('div');
+            cardDiv.className = 'kanban-card';
+            cardDiv.draggable = true;
+            cardDiv.dataset.recordId = cardData._record_id;
+            cardDiv.dataset.tag = tag;
+
+            // Setup drag events
+            setupDragEvents(cardDiv);
+
+            // Find primary field for title (first non-hidden field)
+            let titleField = BOARD_CONFIG.columns[0]; // fallback
+            let titleValue = cardData._record_id.substring(0, 8);
+
+            if (cardData.nome) titleValue = cardData.nome;
+            else if (cardData.title) titleValue = cardData.title;
+            else if (cardData.name) titleValue = cardData.name;
+
+            let cardHTML = `<div class="card-title">${titleValue}</div>`;
+
+            // Add other fields (limit to first 3 for readability)
+            let fieldCount = 0;
+            for (const [key, value] of Object.entries(cardData)) {
+                if (key.startsWith('_') || !value || fieldCount >= 3) continue;
+                if (key === 'nome' || key === 'title' || key === 'name') continue;
+
+                cardHTML += `
+                    <div class="card-field">
+                        <span class="card-field-label">${key}:</span>
+                        <span class="card-field-value">${String(value).substring(0, 30)}</span>
+                    </div>
+                `;
+                fieldCount++;
+            }
+
+            cardHTML += `<div class="card-id">ID: ${cardData._record_id.substring(0, 12)}...</div>`;
+
+            cardDiv.innerHTML = cardHTML;
+            return cardDiv;
+        }
+
+        // Setup drag events for a card
+        function setupDragEvents(cardElement) {
+            cardElement.addEventListener('dragstart', (e) => {
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', JSON.stringify({
+                    recordId: cardElement.dataset.recordId,
+                    fromTag: cardElement.dataset.tag
+                }));
+                cardElement.classList.add('dragging');
+            });
+
+            cardElement.addEventListener('dragend', (e) => {
+                cardElement.classList.remove('dragging');
+            });
+        }
+
+        // Setup drop zone for a cards container
+        function setupDropZone(container) {
+            container.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            });
+
+            container.addEventListener('drop', async (e) => {
+                e.preventDefault();
+
+                try {
+                    const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+                    const toTag = container.dataset.tag;
+
+                    if (data.fromTag === toTag) {
+                        return; // Same column, no move needed
+                    }
+
+                    // Move the card
+                    await moveCard(data.recordId, data.fromTag, toTag);
+
+                } catch (error) {
+                    showError('Erro ao mover card: ' + error.message);
+                }
+            });
+        }
+
+        // Move card via API
+        async function moveCard(recordId, fromTag, toTag) {
+            try {
+                const response = await fetch(`/api/kanban/${BOARD_NAME}/move`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        record_id: recordId,
+                        from_tag: fromTag,
+                        to_tag: toTag,
+                        actor: 'user' // Could be enhanced to track actual user
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Erro na requisição');
+                }
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Reload board to show updated state
+                    await loadBoardCards();
+                } else {
+                    throw new Error(data.error || 'Erro ao mover card');
+                }
+
+            } catch (error) {
+                showError(error.message);
+                // Reload board to restore correct state
+                await loadBoardCards();
+            }
+        }
+
+        // Show error message
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        // Initialize board on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadBoardCards();
+
+            // Auto-refresh every 30 seconds
+            setInterval(loadBoardCards, 30000);
+        });
+    </script>
+</body>
+</html>
