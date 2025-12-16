@@ -1,0 +1,259 @@
+<html>
+<head>
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #f7f7f7; margin: 0; padding: 0; }
+        .layout { display: flex; min-height: 100vh; }
+        .sidebar { width: 250px; background: #2c3e50; color: #fff; padding: 20px 0; position: fixed; height: 100vh; z-index: 1000; display: flex; flex-direction: column; }
+        .sidebar-header { padding: 0 20px 20px; border-bottom: 1px solid #34495e; margin-bottom: 20px; flex-shrink: 0; }
+        .sidebar-header h1 { font-size: 24px; font-style: italic; margin: 0; color: #3498db; }
+        .sidebar-header p { font-size: 12px; margin: 5px 0 0; color: #95a5a6; }
+        .menu-container { flex: 1; overflow-y: auto; position: relative; }
+        .menu { list-style: none; padding: 0; margin: 0; }
+        .menu li { margin: 0; position: static; }
+        .menu a { display: flex; align-items: center; gap: 12px; padding: 15px 20px; color: #ecf0f1; text-decoration: none; transition: all 0.2s; white-space: nowrap; }
+        .menu a:hover { background: #34495e; color: #3498db; }
+        .menu a.active { background: #3498db; color: #fff; }
+        .menu a.active-path { background: #34495e; }
+        .menu a i { font-size: 18px; width: 20px; text-align: center; }
+        .submenu-arrow { font-size: 12px !important; margin-left: auto; }
+        .has-submenu { position: relative; }
+        .submenu { list-style: none; padding: 0; margin: 0; position: fixed; left: 250px; background: #34495e; min-width: 220px; width: auto; box-shadow: 4px 4px 12px rgba(0,0,0,0.4); display: none; z-index: 2000; border-radius: 4px; }
+        .has-submenu:hover > .submenu { display: block; }
+        .submenu li { position: static; }
+        .submenu li a { padding: 12px 20px; font-size: 14px; white-space: nowrap; }
+        .level-2 { background: #2c3e50; }
+        .level-3 { background: #1a252f; }
+        .main-content { margin-left: 250px; flex: 1; padding: 40px; position: relative; z-index: 1; }
+        .container { max-width: 1200px; margin: 0 auto; background: #fff; padding: 30px 60px; border-radius: 10px; box-shadow: 0 2px 8px #ccc; position: relative; z-index: 1; }
+        h2 { text-align: center; margin-bottom: 25px; color: #2c3e50; }
+        form { display: flex; flex-direction: column; gap: 15px; margin-bottom: 30px; }
+        label { font-weight: bold; color: #2c3e50; min-width: 180px; }
+        input[type="text"], input[type="tel"], input[type="email"], input[type="number"], input[type="password"], input[type="date"], textarea { padding: 7px; border-radius: 5px; border: 1px solid #bbb; flex: 1; }
+        textarea { min-height: 80px; resize: vertical; }
+        .form-row { display: flex; align-items: center; gap: 10px; }
+        .form-actions { display: flex; justify-content: flex-start; gap: 10px; }
+        button, .icon-btn { background: #3498db; color: #fff; border: none; border-radius: 5px; padding: 7px 14px; cursor: pointer; font-size: 15px; transition: background 0.2s; }
+        button:hover, .icon-btn:hover { background: #2980b9; }
+        .table-wrapper { width: 100%; overflow-x: auto; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; min-width: 600px; }
+        th, td { padding: 10px; border-bottom: 1px solid #eee; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        th { background: #3498db; color: #fff; }
+        tr:last-child td { border-bottom: none; }
+        .icon-btn { padding: 6px 10px; font-size: 16px; margin: 0 2px; }
+        .edit { background: #f39c12; }
+        .edit:hover { background: #e67e22; }
+        .delete { background: #e74c3c; }
+        .delete:hover { background: #c0392b; }
+        .home-link { display: flex; align-items: center; gap: 12px; padding: 15px 20px; color: #ecf0f1; text-decoration: none; transition: all 0.2s; border-top: 1px solid #34495e; margin-top: 10px; }
+        .home-link:hover { background: #34495e; color: #3498db; }
+        .home-link i { font-size: 18px; width: 20px; text-align: center; }
+        .tag { display: inline-block; color: #fff; padding: 3px 8px; border-radius: 12px; font-size: 11px; margin: 2px; white-space: nowrap; transition: transform 0.2s; }
+        .tag:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .tag .remove-tag { margin-left: 5px; cursor: pointer; opacity: 0.8; }
+        .tag .remove-tag:hover { opacity: 1; }
+        .tag-color-0 { background: #3498db; }
+        .tag-color-1 { background: #27ae60; }
+        .tag-color-2 { background: #e74c3c; }
+        .tag-color-3 { background: #f39c12; }
+        .tag-color-4 { background: #9b59b6; }
+        .tag-color-5 { background: #1abc9c; }
+        .tag-color-6 { background: #e67e22; }
+        .tag-color-7 { background: #34495e; }
+        .tag-color-8 { background: #16a085; }
+        .tag-color-9 { background: #2c3e50; }
+    </style>
+    <script>
+        // Tag management functions
+        async function loadTags(recordId, formName) {
+            try {
+                const response = await fetch(`/api/${formName}/tags/${recordId}`);
+                const data = await response.json();
+
+                if (data.success && data.tags) {
+                    displayTags(recordId, formName, data.tags);
+                }
+            } catch (error) {
+                console.error('Error loading tags:', error);
+            }
+        }
+
+        function getTagColorClass(tag) {
+            // Simple hash function to assign consistent colors to tags
+            let hash = 0;
+            for (let i = 0; i < tag.length; i++) {
+                hash = tag.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            return `tag-color-${Math.abs(hash) % 10}`;
+        }
+
+        function displayTags(recordId, formName, tags) {
+            const container = document.getElementById(`tags-${recordId}`);
+            if (!container) return;
+
+            if (tags.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+
+            // Display tags without remove buttons
+            container.innerHTML = tags.map(tagData => {
+                const tag = tagData.tag || tagData;
+                const colorClass = getTagColorClass(tag);
+                return `<span class="tag ${colorClass}" style="cursor: default;" title="Tag: ${tag}">
+                    ${tag}
+                </span>`;
+            }).join('');
+        }
+
+        function validateTagName(tag) {
+            // Tags must be lowercase, alphanumeric, and underscores only
+            const pattern = /^[a-z0-9_]+$/;
+            return pattern.test(tag);
+        }
+
+        async function addTag(recordId, formName, tag) {
+            if (!tag || !tag.trim()) return;
+
+            tag = tag.trim().toLowerCase();
+
+            // Validate tag name
+            if (!validateTagName(tag)) {
+                alert('Tag inválida: use apenas letras minúsculas, números e underscore (_)');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/${formName}/tags/${recordId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tag: tag, applied_by: 'user' })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Reload tags to show the new one
+                    loadTags(recordId, formName);
+                } else {
+                    alert('Erro ao adicionar tag: ' + (data.error || 'Desconhecido'));
+                }
+            } catch (error) {
+                console.error('Error adding tag:', error);
+                alert('Erro ao adicionar tag: ' + error.message);
+            }
+        }
+
+        async function removeTag(recordId, formName, tag) {
+            try {
+                const response = await fetch(`/api/${formName}/tags/${recordId}/${encodeURIComponent(tag)}?removed_by=user`, {
+                    method: 'DELETE'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Reload tags to remove the deleted one
+                    loadTags(recordId, formName);
+                } else {
+                    alert('Erro ao remover tag: ' + (data.error || 'Desconhecido'));
+                }
+            } catch (error) {
+                console.error('Error removing tag:', error);
+                alert('Erro ao remover tag: ' + error.message);
+            }
+        }
+
+        window.onload = function() {
+            var form = document.getElementById('cadastroForm');
+            if (form) {
+                form.onkeydown = function(e) {
+                    if (e.key === "Enter") {
+                        e.preventDefault();
+                        return false;
+                    }
+                };
+            }
+
+            // Position submenus dynamically
+            var menuItems = document.querySelectorAll('.has-submenu');
+            menuItems.forEach(function(item) {
+                item.addEventListener('mouseenter', function() {
+                    var submenu = this.querySelector(':scope > .submenu');
+                    if (submenu) {
+                        var rect = this.getBoundingClientRect();
+                        submenu.style.top = rect.top + 'px';
+
+                        // For nested submenus, calculate left position
+                        if (this.closest('.submenu')) {
+                            submenu.style.left = (rect.right) + 'px';
+                        }
+                    }
+                });
+            });
+
+            // Load tags automatically for all records (read-only display)
+            document.querySelectorAll('.tags-cell').forEach(function(cell) {
+                const recordId = cell.dataset.recordId;
+                const formName = cell.dataset.formName;
+                if (recordId && formName) {
+                    loadTags(recordId, formName);
+                }
+            });
+        };
+    </script>
+</head>
+<body>
+<div class="layout">
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h1>VibeCForms</h1>
+            <p>Formulários Dinâmicos</p>
+        </div>
+        <div class="menu-container">
+            <ul class="menu">
+                {{ menu_html|safe }}
+            </ul>
+            <a href="/" class="home-link"><i class="fa fa-home"></i> Página Inicial</a>
+        </div>
+    </nav>
+    <div class="main-content">
+        <div class="container">
+            <h2>{{ title }}</h2>
+            {% if default_tags %}
+            <div style="text-align: center; margin: -15px 0 20px;">
+                {% for tag in default_tags %}
+                <span class="tag tag-color-{{ loop.index0 % 10 }}" style="cursor: default;">
+                    {{ tag }}
+                </span>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% if error %}
+            <div style="color:#e74c3c; background:#ffeaea; border:1px solid #e74c3c; padding:10px; margin-bottom:15px; border-radius:5px;">
+                <i class="fa fa-exclamation-triangle"></i> {{error}}
+            </div>
+            {% endif %}
+            <form method="post" id="cadastroForm">
+
+                {{ form_fields|safe }}
+                <div class="form-actions">
+                    <button type="submit"><i class="fa fa-plus"></i> Cadastrar</button>
+                </div>
+            </form>
+            <h3 style="margin-top:0;">Registros cadastrados:</h3>
+            <div class="table-wrapper">
+                <table>
+                    <tr>
+                        {{ table_headers|safe }}
+                    </tr>
+                    {{ table_rows|safe }}
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

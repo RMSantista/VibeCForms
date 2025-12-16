@@ -1,0 +1,51 @@
+<div class="form-row">
+    <label for="{{ field_name }}">{{ field_label }}:</label>
+    <input
+        type="search"
+        name="{{ field_name }}"
+        id="{{ field_name }}"
+        list="{{ field_name }}_datalist"
+        autocomplete="off"
+        {% if required %}required{% endif %}
+        value="{{ value }}"
+        placeholder="Digite para buscar...">
+    <datalist id="{{ field_name }}_datalist"></datalist>
+</div>
+
+<script>
+(function() {
+    const input = document.getElementById('{{ field_name }}');
+    const datalist = document.getElementById('{{ field_name }}_datalist');
+    let debounceTimer;
+
+    if (input && datalist) {
+        input.addEventListener('input', function() {
+            clearTimeout(debounceTimer);
+
+            const query = this.value.trim();
+
+            if (query.length < 2) {
+                datalist.innerHTML = '';
+                return;
+            }
+
+            // Debounce: wait 300ms after user stops typing
+            debounceTimer = setTimeout(function() {
+                fetch('/api/search/{{ datasource }}?q=' + encodeURIComponent(query))
+                    .then(response => response.json())
+                    .then(data => {
+                        datalist.innerHTML = '';
+                        data.forEach(nome => {
+                            const option = document.createElement('option');
+                            option.value = nome;
+                            datalist.appendChild(option);
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Erro ao buscar contatos:', error);
+                    });
+            }, 300);
+        });
+    }
+})();
+</script>

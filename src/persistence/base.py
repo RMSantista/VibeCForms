@@ -262,6 +262,62 @@ class BaseRepository(ABC):
         pass
 
     # =========================================================================
+    # SEARCH METHOD (for search autocomplete fields)
+    # =========================================================================
+
+    @abstractmethod
+    def search(
+        self,
+        form_path: str,
+        spec: Dict[str, Any],
+        field_name: str,
+        query: str,
+        limit: int = 5,
+    ) -> List[str]:
+        """
+        Search for records matching a query string in a specific field.
+
+        This method is optimized for autocomplete functionality in search fields.
+        It performs case-insensitive substring matching and limits results
+        for performance.
+
+        Args:
+            form_path: Path to the form
+            spec: Form specification
+            field_name: Name of the field to search in
+            query: Search query string (case-insensitive substring match)
+            limit: Maximum number of results to return (default: 5)
+
+        Returns:
+            List of distinct field values that match the query
+            Empty list if no matches found
+            Results should be sorted alphabetically
+
+        Implementation notes:
+            - SQLite: Use SELECT DISTINCT field FROM table WHERE field LIKE ? LIMIT ?
+            - TXT: Scan file with early termination after N matches
+            - Case-insensitive matching
+            - Substring match (query can appear anywhere in the field value)
+            - Should stop searching after limit is reached for performance
+            - Return only distinct values (no duplicates)
+
+        Performance considerations:
+            - For SQLite: Use LIMIT clause to avoid loading all matching rows
+            - For TXT: Use early termination to avoid reading entire file
+            - Consider creating indexes on frequently searched fields
+
+        Example:
+            # Search for contacts whose name contains "joão"
+            results = repo.search('contatos', spec, 'nome', 'joão', limit=5)
+            # ['João Silva', 'João Pedro', 'Maria João']
+
+            # Search for products with "note" in name
+            results = repo.search('produtos', spec, 'nome', 'note', limit=5)
+            # ['Notebook Dell', 'Notebook HP', 'Notepad']
+        """
+        pass
+
+    # =========================================================================
     # DEPRECATED INDEX-BASED METHODS (Backward compatibility)
     # =========================================================================
 

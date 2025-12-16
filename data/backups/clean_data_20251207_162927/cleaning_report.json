@@ -1,0 +1,12 @@
+{
+  "timestamp": "2025-12-07T16:29:27.683101",
+  "stats": {
+    "txt_files_cleaned": 8,
+    "txt_records_removed": 139,
+    "sqlite_tables_cleaned": 4,
+    "sqlite_records_removed": 67,
+    "example_files_cleaned": 0,
+    "errors": []
+  },
+  "backup_location": "/home/rodrigo/VibeCForms/data/backups/clean_data_20251207_162927"
+}

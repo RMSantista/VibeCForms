@@ -1,0 +1,33 @@
+{
+  "title": "Matriz de Amostras",
+  "icon": "fa-layer-group",
+  "fields": [
+    {
+      "name": "acreditador",
+      "label": "Acreditador",
+      "type": "select",
+      "required": true,
+      "options": [
+        {"value": "ANVISA", "label": "ANVISA"},
+        {"value": "INMETRO", "label": "INMETRO"}
+      ]
+    },
+    {
+      "name": "grupo_amostra",
+      "label": "Grupo da Amostra",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "descricao",
+      "label": "Descrição",
+      "type": "textarea",
+      "required": false
+    }
+  ],
+  "validation_messages": {
+    "all_empty": "Por favor, preencha pelo menos os campos obrigatórios: Acreditador e Grupo da Amostra",
+    "acreditador": "Selecione um acreditador válido",
+    "grupo_amostra": "Informe o grupo da amostra"
+  }
+}
