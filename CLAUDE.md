@@ -479,9 +479,18 @@ Forms are defined by JSON specification files in `src/specs/`, implementing **Co
 {
   "name": "field_name",
   "type": "search",
-  "datasource": "contatos"
+  "datasource": "contatos",
+  "required": true
 }
 ```
+
+**How Search Fields Work:**
+- **Display**: User types and selects from dropdown (shows display names)
+- **Storage**: Form submits UUID (from `_record_id` field) to maintain relationships
+- **API**: Generic `/api/search/<datasource>` endpoint auto-detects display field from spec
+- **Template**: Dual-field system (visible input + hidden UUID field)
+- **Limit**: Returns maximum 5 results for performance
+- **Auto-detect**: Uses first required text field as display field
 
 **Icon Support:**
 - Optional `icon` field in spec files (e.g., "fa-address-book")
@@ -777,6 +786,36 @@ No code changes required - this is configuration.
 ---
 
 ## Recent Improvements
+
+### Version 2.4
+
+#### Improvement #9: Generic Search API with UUID Support
+- **Generic API Endpoint**: Single `/api/search/<datasource>` route replaces 8+ hardcoded endpoints
+- **Auto-detection**: Automatically detects primary display field from spec (first required text field)
+- **UUID-based Relationships**: Returns `{record_id: "UUID", label: "Display Name"}` objects instead of plain strings
+- **Intelligent Fallback**: Uses first text field if no required text field exists
+- **Performance**: Built-in LIMIT 5 for scalability
+- **200 lines removed**: Replaced duplicated code with 64-line generic implementation
+- **Zero configuration**: Works automatically for any entity with proper spec
+
+**Key Technical Details:**
+- Uses `_record_id` field from repository layer (SQLite adapter standard)
+- Case-insensitive substring matching
+- Supports all text-like field types: text, email, tel, url, search
+- Compatible with both TXT and SQLite backends
+
+#### Improvement #10: Enhanced Search Autocomplete Template
+- **Dual-field Architecture**: Visible input field for display + hidden field for UUID storage
+- **Real-time Dropdown**: Custom dropdown UI with up to 5 suggestions (not HTML5 datalist)
+- **Keyboard Navigation**: Full arrow key support (↑↓), Enter to select, ESC to close
+- **Debounced Search**: 200ms delay to reduce API calls
+- **Visual Feedback**: Active state highlighting for keyboard navigation
+- **UUID Transparency**: Users see names, system stores UUIDs seamlessly
+- **Template Size**: Expanded from 52 lines (1.7KB) to 182 lines (5.2KB) for complete functionality
+
+**Migration Note:**
+- Business cases with custom templates must update `templates/fields/search_autocomplete.html`
+- Copy from `src/templates/fields/search_autocomplete.html` to business case templates folder
 
 ### Version 2.3.1
 

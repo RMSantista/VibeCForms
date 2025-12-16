@@ -448,16 +448,32 @@ Cada formulário é definido por um arquivo JSON na pasta `specs/`. O sistema su
 }
 ```
 
-**search** - Campo de busca (pode ter datasource para autocomplete)
+**search** - Campo de busca com autocomplete baseado em UUID
 ```json
 {
-  "name": "busca",
-  "label": "Buscar",
+  "name": "cliente",
+  "label": "Cliente",
   "type": "search",
-  "datasource": "contatos",  // Opcional: autocomplete
-  "required": false
+  "datasource": "clientes",  // Obrigatório: nome do formulário fonte
+  "required": true
 }
 ```
+
+**Como funciona:**
+- **Interface do Usuário**: Campo de texto visível onde o usuário digita para buscar
+- **Autocomplete Inteligente**: Exibe até 5 sugestões em dropdown conforme o usuário digita
+- **Armazenamento Transparente**: Sistema armazena UUID (`_record_id`) automaticamente
+- **Navegação por Teclado**: Suporte completo para ↑↓ (navegar), Enter (selecionar), ESC (fechar)
+- **Debounce**: 200ms de delay para otimizar performance
+- **Auto-detecção**: API detecta automaticamente qual campo exibir (primeiro campo de texto obrigatório)
+
+**Exemplo de uso:**
+Quando o usuário digita "Faz" no campo Cliente, o sistema:
+1. Busca na API: `/api/search/clientes?q=Faz`
+2. Retorna: `[{"record_id": "5GHJJD0E2197...", "label": "Fazenda Couves Verdes"}]`
+3. Exibe "Fazenda Couves Verdes" no dropdown
+4. Ao selecionar, armazena o UUID no campo oculto
+5. Formulário submete o UUID para manter integridade referencial
 
 #### 2. Campos Numéricos
 
@@ -628,7 +644,7 @@ Cada formulário é definido por um arquivo JSON na pasta `specs/`. O sistema su
 | `min` | number, range | Valor mínimo permitido |
 | `max` | number, range | Valor máximo permitido |
 | `step` | number, range | Incremento/decremento |
-| `datasource` | search | Nome do formulário para autocomplete |
+| `datasource` | search | Nome do formulário fonte para autocomplete (obrigatório). Sistema busca registros e retorna UUIDs automaticamente. |
 
 ### Mensagens de Validação
 

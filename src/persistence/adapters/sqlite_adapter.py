@@ -1245,6 +1245,67 @@ class SQLiteRepository(BaseRepository):
             return False
 
     # =========================================================================
+    # SEARCH METHOD (for search autocomplete fields)
+    # =========================================================================
+
+    def search(
+        self,
+        form_path: str,
+        spec: Dict[str, Any],
+        field_name: str,
+        query: str,
+        limit: int = 5,
+    ) -> List[str]:
+        """
+        Search for records matching a query string in a specific field.
+
+        Uses SQLite LIKE with LIMIT for efficient substring matching.
+        Case-insensitive search with early termination for performance.
+        """
+        table_name = self._get_table_name(form_path)
+
+        if not self.exists(form_path):
+            logger.warning(f"Cannot search: table does not exist: {table_name}")
+            return []
+
+        if not query or not query.strip():
+            return []
+
+        # Case-insensitive substring search with LIMIT
+        search_sql = f"""
+        SELECT DISTINCT {field_name}
+        FROM {table_name}
+        WHERE LOWER({field_name}) LIKE LOWER(?)
+        ORDER BY {field_name}
+        LIMIT ?
+        """
+
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            # Use % wildcards for substring matching
+            cursor.execute(search_sql, (f"%{query}%", limit))
+            rows = cursor.fetchall()
+            conn.close()
+
+            # Extract field values (skip None/NULL values)
+            results = [row[field_name] for row in rows if row[field_name]]
+
+            logger.debug(
+                f"Search '{query}' in {table_name}.{field_name}: {len(results)} results"
+            )
+            return results
+
+        except sqlite3.OperationalError as e:
+            logger.error(
+                f"Search failed - field '{field_name}' not found in {table_name}: {e}"
+            )
+            return []
+        except Exception as e:
+            logger.error(f"Search failed in {table_name}.{field_name}: {e}")
+            return []
+
+    # =========================================================================
     # TAG MANAGEMENT METHODS (Stub implementations for FASE 3)
     # =========================================================================
 

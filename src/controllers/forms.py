@@ -484,6 +484,7 @@ def generate_form_field(field, form_data=None):
 
     elif field_type == "search" and field.get("datasource"):
         # Search field with autocomplete from datasource
+        datasource = field.get("datasource")
         template_content = read_template("fields/search_autocomplete.html")
         return render_template_string(
             template_content,
@@ -491,6 +492,7 @@ def generate_form_field(field, form_data=None):
             field_label=field_label,
             required=required,
             value=value,
+            datasource=datasource,
         )
 
     else:
@@ -724,6 +726,82 @@ def api_search_contatos():
         nome = form.get("nome", "").lower()
         if query in nome:
             results.append(form.get("nome", ""))
+
+    return jsonify(results)
+
+
+@forms_bp.route("/api/search/<datasource>")
+def api_search_generic(datasource):
+    """Generic API endpoint to search any entity with autocomplete.
+
+    Automatically detects the primary display field from the spec (first required text field)
+    and returns results as {record_id, label} pairs for UUID-based relationships.
+
+    Args:
+        datasource: The entity name (e.g., 'clientes', 'acreditadores')
+
+    Query params:
+        q: Search query string
+
+    Returns:
+        JSON array of objects: [{"record_id": "UUID", "label": "Display Name"}, ...]
+        Limited to 5 results for performance.
+    """
+    query = request.args.get("q", "").strip().lower()
+
+    if not query:
+        return jsonify([])
+
+    try:
+        spec = load_spec(datasource)
+    except:
+        return jsonify([])
+
+    # Detect the primary display field from spec (first required text field)
+    display_field = None
+    for field in spec.get("fields", []):
+        field_type = field.get("type", "text")
+        # Use first required text-like field
+        if field.get("required", False) and field_type in [
+            "text",
+            "email",
+            "tel",
+            "url",
+            "search",
+        ]:
+            display_field = field.get("name")
+            break
+
+    # Fallback: use first text field if no required text field found
+    if not display_field:
+        for field in spec.get("fields", []):
+            field_type = field.get("type", "text")
+            if field_type in ["text", "email", "tel", "url", "search"]:
+                display_field = field.get("name")
+                break
+
+    if not display_field:
+        return jsonify([])
+
+    forms = read_forms(spec, datasource)
+
+    # Filter forms by display field (case-insensitive substring match)
+    results = []
+    for form in forms:
+        display_value = form.get(display_field, "")
+        if isinstance(display_value, str) and query in display_value.lower():
+            results.append(
+                {
+                    "record_id": form.get(
+                        "_record_id", ""
+                    ),  # Note: SQLite adapter uses "_record_id"
+                    "label": display_value,
+                }
+            )
+
+            # Limit to 5 results for performance
+            if len(results) >= 5:
+                break
 
     return jsonify(results)
 
