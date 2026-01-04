@@ -7,15 +7,14 @@ Handles all tag-related operations including:
 - Tag-based search and filtering
 """
 
-import os
-import json
 import logging
-from flask import Blueprint, render_template, request, jsonify, current_app
-from typing import Dict, Any, Optional, List
+from flask import Blueprint, render_template, request, jsonify
+from typing import Dict, Any
 
 from services.tag_service import TagService
 from persistence.factory import RepositoryFactory
 from utils.spec_loader import load_spec
+from utils.menu_builder import get_forms_for_landing_page, get_menu_html
 from utils.crockford import validate_id
 
 logger = logging.getLogger(__name__)
@@ -27,224 +26,6 @@ tags_bp = Blueprint("tags", __name__)
 tag_service = TagService()
 
 
-# Helper functions (imported from VibeCForms.py)
-def get_folder_icon(folder_name):
-    """Get an intuitive icon for a folder based on its name."""
-    icons = {
-        "financeiro": "fa-dollar-sign",
-        "rh": "fa-users",
-        "departamentos": "fa-sitemap",
-        "vendas": "fa-shopping-cart",
-        "estoque": "fa-boxes",
-        "clientes": "fa-user-tie",
-        "relatorios": "fa-chart-bar",
-        "configuracoes": "fa-cog",
-    }
-    return icons.get(folder_name.lower(), "fa-folder")
-
-
-def load_folder_config(folder_path: str) -> Optional[Dict[str, Any]]:
-    """Load folder configuration from _folder.json if it exists.
-
-    Args:
-        folder_path: Full path to the folder
-
-    Returns:
-        Dictionary with config or None if file doesn't exist
-    """
-    config_path = os.path.join(folder_path, "_folder.json")
-    if os.path.exists(config_path):
-        try:
-            with open(config_path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except FileNotFoundError:
-            logger.warning(f"Config file not found: {config_path}")
-            return None
-        except json.JSONDecodeError as e:
-            logger.error(f"Invalid JSON in config {config_path}: {e}")
-            return None
-        except PermissionError as e:
-            logger.error(f"Permission denied reading {config_path}: {e}")
-            return None
-    return None
-
-
-def scan_specs_directory(base_path=None, relative_path=""):
-    """Recursively scan the specs directory and build menu structure.
-
-    Returns a list of menu items, where each item is either:
-    - {"type": "form", "name": str, "path": str, "title": str, "icon": str}
-    - {"type": "folder", "name": str, "path": str, "icon": str, "children": list, "description": str (optional)}
-    """
-    from VibeCForms import SPECS_DIR
-
-    # Use current SPECS_DIR if base_path not provided
-    if base_path is None:
-        base_path = SPECS_DIR
-
-    items = []
-    full_path = os.path.join(base_path, relative_path) if relative_path else base_path
-
-    if not os.path.exists(full_path):
-        return items
-
-    # Get all items in directory
-    entries = sorted(os.listdir(full_path))
-
-    for entry in entries:
-        # Skip folder config files
-        if entry == "_folder.json":
-            continue
-
-        entry_path = os.path.join(full_path, entry)
-        relative_entry_path = (
-            os.path.join(relative_path, entry) if relative_path else entry
-        )
-
-        if os.path.isdir(entry_path):
-            # It's a folder - recursively scan it
-            children = scan_specs_directory(base_path, relative_entry_path)
-            if children:  # Only add folder if it has content
-                # Try to load folder configuration
-                folder_config = load_folder_config(entry_path)
-
-                if folder_config:
-                    # Use config values
-                    folder_item = {
-                        "type": "folder",
-                        "name": folder_config.get("name", entry.capitalize()),
-                        "path": relative_entry_path,
-                        "icon": folder_config.get("icon", get_folder_icon(entry)),
-                        "children": children,
-                    }
-                    # Add description if present
-                    if "description" in folder_config:
-                        folder_item["description"] = folder_config["description"]
-                    # Add order if present
-                    if "order" in folder_config:
-                        folder_item["order"] = folder_config["order"]
-                else:
-                    # Fallback to default behavior
-                    folder_item = {
-                        "type": "folder",
-                        "name": entry.capitalize(),
-                        "path": relative_entry_path,
-                        "icon": get_folder_icon(entry),
-                        "children": children,
-                    }
-
-                items.append(folder_item)
-
-        elif entry.endswith(".json"):
-            # It's a form spec file
-            form_name = entry[:-5]  # Remove .json extension
-            form_path = (
-                os.path.join(relative_path, form_name) if relative_path else form_name
-            )
-
-            try:
-                spec = load_spec(form_path)
-                # Read icon from spec (optional field)
-                icon = spec.get("icon", "")
-
-                # Fallback: root level forms without icon get default
-                if not icon and not relative_path:
-                    icon = "fa-file-alt"
-
-                items.append(
-                    {
-                        "type": "form",
-                        "name": form_name,
-                        "path": form_path,
-                        "title": spec.get("title", form_name.capitalize()),
-                        "icon": icon,
-                    }
-                )
-            except Exception:
-                # Skip invalid spec files
-                continue
-
-    # Sort items by order field if present, then by name
-    items.sort(key=lambda x: (x.get("order", 999), x.get("name", "")))
-
-    return items
-
-
-def get_all_forms_flat(menu_items=None, prefix=""):
-    """Flatten the hierarchical menu structure to get all forms.
-
-    Returns a list of all form items with their full path and category.
-    Each item: {"title": str, "path": str, "icon": str, "category": str}
-    """
-    if menu_items is None:
-        menu_items = scan_specs_directory()
-
-    forms = []
-
-    for item in menu_items:
-        if item["type"] == "form":
-            category = prefix if prefix else "Geral"
-
-            # Get icon from item (already resolved in scan_specs_directory)
-            icon = item.get("icon", "fa-file-alt")
-
-            forms.append(
-                {
-                    "title": item["title"],
-                    "path": item["path"],
-                    "icon": icon,
-                    "category": category,
-                }
-            )
-        elif item["type"] == "folder":
-            # Recursively get forms from folder
-            folder_name = item["name"]
-            nested_forms = get_all_forms_flat(item["children"], folder_name)
-            forms.extend(nested_forms)
-
-    return forms
-
-
-def generate_menu_html(menu_items, current_form_path="", level=0):
-    """Generate HTML for menu items recursively with submenu support.
-
-    Args:
-        menu_items: List of menu items from scan_specs_directory()
-        current_form_path: Current form path to highlight active items
-        level: Nesting level (0 = root)
-    """
-    if not menu_items:
-        return ""
-
-    html = ""
-    for item in menu_items:
-        if item["type"] == "form":
-            # Form item
-            is_active = item["path"] == current_form_path
-            active_class = "active" if is_active else ""
-            icon_html = f'<i class="fa {item["icon"]}"></i> ' if item["icon"] else ""
-
-            html += f'<li><a href="/{item["path"]}" class="{active_class}">{icon_html}{item["title"]}</a></li>\n'
-
-        elif item["type"] == "folder":
-            # Folder item with submenu
-            # Check if any child is active
-            is_path_active = current_form_path.startswith(item["path"])
-            icon_html = f'<i class="fa {item["icon"]}"></i> '
-
-            html += f"""<li class="has-submenu">
-                <a href="javascript:void(0)" class="folder-item {'active-path' if is_path_active else ''}">
-                    {icon_html}{item["name"]}
-                    <i class="fa fa-chevron-right submenu-arrow"></i>
-                </a>
-                <ul class="submenu level-{level + 1}">
-                    {generate_menu_html(item["children"], current_form_path, level + 1)}
-                </ul>
-            </li>\n"""
-
-    return html
-
-
 # =============================================================================
 # TAGS ENDPOINTS
 # =============================================================================
@@ -253,9 +34,8 @@ def generate_menu_html(menu_items, current_form_path="", level=0):
 @tags_bp.route("/tags/manager")
 def tags_manager():
     """Display the tags management page."""
-    forms = get_all_forms_flat()
-    menu_items = scan_specs_directory()
-    menu_html = generate_menu_html(menu_items, "")
+    forms = get_forms_for_landing_page()
+    menu_html = get_menu_html("")
     return render_template("tags_manager.html", forms=forms, menu_html=menu_html)
 
 

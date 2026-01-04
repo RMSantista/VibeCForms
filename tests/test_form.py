@@ -5,7 +5,6 @@ from src.VibeCForms import (
     write_forms,
     load_spec,
     validate_form_data,
-    get_folder_icon,
     scan_specs_directory,
     get_all_forms_flat,
     generate_menu_html,
@@ -156,15 +155,6 @@ def test_load_spec():
     assert spec["fields"][0]["name"] == "nome"
     assert spec["fields"][1]["name"] == "telefone"
     assert spec["fields"][2]["name"] == "whatsapp"
-
-
-def test_get_folder_icon():
-    """Test folder icon assignment."""
-    assert get_folder_icon("financeiro") == "fa-dollar-sign"
-    assert get_folder_icon("rh") == "fa-users"
-    assert get_folder_icon("departamentos") == "fa-sitemap"
-    # produtos is not in the icon mapping, so it returns the default
-    assert get_folder_icon("desconhecido") == "fa-folder"
 
 
 def test_scan_specs_directory():

@@ -144,18 +144,46 @@ def initialize_app(business_case_path):
 from controllers.forms import (
     read_forms,
     write_forms,
-    validate_form_data,
-    get_folder_icon,
-    scan_specs_directory,
-    get_all_forms_flat,
-    generate_menu_html,
-    generate_form_field,
-    generate_table_headers,
-    generate_table_row,
-    get_template_path,
-    read_template,
-    load_folder_config,
 )
+
+# Import from new menu_builder module, with compatibility wrappers
+from utils.menu_builder import (
+    get_forms_for_landing_page,
+    _scan_specs_directory as scan_specs_directory,
+    _load_folder_config as load_folder_config,
+    _generate_menu_html,
+    _get_all_forms_flat,
+)
+
+# Import from new spec_renderer module, with compatibility wrappers
+from utils.spec_renderer import (
+    render_form_fields,
+    render_table,
+    validate_form as validate_form_data,
+    _render_field as generate_form_field,
+    _render_table_headers as generate_table_headers,
+    _render_table_row as generate_table_row,
+    _get_template_path as get_template_path,
+    _read_template as read_template,
+)
+
+
+# Compatibility wrapper for get_all_forms_flat
+def get_all_forms_flat(menu_items=None, prefix=""):
+    """Compatibility wrapper for tests that pass menu_items directly."""
+    if menu_items is not None:
+        # Called with menu_items (legacy test usage)
+        return _get_all_forms_flat(menu_items, prefix)
+    # Called without arguments (new usage)
+    return get_forms_for_landing_page()
+
+
+# Compatibility wrapper for generate_menu_html
+def generate_menu_html(menu_items, current_form_path="", level=0):
+    """Compatibility wrapper for tests that pass menu_items directly."""
+    return _generate_menu_html(menu_items, current_form_path, level)
+
+
 from utils.spec_loader import load_spec
 
 # Make these available for import
@@ -166,7 +194,6 @@ __all__ = [
     "read_forms",
     "write_forms",
     "validate_form_data",
-    "get_folder_icon",
     "scan_specs_directory",
     "get_all_forms_flat",
     "generate_menu_html",
