@@ -1924,7 +1924,1049 @@ python scripts/validate_migration.py
 
 ---
 
-## 10. Métricas de Sucesso
+## 10. Revisão dos Processos de Busca (Search Field)
+
+### 10.1 Estado Atual do Search Field (v2.4)
+
+O VibeCForms v2.4 implementa campos de busca com autocomplete através:
+
+**Spec Format**:
+```json
+{
+  "name": "cliente",
+  "label": "Cliente",
+  "type": "search",
+  "datasource": "clientes",
+  "required": true
+}
+```
+
+**Componentes Atuais**:
+1. **Template**: `templates/fields/search_autocomplete.html` (182 linhas)
+   - Input visível para seleção
+   - Campo oculto para UUID (`_record_id`)
+   - Dropdown com até 5 sugestões
+   - Navegação por teclado (↑↓, Enter, ESC)
+   - Debounce de 200ms
+
+2. **API Endpoint**: `GET /api/search/<datasource>?q=<query>`
+   - Auto-detecção de campo display (primeira propriedade texto obrigatória)
+   - Case-insensitive substring matching
+   - Retorna: `{record_id: "UUID", label: "Display Name"}`
+   - Limite: máximo 5 resultados
+
+3. **Backend**:
+   - Generic search endpoint (64 linhas)
+   - Compatível com TXT e SQLite
+   - UUID-based para relacionamentos
+
+### 10.2 Integração com Novo Paradigma
+
+No novo paradigma, o `search` **evolui para `relationship`**:
+
+**Transformação**:
+```
+ANTES (v2.4):
+├─ Campo de busca (search)
+├─ API genérica /api/search/<datasource>
+├─ UUIDs em _record_id oculto
+└─ Sem registro formal de relacionamento
+
+DEPOIS (v3.0):
+├─ Campo de relacionamento (relationship)
+├─ API de relacionamentos /api/relationships/*
+├─ UUIDs em relationships table
+├─ Display values sincronizados
+└─ Rastreabilidade completa
+```
+
+### 10.3 Processo de Busca Otimizado (v3.0)
+
+#### 10.3.1 Fluxo de Busca Transparente
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    FLUXO DE BUSCA (v3.0)                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  1. USER TYPES IN FIELD                                         │
+│     "João" → Debounce 200ms                                     │
+│                                                                 │
+│  2. API CALL                                                    │
+│     GET /api/search/clientes?q=João                             │
+│                                                                 │
+│  3. BACKEND PROCESSING (SQLite optimized)                       │
+│     ┌─────────────────────────────────────────┐                │
+│     │ Query otimizada:                        │                │
+│     │                                         │                │
+│     │ SELECT record_id, nome                  │                │
+│     │ FROM clientes                           │                │
+│     │ WHERE nome LIKE '%João%'                │                │
+│     │   AND removed_at IS NULL                │                │
+│     │ LIMIT 5;                                │                │
+│     │                                         │                │
+│     │ ⚡ Sem JOINs (índice simples)           │                │
+│     │ ⚡ Filtra soft-deletes                  │                │
+│     └─────────────────────────────────────────┘                │
+│                                                                 │
+│  4. API RESPONSE                                                │
+│     [                                                           │
+│       {                                                         │
+│         "record_id": "UUID_001",                                │
+│         "label": "João Silva",                                  │
+│         "score": 0.95  // Novo: relevância                      │
+│       },                                                        │
+│       ...                                                       │
+│     ]                                                           │
+│                                                                 │
+│  5. UI RENDERING                                                │
+│     ┌────────────────────────────┐                              │
+│     │ Cliente                    │                              │
+│     │ ┌──────────────────────┐   │                              │
+│     │ │ João... | ✕          │   │                              │
+│     │ └──────────────────────┘   │                              │
+│     │  ▼ Dropdown                │                              │
+│     │  • João Silva              │                              │
+│     │  • João Santos             │                              │
+│     │  • João Oliveira           │                              │
+│     └────────────────────────────┘                              │
+│                                                                 │
+│  6. USER SELECTS                                                │
+│     Select "João Silva" (UUID_001)                              │
+│                                                                 │
+│  7. FORM SUBMISSION                                             │
+│     {                                                           │
+│       "cliente": "UUID_001",    // Campo visível               │
+│       "_cliente_hidden": "UUID_001"  // Backup                  │
+│     }                                                           │
+│                                                                 │
+│  8. BACKEND SAVES                                               │
+│     ┌─────────────────────────────────────────┐                │
+│     │ BEGIN TRANSACTION;                      │                │
+│     │                                         │                │
+│     │ -- 1. Fetch display value               │                │
+│     │ SELECT nome FROM clientes               │                │
+│     │ WHERE record_id = 'UUID_001';           │                │
+│     │ → "João Silva"                          │                │
+│     │                                         │                │
+│     │ -- 2. INSERT com display                │                │
+│     │ INSERT INTO pedidos (                   │                │
+│     │   record_id, _cliente_display           │                │
+│     │ ) VALUES ('PEDIDO_001', 'João Silva');  │                │
+│     │                                         │                │
+│     │ -- 3. Create relationship               │                │
+│     │ INSERT INTO relationships (             │                │
+│     │   source_type, source_id,               │                │
+│     │   relationship_name, target_id          │                │
+│     │ ) VALUES (                              │                │
+│     │   'pedidos', 'PEDIDO_001',              │                │
+│     │   'cliente', 'UUID_001'                 │                │
+│     │ );                                      │                │
+│     │                                         │                │
+│     │ COMMIT;                                 │                │
+│     └─────────────────────────────────────────┘                │
+│                                                                 │
+│  9. RESPONSE                                                    │
+│     {                                                           │
+│       "status": "success",                                      │
+│       "record_id": "PEDIDO_001",                                │
+│       "relationship_id": "REL_001"                              │
+│     }                                                           │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 10.3.2 Melhorias na Busca (v3.0 vs v2.4)
+
+| Aspecto | v2.4 | v3.0 | Ganho |
+|---------|------|------|-------|
+| **Indexação** | Índice simples | Índice composto + coluna display | ⚡ 2x rápido |
+| **Soft-delete** | Sem suporte | Filtra `removed_at IS NULL` | ✅ Suportado |
+| **Relevância** | Sem score | Score baseado em posição | 🎯 Melhor UX |
+| **Caching** | Não | Cache em memória (30s) | ⚡ 10x rápido (hit) |
+| **Query Plan** | JOIN se lookup | Sem JOIN (display inline) | ✅ Simples |
+| **Histórico** | Não | Rastreável via relationships | 📊 Auditável |
+
+### 10.4 API de Busca Evoluída (v3.0)
+
+#### 10.4.1 Endpoints Novos
+
+```python
+# File: src/controllers/search.py
+
+# ═══════════════════════════════════════════════════════════════
+# 1. Busca Simples (equivalente ao v2.4)
+# ═══════════════════════════════════════════════════════════════
+GET /api/search/<datasource>?q=<query>&limit=5&offset=0
+Response: [
+    {
+        "record_id": "UUID_001",
+        "label": "João Silva",
+        "score": 0.95
+    }
+]
+
+# ═══════════════════════════════════════════════════════════════
+# 2. Busca Avançada (novo em v3.0)
+# ═══════════════════════════════════════════════════════════════
+GET /api/search/<datasource>/advanced
+Parameters:
+  - q: string (query)
+  - fields: string[] (campos a buscar)
+  - filters: object (filtros adicionais)
+  - sort: string (campo para ordenação)
+  - limit: number (máximo de resultados)
+
+Response: [
+    {
+        "record_id": "UUID_001",
+        "label": "João Silva",
+        "preview": "Tel: 11-99999-9999",
+        "score": 0.95,
+        "last_updated": "2026-01-08T10:30:00"
+    }
+]
+
+# ═══════════════════════════════════════════════════════════════
+# 3. Busca com Relacionamentos (novo em v3.0)
+# ═══════════════════════════════════════════════════════════════
+GET /api/search/<datasource>/with-relationships/<relationship_name>
+Parameters:
+  - q: string (query)
+  - exclude_ids: string[] (excluir registros já relacionados)
+
+Response: [
+    {
+        "record_id": "UUID_001",
+        "label": "João Silva",
+        "is_already_related": false
+    }
+]
+
+# ═══════════════════════════════════════════════════════════════
+# 4. Busca Reversa (novo em v3.0)
+# ═══════════════════════════════════════════════════════════════
+GET /api/search/reverse/<source_type>/<source_id>/<relationship_name>
+Response: [
+    {
+        "record_id": "UUID_002",
+        "label": "Pedido #123",
+        "created_at": "2026-01-08T10:30:00"
+    }
+]
+```
+
+#### 10.4.2 Implementação da Busca Avançada
+
+```python
+# File: src/persistence/search_engine.py
+
+class SearchEngine:
+    """
+    Engine centralizado de busca com suporte a múltiplas estratégias
+    """
+
+    def __init__(self, repository, cache_ttl=30):
+        self.repo = repository
+        self.cache = LRUCache(maxsize=100)
+        self.cache_ttl = cache_ttl
+
+    def search_simple(self, datasource, query, limit=5):
+        """Busca simples (compatível v2.4)"""
+        cache_key = f"{datasource}:{query}:{limit}"
+
+        # Verificar cache
+        if cache_key in self.cache:
+            return self.cache[cache_key]
+
+        # Buscar
+        results = self.repo.search(
+            datasource,
+            query=query,
+            limit=limit,
+            include_soft_deleted=False
+        )
+
+        # Cache
+        self.cache[cache_key] = results
+        return results
+
+    def search_advanced(self, datasource, query, fields=None, filters=None, sort=None, limit=5):
+        """Busca avançada com múltiplos campos"""
+
+        # Construir query SQL dinâmica
+        sql = f"SELECT record_id, {', '.join(fields or ['nome'])}"
+        sql += f" FROM {datasource}"
+        sql += " WHERE removed_at IS NULL"
+
+        # Adicionar WHERE para query
+        if query:
+            search_fields = fields or self._detect_search_fields(datasource)
+            conditions = " OR ".join([
+                f"{field} LIKE '%{query}%'"
+                for field in search_fields
+            ])
+            sql += f" AND ({conditions})"
+
+        # Adicionar filtros customizados
+        if filters:
+            for field, value in filters.items():
+                sql += f" AND {field} = '{value}'"
+
+        # Adicionar ordenação
+        if sort:
+            sql += f" ORDER BY {sort}"
+
+        sql += f" LIMIT {limit}"
+
+        # Executar
+        results = self.repo.execute(sql)
+
+        # Calcular score de relevância
+        return self._score_results(results, query)
+
+    def search_with_relationships(self, datasource, query, relationship_name, exclude_ids=None, limit=5):
+        """Busca que exclui registros já relacionados"""
+
+        # Busca base
+        results = self.search_simple(datasource, query, limit=100)
+
+        # Filtrar excluindo já relacionados
+        if exclude_ids:
+            results = [r for r in results if r['record_id'] not in exclude_ids]
+
+        # Limitar
+        return results[:limit]
+
+    def search_reverse(self, source_type, source_id, relationship_name):
+        """Busca reversa: encontrar todos os registros que apontam para este"""
+
+        sql = f"""
+            SELECT DISTINCT
+                r.source_id as record_id,
+                {source_type}.nome as label,
+                r.created_at
+            FROM relationships r
+            JOIN {source_type} ON r.source_id = {source_type}.record_id
+            WHERE r.target_type = '{source_type}'
+              AND r.target_id = '{source_id}'
+              AND r.relationship_name = '{relationship_name}'
+              AND r.removed_at IS NULL
+            ORDER BY r.created_at DESC
+        """
+
+        return self.repo.execute(sql)
+
+    def _detect_search_fields(self, datasource):
+        """Auto-detect fields tipo text para busca"""
+        spec = self.repo.load_spec(datasource)
+        return [
+            f['name'] for f in spec.get('fields', [])
+            if f['type'] in ['text', 'email', 'tel', 'url', 'search']
+        ]
+
+    def _score_results(self, results, query):
+        """Calcula score de relevância para cada resultado"""
+        for result in results:
+            label = result.get('label', '')
+
+            # Score: 1.0 se começa com query, 0.5 se contém
+            if label.lower().startswith(query.lower()):
+                result['score'] = 1.0
+            elif query.lower() in label.lower():
+                result['score'] = 0.75
+            else:
+                result['score'] = 0.5
+
+        # Ordenar por score
+        return sorted(results, key=lambda r: r['score'], reverse=True)
+```
+
+### 10.5 Template de Busca Evoluído
+
+```html
+<!-- File: templates/fields/relationship_search.html (novo em v3.0) -->
+
+<div class="relationship-field">
+    <label for="{{ field.name }}">{{ field.label }}</label>
+
+    <!-- Input visível para busca -->
+    <div class="search-container">
+        <input
+            type="text"
+            id="{{ field.name }}-search"
+            class="search-input"
+            placeholder="Buscar {{ field.label }}..."
+            autocomplete="off"
+            data-target="{{ field.target }}"
+            data-cardinality="{{ field.cardinality }}"
+        >
+
+        <!-- Ícone de carregamento -->
+        <span class="search-loading" style="display: none;">⌛</span>
+
+        <!-- Botão para limpar -->
+        <button type="button" class="search-clear" style="display: none;">✕</button>
+    </div>
+
+    <!-- Dropdown de resultados -->
+    <ul class="search-results" style="display: none;">
+        <!-- Populated by JavaScript -->
+    </ul>
+
+    <!-- Campo oculto para UUID -->
+    <input
+        type="hidden"
+        id="{{ field.name }}"
+        name="{{ field.name }}"
+        value="{{ data.get(field.name, '') }}"
+    >
+
+    <!-- Display value (opcional, para debug) -->
+    <div class="selected-value" style="display: none;">
+        <small>Selecionado: <span></span></small>
+    </div>
+</div>
+
+<script>
+    // Debounce search
+    const searchInput = document.getElementById('{{ field.name }}-search');
+    let searchTimeout;
+
+    searchInput.addEventListener('input', function(e) {
+        clearTimeout(searchTimeout);
+        const query = e.target.value.trim();
+
+        if (query.length < 2) {
+            document.querySelector('.search-results').style.display = 'none';
+            return;
+        }
+
+        document.querySelector('.search-loading').style.display = 'inline';
+
+        searchTimeout = setTimeout(async () => {
+            try {
+                // Chamar nova API de busca
+                const response = await fetch(
+                    `/api/search/{{ field.target }}/advanced?q=${encodeURIComponent(query)}`
+                );
+                const results = await response.json();
+
+                // Renderizar dropdown
+                renderSearchResults(results);
+            } finally {
+                document.querySelector('.search-loading').style.display = 'none';
+            }
+        }, 200);
+    });
+
+    function renderSearchResults(results) {
+        const list = document.querySelector('.search-results');
+        list.innerHTML = results.map(r => `
+            <li data-record-id="${r.record_id}">
+                <strong>${r.label}</strong>
+                <small>${r.preview || ''}</small>
+                <span class="score">${(r.score * 100).toFixed(0)}%</span>
+            </li>
+        `).join('');
+        list.style.display = 'block';
+    }
+</script>
+```
+
+---
+
+## 11. Migração Transparente Entre Formatos de Persistência
+
+### 11.1 Problema de Migração Atual (v2.4)
+
+O VibeCForms v2.4 implementa migração entre backends (TXT ↔ SQLite), mas com limitações:
+
+**Limitações**:
+- ❌ Migração é destrutiva (requer confirmação manual)
+- ❌ Sem transações entre cópias de dados
+- ❌ Sem validação automática pós-migração
+- ❌ Sem suporte a rollback atômico
+- ❌ Acoplamento com MigrationManager específico
+
+### 11.2 Arquitetura de Migração Transparente (v3.0)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│              CAMADAS DE MIGRAÇÃO TRANSPARENTE (v3.0)            │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │ 1. ABSTRACTION LAYER                                     │  │
+│  │    └─ BaseRepository (interface única)                   │  │
+│  │       • create(), read_all(), update(), delete()         │  │
+│  │       • Agnóstico quanto ao backend                      │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│                            ▲                                     │
+│                            │ Implementado por                    │
+│          ┌─────────────────┼─────────────────┐                  │
+│          │                 │                 │                  │
+│  ┌───────▼────────┐ ┌─────▼─────┐ ┌────────▼──────┐           │
+│  │ TxtRepository  │ │SQLiteRepo │ │MySQLRepository│ (future)  │
+│  │ ───────────    │ │───────────│ │───────────────│           │
+│  │ • .txt files   │ │ • SQLite  │ │ • MySQL       │           │
+│  │ • Simple       │ │ • Indexes │ │ • Advanced    │           │
+│  └────────────────┘ └───────────┘ └───────────────┘           │
+│                                                                 │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │ 2. MIGRATION ENGINE                                      │  │
+│  │    ├─ Source: Load from current backend                  │  │
+│  │    ├─ Validation: Pre-flight checks                      │  │
+│  │    ├─ Transfer: Atomic data copy                         │  │
+│  │    ├─ Verification: Post-flight checks                   │  │
+│  │    └─ Backup: Create restore point                       │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │ 3. TRANSACTION MANAGER                                   │  │
+│  │    ├─ Checkpoint system (incremental)                    │  │
+│  │    ├─ Rollback capability (atomic)                       │  │
+│  │    └─ Recovery (crash-safe)                              │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │ 4. PERSISTENCE CONFIG                                    │  │
+│  │    ├─ Default backend (fallback)                         │  │
+│  │    ├─ Form mappings (per-form backend selection)         │  │
+│  │    └─ Migration strategy (eager/lazy)                    │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 11.3 Processo de Migração Transparente
+
+#### 11.3.1 Migração Automática Detectada
+
+```python
+# File: src/persistence/transparent_migration.py
+
+class TransparentMigrationEngine:
+    """
+    Engine que detecta e executa migrações transparentemente
+    sem intervenção manual
+    """
+
+    def __init__(self, repository_factory, config):
+        self.factory = repository_factory
+        self.config = config
+        self.logger = setup_logger(__name__)
+
+    def detect_migration_needed(self, form_path):
+        """
+        Detecta se forma precisa migração
+
+        Returns:
+            {
+                'needed': bool,
+                'from_backend': str,
+                'to_backend': str,
+                'reason': str,
+                'impact': dict
+            }
+        """
+        current_backend = self._get_current_backend(form_path)
+        target_backend = self._get_target_backend(form_path)
+
+        if current_backend == target_backend:
+            return {'needed': False}
+
+        # Analisar impacto
+        current_repo = self.factory.create(form_path, current_backend)
+        record_count = current_repo.count(form_path)
+
+        return {
+            'needed': True,
+            'from_backend': current_backend,
+            'to_backend': target_backend,
+            'reason': f"Config mudou de {current_backend} para {target_backend}",
+            'impact': {
+                'records_to_migrate': record_count,
+                'estimated_time': self._estimate_time(record_count, current_backend, target_backend),
+                'estimated_storage': self._estimate_storage(form_path, target_backend)
+            }
+        }
+
+    def execute_migration_if_needed(self, form_path, dry_run=False):
+        """
+        Executa migração se necessária
+
+        Returns:
+            {
+                'executed': bool,
+                'from_backend': str,
+                'to_backend': str,
+                'records_migrated': int,
+                'duration_ms': float,
+                'status': 'success' | 'failed' | 'skipped',
+                'error': str (if failed)
+            }
+        """
+        migration = self.detect_migration_needed(form_path)
+
+        if not migration['needed']:
+            return {
+                'executed': False,
+                'status': 'skipped',
+                'reason': 'No migration needed'
+            }
+
+        self.logger.info(f"🔄 Iniciando migração: {form_path}")
+        self.logger.info(f"   De: {migration['from_backend']}")
+        self.logger.info(f"   Para: {migration['to_backend']}")
+
+        try:
+            # 1. Backup
+            backup_path = self._create_backup(form_path, migration['from_backend'])
+            self.logger.info(f"✅ Backup criado: {backup_path}")
+
+            # 2. Migração
+            migrator = MigrationExecutor(
+                self.factory,
+                migration['from_backend'],
+                migration['to_backend']
+            )
+
+            start_time = time.time()
+            records = migrator.migrate(form_path, dry_run=dry_run)
+            duration = (time.time() - start_time) * 1000
+
+            self.logger.info(f"✅ {len(records)} registros migrados em {duration:.2f}ms")
+
+            # 3. Validação
+            validation = self._validate_migration(form_path, migration['to_backend'], len(records))
+
+            if not validation['passed']:
+                raise MigrationValidationError(validation['errors'])
+
+            # 4. Atualizar schema history
+            self._update_schema_history(form_path, migration['to_backend'])
+
+            return {
+                'executed': True,
+                'from_backend': migration['from_backend'],
+                'to_backend': migration['to_backend'],
+                'records_migrated': len(records),
+                'duration_ms': duration,
+                'backup_path': backup_path,
+                'status': 'success'
+            }
+
+        except Exception as e:
+            self.logger.error(f"❌ Migração falhou: {str(e)}")
+
+            # Tentar rollback
+            self._attempt_rollback(form_path, backup_path)
+
+            return {
+                'executed': False,
+                'status': 'failed',
+                'error': str(e),
+                'rollback_attempted': True
+            }
+
+    def _validate_migration(self, form_path, target_backend, expected_count):
+        """Valida integridade pós-migração"""
+        repo = self.factory.create(form_path, target_backend)
+
+        errors = []
+
+        # 1. Verificar contagem
+        actual_count = repo.count(form_path)
+        if actual_count != expected_count:
+            errors.append(f"Contagem: esperado {expected_count}, obtido {actual_count}")
+
+        # 2. Verificar integridade de dados
+        records = repo.read_all(form_path, None)
+        for record in records:
+            if not record.get('_record_id'):
+                errors.append(f"Registro sem _record_id: {record}")
+
+        # 3. Verificar integridade de relacionamentos (v3.0)
+        if target_backend == 'sqlite':
+            rel_errors = self._validate_relationships(form_path)
+            errors.extend(rel_errors)
+
+        return {
+            'passed': len(errors) == 0,
+            'errors': errors
+        }
+
+    def _validate_relationships(self, form_path):
+        """Valida integridade de relacionamentos (v3.0)"""
+        errors = []
+
+        # Verificar relacionamentos órfãos
+        orphans = self._find_orphan_relationships(form_path)
+        if orphans:
+            errors.append(f"Encontrados {len(orphans)} relacionamentos órfãos")
+
+        # Verificar consistência de display values
+        inconsistencies = self._find_display_inconsistencies(form_path)
+        if inconsistencies:
+            errors.append(f"Encontradas {len(inconsistencies)} inconsistências de display")
+
+        return errors
+```
+
+#### 11.3.2 Configuração de Migração
+
+```json
+{
+  "file": "src/config/persistence.json",
+
+  "default_backend": "sqlite",
+
+  "backends": {
+    "txt": {
+      "type": "txt",
+      "path": "src",
+      "extension": ".txt",
+      "delimiter": ";",
+      "encoding": "utf-8"
+    },
+    "sqlite": {
+      "type": "sqlite",
+      "path": "src",
+      "database": "vibecforms.db",
+      "timeout": 10,
+      "journal_mode": "WAL",
+      "synchronous": "NORMAL"
+    },
+    "mysql": {
+      "type": "mysql",
+      "host": "localhost",
+      "port": 3306,
+      "database": "vibecforms",
+      "user": "${DB_USER}",
+      "password": "${DB_PASSWORD}",
+      "charset": "utf8mb4"
+    }
+  },
+
+  "form_mappings": {
+    "contatos": "sqlite",
+    "produtos": "sqlite",
+    "financeiro/*": "sqlite",
+    "*": "default_backend"
+  },
+
+  "migration_strategy": {
+    "mode": "automatic",
+    "trigger": "on_startup",
+    "backup_before_migration": true,
+    "rollback_on_error": true,
+    "validation_after_migration": true,
+    "parallel_migrations": false,
+    "max_records_per_batch": 1000
+  }
+}
+```
+
+#### 11.3.3 Executor de Migração com Transações
+
+```python
+# File: src/persistence/migration_executor.py
+
+class MigrationExecutor:
+    """
+    Executa migração entre backends com suporte a transações
+    e rollback atômico
+    """
+
+    def __init__(self, factory, from_backend, to_backend):
+        self.factory = factory
+        self.from_backend = from_backend
+        self.to_backend = to_backend
+        self.logger = setup_logger(__name__)
+
+    def migrate(self, form_path, spec=None, dry_run=False):
+        """
+        Migra dados de um backend para outro
+
+        Fluxo:
+        1. Create checkpoint (snapshot do estado original)
+        2. Read all records from source
+        3. For each record:
+           a. Transform if needed
+           b. Write to target
+           c. Update checkpoint
+        4. Verify count matches
+        5. Commit transaction
+        """
+
+        # Abrir conexões
+        source_repo = self.factory.create(form_path, self.from_backend)
+        target_repo = self.factory.create(form_path, self.to_backend)
+
+        # Criar checkpoint
+        checkpoint = Checkpoint(form_path, self.from_backend, self.to_backend)
+        checkpoint.create()
+
+        try:
+            # Ler todos os registros da source
+            records = source_repo.read_all(form_path, spec)
+            total = len(records)
+
+            self.logger.info(f"📋 Lendo {total} registros de {self.from_backend}")
+
+            migrated = []
+
+            # Migrar em batches
+            batch_size = 100
+            for i in range(0, total, batch_size):
+                batch = records[i:i + batch_size]
+
+                for record in batch:
+                    # Transformar se necessário
+                    transformed = self._transform_record(record, spec)
+
+                    # Escrever no target
+                    if not dry_run:
+                        target_repo.create(form_path, spec, transformed)
+
+                    migrated.append(transformed)
+                    checkpoint.mark_progress(i + len(migrated), total)
+
+                self.logger.info(f"✅ {min(i + batch_size, total)}/{total} registros processados")
+
+            # Validar contagem final
+            if not dry_run:
+                target_count = target_repo.count(form_path)
+                if target_count != total:
+                    raise MigrationError(
+                        f"Contagem mismatch: esperado {total}, obtido {target_count}"
+                    )
+
+            checkpoint.mark_completed()
+            return migrated
+
+        except Exception as e:
+            checkpoint.mark_failed(str(e))
+            raise
+
+    def _transform_record(self, record, spec):
+        """
+        Transforma registro se necessário
+
+        v2.4 → v3.0:
+        - Adiciona timestamps se faltando
+        - Converte search fields para relationships
+        - Adiciona display values
+        """
+        transformed = record.copy()
+
+        # 1. Adicionar timestamps
+        if 'created_at' not in transformed:
+            transformed['created_at'] = datetime.now().isoformat()
+        if 'updated_at' not in transformed:
+            transformed['updated_at'] = transformed['created_at']
+
+        # 2. Convertendo search para relationship (v3.0)
+        if spec:
+            search_fields = [f for f in spec.get('fields', []) if f['type'] == 'search']
+            for field in search_fields:
+                # Mover para display value
+                uuid_value = transformed.get(field['name'])
+                if uuid_value:
+                    # Buscar display value
+                    display = self._get_display_value(
+                        field.get('datasource'),
+                        uuid_value
+                    )
+                    transformed[f"_{field['name']}_display"] = display
+                    # Remover UUID original (agora em relationships table)
+                    del transformed[field['name']]
+
+        return transformed
+
+    def _get_display_value(self, datasource, record_id):
+        """Busca valor de display de outro form"""
+        repo = self.factory.create(datasource, self.from_backend)
+        try:
+            record = repo.read_by_id(datasource, None, record_id)
+            return record.get('nome', str(record_id))
+        except:
+            return str(record_id)
+```
+
+#### 11.3.4 Checkpoint System
+
+```python
+# File: src/persistence/checkpoint.py
+
+class Checkpoint:
+    """
+    Sistema de checkpoint para suporte a resume e rollback
+    """
+
+    def __init__(self, form_path, from_backend, to_backend):
+        self.form_path = form_path
+        self.from_backend = from_backend
+        self.to_backend = to_backend
+        self.checkpoint_file = f"data/migration/checkpoint_{form_path}_{uuid.uuid4()}.json"
+        self.state = {
+            'form_path': form_path,
+            'from_backend': from_backend,
+            'to_backend': to_backend,
+            'started_at': datetime.now().isoformat(),
+            'progress': 0,
+            'total': 0,
+            'status': 'in_progress',
+            'records_migrated': 0
+        }
+
+    def create(self):
+        """Cria arquivo de checkpoint"""
+        os.makedirs(os.path.dirname(self.checkpoint_file), exist_ok=True)
+        self._write()
+
+    def mark_progress(self, current, total):
+        """Marca progresso"""
+        self.state['progress'] = current
+        self.state['total'] = total
+        self.state['records_migrated'] = current
+        self._write()
+
+    def mark_completed(self):
+        """Marca como completo"""
+        self.state['status'] = 'completed'
+        self.state['completed_at'] = datetime.now().isoformat()
+        self._write()
+
+    def mark_failed(self, error):
+        """Marca como falho"""
+        self.state['status'] = 'failed'
+        self.state['error'] = error
+        self.state['failed_at'] = datetime.now().isoformat()
+        self._write()
+
+    def can_resume(self):
+        """Verifica se pode resumir"""
+        return (
+            self.state['status'] == 'in_progress' and
+            self.state['progress'] > 0 and
+            self.state['progress'] < self.state['total']
+        )
+
+    def resume_from(self):
+        """Retorna ponto de resumo"""
+        return self.state['progress']
+
+    def _write(self):
+        """Escreve checkpoint em arquivo"""
+        with open(self.checkpoint_file, 'w') as f:
+            json.dump(self.state, f, indent=2)
+```
+
+### 11.4 Detecção Automática em Startup
+
+```python
+# File: src/VibeCForms.py
+
+def initialize_app(business_case_path):
+    """Inicializa app com detecção e execução de migrações transparentes"""
+
+    app = Flask(__name__)
+    app.config.update(load_config(business_case_path))
+
+    # Inicializar factory
+    factory = RepositoryFactory(
+        load_persistence_config(business_case_path)
+    )
+
+    # ⭐ NOVIDADE (v3.0): Migração transparente
+    migration_engine = TransparentMigrationEngine(factory, app.config)
+
+    # Detectar e executar migrações necessárias
+    specs = load_all_specs(business_case_path)
+    for spec in specs:
+        migration_result = migration_engine.execute_migration_if_needed(
+            spec['form_path'],
+            dry_run=False  # Executar automaticamente
+        )
+
+        if migration_result.get('executed'):
+            logger.info(f"✅ Migração completada: {spec['form_path']}")
+        elif migration_result.get('status') == 'failed':
+            logger.error(f"❌ Migração falhou: {migration_result['error']}")
+            # Decidir: abortar app ou continuar?
+            # Sugestão: continuar com backend antigo
+            factory.override_backend(
+                spec['form_path'],
+                migration_result.get('from_backend')
+            )
+
+    # Continuar com inicialização normal
+    register_blueprints(app, factory)
+    return app
+```
+
+### 11.5 Teste de Migração Transparente
+
+```python
+# File: tests/persistence/test_transparent_migration.py
+
+class TestTransparentMigration:
+
+    def test_migrate_txt_to_sqlite_automatically(self):
+        """Testa migração automática TXT → SQLite"""
+
+        # 1. Criar dados em TXT
+        txt_repo = TxtRepository()
+        txt_repo.create('contatos', SPEC, {'nome': 'João', 'email': 'joao@test.com'})
+
+        # 2. Mudar configuração para SQLite
+        config = load_config()
+        config['form_mappings']['contatos'] = 'sqlite'
+
+        # 3. Detectar migração
+        engine = TransparentMigrationEngine(factory, config)
+        migration = engine.detect_migration_needed('contatos')
+
+        assert migration['needed'] == True
+        assert migration['from_backend'] == 'txt'
+        assert migration['to_backend'] == 'sqlite'
+
+        # 4. Executar migração
+        result = engine.execute_migration_if_needed('contatos')
+
+        assert result['status'] == 'success'
+        assert result['records_migrated'] == 1
+
+        # 5. Verificar dados no SQLite
+        sqlite_repo = SQLiteRepository()
+        records = sqlite_repo.read_all('contatos', SPEC)
+        assert len(records) == 1
+        assert records[0]['nome'] == 'João'
+
+    def test_checkpoint_and_resume(self):
+        """Testa sistema de checkpoint e resume"""
+
+        checkpoint = Checkpoint('contatos', 'txt', 'sqlite')
+        checkpoint.create()
+        checkpoint.mark_progress(50, 100)
+
+        assert checkpoint.can_resume() == True
+        assert checkpoint.resume_from() == 50
+
+    def test_rollback_on_error(self):
+        """Testa rollback em caso de erro"""
+
+        # Simular erro durante migração
+        migration_engine.execute_migration_if_needed('contatos', dry_run=True)
+        # ... (simular erro)
+        # Verificar que backup foi restaurado
+```
+
+---
+
+## 12. Métricas de Sucesso
 
 ### 10.1 KPIs
 
