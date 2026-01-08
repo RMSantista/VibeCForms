@@ -1,44 +1,92 @@
 {
-  "clientes": {
-    "last_spec_hash": "44c23ff87b887b6d1e493840454348b4",
-    "last_backend": "sqlite",
-    "last_updated": "2025-12-15T14:29:53.733409",
-    "record_count": 3
-  },
   "acreditadores": {
-    "last_spec_hash": "8d601478843ee8c840236b496de8c71d",
+    "last_spec_hash": "4fe31dd2580e4040354142e9726b7cf7",
     "last_backend": "sqlite",
-    "last_updated": "2025-12-15T14:29:19.699936",
-    "record_count": 2
-  },
-  "tipo_amostra": {
-    "last_spec_hash": "012be9a2a80b0720fd21bc53d934a7a8",
-    "last_backend": "sqlite",
-    "last_updated": "2025-12-13T00:11:18.631602",
-    "record_count": 5
-  },
-  "metodologias": {
-    "last_spec_hash": "1dd883f7625399926346a8f7383096c9",
-    "last_backend": "sqlite",
-    "last_updated": "2025-12-15T15:42:29.186382",
-    "record_count": 8
-  },
-  "matriz_amostras": {
-    "last_spec_hash": "4d8ac89d253bb6ca75076d966c1863dc",
-    "last_backend": "sqlite",
-    "last_updated": "2025-12-15T15:28:31.361531",
+    "last_updated": "2026-01-08T13:34:56.403940",
     "record_count": 3
+  },
+  "amostra": {
+    "last_spec_hash": "cb5416c26a163ebbfeb764a94efd31a1",
+    "last_backend": "sqlite",
+    "last_updated": "2026-01-08T13:34:58.727952",
+    "record_count": 4
+  },
+  "amostra_especifica": {
+    "last_spec_hash": "7748810958cb3b73b9d5900948f9f242",
+    "last_backend": "sqlite",
+    "last_updated": "2026-01-08T13:35:00.698772",
+    "record_count": 6
   },
   "analises": {
-    "last_spec_hash": "817bbbd89fbe606cf075d11aa920a04e",
+    "last_spec_hash": "a4d040ae8984d49cd6d1545eaf78a76e",
     "last_backend": "sqlite",
-    "last_updated": "2025-12-15T15:28:22.749921",
-    "record_count": 10
+    "last_updated": "2026-01-08T13:35:01.995558",
+    "record_count": 8
   },
-  "amostras": {
-    "last_spec_hash": "61b5ff2929956d05ef212075ac4e38bb",
+  "classificacao": {
+    "last_spec_hash": "7a2f3ec4e2b4046e3e9243181bc61b0f",
     "last_backend": "sqlite",
-    "last_updated": "2025-12-13T00:23:54.347798",
-    "record_count": 15
+    "last_updated": "2026-01-08T13:35:03.114629",
+    "record_count": 4
+  },
+  "clientes": {
+    "last_spec_hash": "739ef9354183c42a553923b331a3b515",
+    "last_backend": "sqlite",
+    "last_updated": "2026-01-08T13:40:12.120284",
+    "record_count": 4
+  },
+  "fracionamento": {
+    "last_spec_hash": "0b5d9e501d09aa28cf8245d95cab7bc1",
+    "last_backend": "sqlite",
+    "last_updated": "2026-01-08T13:35:04.975777",
+    "record_count": 4
+  },
+  "funcionarios": {
+    "last_spec_hash": "5a977c9f0cf89d936c693d4ec3ce8dba",
+    "last_backend": "sqlite",
+    "last_updated": "2026-01-08T13:35:06.319685",
+    "record_count": 8
+  },
+  "laudo": {
+    "last_spec_hash": "62ac74f3a7ab4c3ac8d1626a5d05dcac",
+    "last_backend": "sqlite",
+    "last_updated": "2026-01-08T13:35:07.948049",
+    "record_count": 4
+  },
+  "matriz": {
+    "last_spec_hash": "67538bc3f65c351d9455d3ab0d0089e7",
+    "last_backend": "sqlite",
+    "last_updated": "2026-01-08T13:35:09.234711",
+    "record_count": 8
+  },
+  "metodologias": {
+    "last_spec_hash": "911ec05e23e69ccf811d42539dbe22e1",
+    "last_backend": "sqlite",
+    "last_updated": "2026-01-08T13:35:10.369867",
+    "record_count": 4
+  },
+  "orcamento": {
+    "last_spec_hash": "5f455ef14bbad774d0ced276c41e0604",
+    "last_backend": "sqlite",
+    "last_updated": "2026-01-08T13:35:11.490367",
+    "record_count": 4
+  },
+  "parciais": {
+    "last_spec_hash": "0c86db4af38d655fc316fbf94248b03a",
+    "last_backend": "sqlite",
+    "last_updated": "2026-01-08T13:35:20.099970",
+    "record_count": 3
+  },
+  "resultado": {
+    "last_spec_hash": "077ea58961e2467819f141a434954d62",
+    "last_backend": "sqlite",
+    "last_updated": "2026-01-08T13:35:23.281914",
+    "record_count": 4
+  },
+  "tipo_amostra": {
+    "last_spec_hash": "de51defd3daa4942b2eaa8e5d2aa0131",
+    "last_backend": "sqlite",
+    "last_updated": "2026-01-08T13:35:25.492126",
+    "record_count": 4
   }
 }

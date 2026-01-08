@@ -2,16 +2,21 @@
   "title": "Clientes",
   "icon": "fa-building",
   "fields": [
-    {"name": "nome", "label": "Nome/Razão Social", "type": "text", "required": true},
-    {"name": "cpf_cnpj", "label": "CPF/CNPJ", "type": "text", "required": true},
-    {"name": "sif", "label": "SIF (Serviço de Inspeção Federal)", "type": "text", "required": false},
-    {"name": "ima", "label": "IMA (Instituto Mineiro de Agropecuária)", "type": "text", "required": false},
-    {"name": "telefone", "label": "Telefone", "type": "tel", "required": false},
-    {"name": "email", "label": "E-mail", "type": "email", "required": false}
+    {"name": "nome", "label": "Nome / Razão Social", "type": "text", "required": true},
+    {"name": "cpf_cnpj", "label": "CPF / CNPJ", "type": "text", "required": true},
+    {"name": "email", "label": "E-mail", "type": "email", "required": true},
+    {"name": "telefone", "label": "Telefone", "type": "tel", "required": true},
+    {"name": "endereco", "label": "Endereço", "type": "text", "required": false},
+    {"name": "cidade", "label": "Cidade", "type": "text", "required": false},
+    {"name": "uf", "label": "UF", "type": "text", "required": false},
+    {"name": "cep", "label": "CEP", "type": "text", "required": false},
+    {"name": "desconto_padrao", "label": "Desconto Padrão (%)", "type": "number", "required": false}
   ],
   "validation_messages": {
-    "all_empty": "Informe ao menos o nome e CPF/CNPJ do cliente.",
-    "nome": "O nome/razão social é obrigatório.",
-    "cpf_cnpj": "O CPF/CNPJ é obrigatório."
+    "all_empty": "Por favor, preencha os dados do cliente",
+    "nome": "Informe o nome ou razão social",
+    "cpf_cnpj": "Informe o CPF ou CNPJ",
+    "email": "Informe um e-mail válido",
+    "telefone": "Informe o telefone de contato"
   }
 }

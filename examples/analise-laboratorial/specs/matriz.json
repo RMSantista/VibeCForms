@@ -1,0 +1,19 @@
+{
+  "title": "Matriz de Análises",
+  "icon": "fa-table",
+  "fields": [
+    {"name": "tipo_amostra", "label": "Tipo de Amostra", "type": "search", "datasource": "tipo_amostra", "required": true},
+    {"name": "analise", "label": "Análise", "type": "search", "datasource": "analises", "required": true},
+    {"name": "metodologia", "label": "Metodologia", "type": "search", "datasource": "metodologias", "required": true},
+    {"name": "padrao_referencia", "label": "Padrão de Referência", "type": "text", "required": true},
+    {"name": "valor", "label": "Valor (R$)", "type": "number", "required": true}
+  ],
+  "validation_messages": {
+    "all_empty": "Por favor, preencha os dados da matriz",
+    "tipo_amostra": "Selecione o tipo de amostra",
+    "analise": "Selecione a análise",
+    "metodologia": "Selecione a metodologia",
+    "padrao_referencia": "Informe o padrão de referência",
+    "valor": "Informe o valor"
+  }
+}

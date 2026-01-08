@@ -1,0 +1,16 @@
+{
+  "title": "Amostras Específicas",
+  "icon": "fa-box",
+  "fields": [
+    {"name": "tipo_amostra", "label": "Tipo de Amostra", "type": "search", "datasource": "tipo_amostra", "required": true},
+    {"name": "nome", "label": "Nome/Descrição", "type": "text", "required": true},
+    {"name": "marca", "label": "Marca", "type": "text", "required": false},
+    {"name": "lote", "label": "Lote", "type": "text", "required": false},
+    {"name": "validade", "label": "Validade", "type": "date", "required": false}
+  ],
+  "validation_messages": {
+    "all_empty": "Por favor, preencha os dados da amostra específica",
+    "tipo_amostra": "Selecione o tipo de amostra",
+    "nome": "Informe o nome ou descrição"
+  }
+}

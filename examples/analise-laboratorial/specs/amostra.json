@@ -1,0 +1,70 @@
+{
+  "title": "Amostra",
+  "icon": "fa-flask",
+  "fields": [
+    {
+      "name": "orcamento",
+      "label": "Orçamento",
+      "type": "search",
+      "datasource": "orcamento",
+      "required": true
+    },
+    {
+      "name": "amostra_especifica",
+      "label": "Amostra Específica",
+      "type": "search",
+      "datasource": "amostra_especifica",
+      "required": true
+    },
+    {
+      "name": "data_entrada",
+      "label": "Data de Entrada",
+      "type": "datetime-local",
+      "required": true
+    },
+    {
+      "name": "recebedor",
+      "label": "Recebedor",
+      "type": "search",
+      "datasource": "funcionarios",
+      "required": true
+    },
+    {
+      "name": "temperatura",
+      "label": "Temperatura (°C)",
+      "type": "number",
+      "required": false
+    },
+    {
+      "name": "lacre",
+      "label": "Número do Lacre",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "lacre_ok",
+      "label": "Lacre Íntegro",
+      "type": "checkbox",
+      "required": false
+    },
+    {
+      "name": "quantidade",
+      "label": "Quantidade",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "anomalias",
+      "label": "Anomalias Encontradas",
+      "type": "textarea",
+      "required": false
+    }
+  ],
+  "validation_messages": {
+    "all_empty": "Por favor, preencha os dados da amostra",
+    "orcamento": "Selecione o orçamento",
+    "amostra_especifica": "Selecione a amostra específica",
+    "data_entrada": "Informe a data e hora de entrada",
+    "recebedor": "Selecione o recebedor"
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "title": "Laudos",
+  "icon": "fa-file-signature",
+  "fields": [
+    {
+      "name": "orcamento",
+      "label": "Orçamento",
+      "type": "search",
+      "datasource": "orcamento",
+      "required": true
+    },
+    {
+      "name": "numero",
+      "label": "Número do Laudo",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "data_emissao",
+      "label": "Data de Emissão",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "rt",
+      "label": "Responsável Técnico",
+      "type": "search",
+      "datasource": "funcionarios",
+      "required": true
+    },
+    {
+      "name": "parecer",
+      "label": "Parecer",
+      "type": "select",
+      "required": true,
+      "options": [
+        {"value": "conforme", "label": "Conforme"},
+        {"value": "nao_conforme", "label": "Não Conforme"},
+        {"value": "parcial", "label": "Parcial"}
+      ]
+    },
+    {
+      "name": "observacoes",
+      "label": "Observações",
+      "type": "textarea",
+      "required": false
+    }
+  ],
+  "validation_messages": {
+    "all_empty": "Por favor, preencha os dados do laudo",
+    "orcamento": "Selecione o orçamento",
+    "numero": "Informe o número do laudo",
+    "data_emissao": "Informe a data de emissão",
+    "rt": "Selecione o responsável técnico",
+    "parecer": "Selecione o parecer"
+  }
+}

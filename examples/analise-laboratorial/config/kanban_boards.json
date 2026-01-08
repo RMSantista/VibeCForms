@@ -1,0 +1,42 @@
+{
+  "boards": [
+    {
+      "name": "orcamento",
+      "form_path": "orcamento",
+      "states": [
+        {"tag": "rascunho", "label": "Rascunho", "color": "#6c757d"},
+        {"tag": "enviado", "label": "Enviado", "color": "#17a2b8"},
+        {"tag": "aprovado", "label": "Aprovado", "color": "#28a745"},
+        {"tag": "em_andamento", "label": "Em Andamento", "color": "#007bff"}
+      ]
+    },
+    {
+      "name": "amostra",
+      "form_path": "amostra",
+      "states": [
+        {"tag": "aguardando", "label": "Aguardando", "color": "#6c757d"},
+        {"tag": "recebida", "label": "Recebida", "color": "#17a2b8"},
+        {"tag": "fracionada", "label": "Fracionada", "color": "#28a745"}
+      ]
+    },
+    {
+      "name": "resultado",
+      "form_path": "parciais",
+      "states": [
+        {"tag": "aguardando", "label": "Aguardando", "color": "#6c757d"},
+        {"tag": "em_execucao", "label": "Em Execução", "color": "#007bff"},
+        {"tag": "concluida", "label": "Concluída", "color": "#28a745"}
+      ]
+    },
+    {
+      "name": "laudo",
+      "form_path": "laudo",
+      "states": [
+        {"tag": "rascunho", "label": "Rascunho", "color": "#6c757d"},
+        {"tag": "revisao", "label": "Revisão", "color": "#ffc107"},
+        {"tag": "liberado", "label": "Liberado", "color": "#28a745"},
+        {"tag": "entregue", "label": "Entregue", "color": "#20c997"}
+      ]
+    }
+  ]
+}
