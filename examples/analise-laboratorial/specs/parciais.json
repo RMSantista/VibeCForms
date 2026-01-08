@@ -1,0 +1,17 @@
+{
+  "title": "Resultados Parciais",
+  "icon": "fa-calculator",
+  "fields": [
+    {"name": "analise", "label": "Análise", "type": "search", "datasource": "analises", "required": true},
+    {"name": "nome", "label": "Nome do Parcial", "type": "text", "required": true},
+    {"name": "ordem", "label": "Ordem", "type": "number", "required": true},
+    {"name": "formula", "label": "Fórmula de Cálculo", "type": "text", "required": false},
+    {"name": "unidade", "label": "Unidade", "type": "text", "required": false}
+  ],
+  "validation_messages": {
+    "all_empty": "Por favor, preencha os dados do parcial",
+    "analise": "Selecione a análise",
+    "nome": "Informe o nome do parcial",
+    "ordem": "Informe a ordem"
+  }
+}

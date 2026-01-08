@@ -1,5 +1,5 @@
 {
-  "version": "1.0",
+  "version": "2.0",
   "default_backend": "sqlite",
   "data_root": "data",
 
@@ -14,14 +14,20 @@
 
   "form_mappings": {
     "clientes": "sqlite",
+    "funcionarios": "sqlite",
     "acreditadores": "sqlite",
-    "matriz_amostras": "sqlite",
-    "tipo_amostra": "sqlite",
     "metodologias": "sqlite",
+    "classificacao": "sqlite",
+    "tipo_amostra": "sqlite",
+    "amostra_especifica": "sqlite",
     "analises": "sqlite",
-    "amostras": "sqlite",
-    "ordens_servico": "sqlite",
-    "resultados": "sqlite",
+    "parciais": "sqlite",
+    "matriz": "sqlite",
+    "orcamento": "sqlite",
+    "amostra": "sqlite",
+    "fracionamento": "sqlite",
+    "resultado": "sqlite",
+    "laudo": "sqlite",
     "*": "default_backend"
   },
 

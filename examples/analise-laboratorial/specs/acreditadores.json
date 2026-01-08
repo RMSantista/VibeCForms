@@ -2,12 +2,23 @@
   "title": "Acreditadores",
   "icon": "fa-certificate",
   "fields": [
-    {"name": "acreditador", "label": "Nome do Acreditador", "type": "text", "required": true},
-    {"name": "sigla", "label": "Sigla", "type": "text", "required": false},
-    {"name": "website", "label": "Website", "type": "url", "required": false}
+    {"name": "nome", "label": "Nome", "type": "text", "required": true},
+    {"name": "sigla", "label": "Sigla", "type": "text", "required": true},
+    {
+      "name": "tipo_certificado",
+      "label": "Tipo de Certificado",
+      "type": "select",
+      "required": true,
+      "options": [
+        {"value": "oficial", "label": "Certificado Oficial"},
+        {"value": "laudo", "label": "Laudo Padrão"}
+      ]
+    }
   ],
   "validation_messages": {
-    "all_empty": "Informe o nome do acreditador.",
-    "acreditador": "O nome do acreditador é obrigatório."
+    "all_empty": "Por favor, preencha os dados do acreditador",
+    "nome": "Informe o nome do acreditador",
+    "sigla": "Informe a sigla do acreditador",
+    "tipo_certificado": "Selecione o tipo de certificado"
   }
 }

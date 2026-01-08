@@ -1,0 +1,22 @@
+{
+  "title": "Orçamentos",
+  "icon": "fa-file-invoice-dollar",
+  "fields": [
+    {"name": "cliente", "label": "Cliente", "type": "search", "datasource": "clientes", "required": true},
+    {"name": "acreditador", "label": "Acreditador", "type": "search", "datasource": "acreditadores", "required": true},
+    {"name": "data", "label": "Data", "type": "date", "required": true},
+    {"name": "qtd_amostras", "label": "Qtd. de Amostras", "type": "number", "required": true},
+    {"name": "urgente", "label": "Urgente?", "type": "checkbox", "required": false},
+    {"name": "coleta", "label": "Inclui Coleta?", "type": "checkbox", "required": false},
+    {"name": "taxa_coleta", "label": "Taxa de Coleta (R$)", "type": "number", "required": false},
+    {"name": "desconto", "label": "Desconto (%)", "type": "number", "required": false},
+    {"name": "observacoes", "label": "Observações", "type": "textarea", "required": false}
+  ],
+  "validation_messages": {
+    "all_empty": "Por favor, preencha os dados do orçamento",
+    "cliente": "Selecione o cliente",
+    "acreditador": "Selecione o acreditador",
+    "data": "Informe a data",
+    "qtd_amostras": "Informe a quantidade de amostras"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "title": "Funcionários",
+  "icon": "fa-user-tie",
+  "fields": [
+    {"name": "nome", "label": "Nome", "type": "text", "required": true},
+    {
+      "name": "funcao",
+      "label": "Função",
+      "type": "select",
+      "required": true,
+      "options": [
+        {"value": "analista", "label": "Analista"},
+        {"value": "supervisor", "label": "Supervisor"},
+        {"value": "rt", "label": "Responsável Técnico"},
+        {"value": "coletor", "label": "Coletor"},
+        {"value": "recepcao", "label": "Recepção"},
+        {"value": "administrativo", "label": "Administrativo"}
+      ]
+    },
+    {"name": "crq", "label": "CRQ (se aplicável)", "type": "text", "required": false},
+    {"name": "ativo", "label": "Ativo", "type": "checkbox", "required": false}
+  ],
+  "validation_messages": {
+    "all_empty": "Por favor, preencha os dados do funcionário",
+    "nome": "Informe o nome do funcionário",
+    "funcao": "Selecione a função do funcionário"
+  }
+}

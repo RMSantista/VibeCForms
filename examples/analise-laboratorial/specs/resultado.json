@@ -1,0 +1,69 @@
+{
+  "title": "Resultados",
+  "icon": "fa-clipboard-check",
+  "fields": [
+    {
+      "name": "fracionamento",
+      "label": "Fracionamento",
+      "type": "search",
+      "datasource": "fracionamento",
+      "required": true
+    },
+    {
+      "name": "analista",
+      "label": "Analista",
+      "type": "search",
+      "datasource": "funcionarios",
+      "required": true
+    },
+    {
+      "name": "inicio",
+      "label": "Início da Análise",
+      "type": "datetime-local",
+      "required": true
+    },
+    {
+      "name": "termino",
+      "label": "Término da Análise",
+      "type": "datetime-local",
+      "required": false
+    },
+    {
+      "name": "valores_parciais",
+      "label": "Valores Parciais (JSON)",
+      "type": "textarea",
+      "required": false
+    },
+    {
+      "name": "resultado_final",
+      "label": "Resultado Final",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "conformidade",
+      "label": "Conformidade",
+      "type": "select",
+      "required": true,
+      "options": [
+        {"value": "conforme", "label": "Conforme"},
+        {"value": "nao_conforme", "label": "Não Conforme"},
+        {"value": "inconclusivo", "label": "Inconclusivo"}
+      ]
+    },
+    {
+      "name": "observacoes",
+      "label": "Observações",
+      "type": "textarea",
+      "required": false
+    }
+  ],
+  "validation_messages": {
+    "all_empty": "Por favor, preencha os dados do resultado",
+    "fracionamento": "Selecione o fracionamento",
+    "analista": "Selecione o analista",
+    "inicio": "Informe a data e hora de início",
+    "resultado_final": "Informe o resultado final",
+    "conformidade": "Selecione a conformidade do resultado"
+  }
+}

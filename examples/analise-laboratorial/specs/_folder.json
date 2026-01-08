@@ -1,6 +1,6 @@
 {
-  "name": "Laboratório",
-  "description": "Sistema de Análises Laboratoriais de Controle de Qualidade",
+  "name": "Laboratório QA",
+  "description": "Sistema LIMS para Controle de Qualidade de Água e Alimentos",
   "icon": "fa-flask",
   "order": 1
 }

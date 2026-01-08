@@ -1,0 +1,13 @@
+{
+  "title": "Classificações de Amostra",
+  "icon": "fa-layer-group",
+  "fields": [
+    {"name": "acreditador", "label": "Acreditador", "type": "search", "datasource": "acreditadores", "required": true},
+    {"name": "nome", "label": "Nome da Classificação", "type": "text", "required": true}
+  ],
+  "validation_messages": {
+    "all_empty": "Por favor, preencha os dados da classificação",
+    "acreditador": "Selecione o acreditador",
+    "nome": "Informe o nome da classificação"
+  }
+}

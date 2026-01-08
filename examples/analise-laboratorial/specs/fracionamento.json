@@ -1,0 +1,47 @@
+{
+  "title": "Fracionamento",
+  "icon": "fa-cut",
+  "fields": [
+    {
+      "name": "amostra",
+      "label": "Amostra",
+      "type": "search",
+      "datasource": "amostra",
+      "required": true
+    },
+    {
+      "name": "porcao",
+      "label": "Nº da Porção",
+      "type": "number",
+      "required": true
+    },
+    {
+      "name": "matriz",
+      "label": "Matriz",
+      "type": "search",
+      "datasource": "matriz",
+      "required": true
+    },
+    {
+      "name": "responsavel",
+      "label": "Responsável",
+      "type": "search",
+      "datasource": "funcionarios",
+      "required": true
+    },
+    {
+      "name": "data_hora",
+      "label": "Data e Hora",
+      "type": "datetime-local",
+      "required": true
+    }
+  ],
+  "validation_messages": {
+    "all_empty": "Por favor, preencha os dados do fracionamento",
+    "amostra": "Selecione a amostra",
+    "porcao": "Informe o número da porção",
+    "matriz": "Selecione a matriz",
+    "responsavel": "Selecione o responsável",
+    "data_hora": "Informe a data e hora do fracionamento"
+  }
+}

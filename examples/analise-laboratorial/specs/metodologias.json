@@ -2,17 +2,15 @@
   "title": "Metodologias",
   "icon": "fa-book",
   "fields": [
-    {"name": "metodologia", "label": "Metodologia", "type": "text", "required": true},
+    {"name": "nome", "label": "Nome", "type": "text", "required": true},
     {"name": "bibliografia", "label": "Bibliografia", "type": "text", "required": true},
-    {"name": "referencia", "label": "Referência Bibliográfica", "type": "text", "required": true},
-    {"name": "valor_referencia", "label": "Valor de Referência", "type": "text", "required": true},
-    {"name": "descricao", "label": "Descrição Detalhada", "type": "textarea", "required": false}
+    {"name": "referencia", "label": "Referência", "type": "text", "required": true},
+    {"name": "versao", "label": "Versão", "type": "text", "required": false}
   ],
   "validation_messages": {
-    "all_empty": "Informe ao menos a metodologia, bibliografia, referência e valor de referência.",
-    "metodologia": "A metodologia é obrigatória.",
-    "bibliografia": "A bibliografia é obrigatória.",
-    "referencia": "A referência bibliográfica é obrigatória.",
-    "valor_referencia": "O valor de referência é obrigatório."
+    "all_empty": "Por favor, preencha os dados da metodologia",
+    "nome": "Informe o nome da metodologia",
+    "bibliografia": "Informe a bibliografia",
+    "referencia": "Informe a referência"
   }
 }
