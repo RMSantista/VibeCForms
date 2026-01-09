@@ -19,7 +19,7 @@ from datetime import datetime
 from uuid import uuid4
 from contextlib import contextmanager
 
-from src.persistence.contracts.relationship_interface import (
+from persistence.contracts.relationship_interface import (
     IRelationshipRepository,
     Relationship,
     SyncStrategy,
@@ -42,16 +42,109 @@ class RelationshipRepository(IRelationshipRepository):
     - Comprehensive validation
     """
 
-    def __init__(self, connection: sqlite3.Connection):
+    def __init__(
+        self,
+        connection: sqlite3.Connection,
+        sync_strategy: SyncStrategy = SyncStrategy.EAGER,
+        cardinality_rules: Optional[Dict] = None
+    ):
         """
-        Initialize repository with database connection.
+        Initialize repository with database connection and sync strategy.
 
         Args:
             connection: SQLite database connection (must be open)
+            sync_strategy: SyncStrategy enum (EAGER, LAZY, SCHEDULED)
+                          Default: EAGER (immediate sync)
+            cardinality_rules: Dict mapping relationship names to cardinality
+                              Example: {"cliente": CardinalityType.ONE_TO_MANY}
+
+        Gap #3 Fix: SyncStrategy is now configurable (was hardcoded to EAGER)
+        Gap #4 Fix: CardinalityType rules can be provided for validation
         """
         self.conn = connection
         self.conn.row_factory = sqlite3.Row
         self.logger = logging.getLogger(__name__)
+
+        # Gap #3: Store sync strategy for use in sync_display_values
+        self.sync_strategy = sync_strategy
+        self.logger.info(f"RelationshipRepository initialized with sync_strategy={sync_strategy.name}")
+
+        # Gap #4: Store cardinality rules for validation
+        self.cardinality_rules = cardinality_rules or {}
+        if self.cardinality_rules:
+            self.logger.info(f"Cardinality rules loaded: {list(self.cardinality_rules.keys())}")
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # GAP #4 FIX: CARDINALITY VALIDATION
+    # ═══════════════════════════════════════════════════════════════════════
+
+    def validate_cardinality(
+        self,
+        source_type: str,
+        source_id: str,
+        relationship_name: str,
+        cardinality: Optional[CardinalityType] = None,
+        cursor: Optional[sqlite3.Cursor] = None
+    ) -> tuple[bool, Optional[str]]:
+        """
+        Validate relationship cardinality constraints.
+
+        Gap #4 Fix: Determines if we can add another relationship
+        based on cardinality type (1:1, 1:N, N:N).
+
+        Args:
+            source_type: Entity type (e.g., 'pedidos')
+            source_id: Entity ID
+            relationship_name: Relationship field (e.g., 'cliente')
+            cardinality: Override cardinality (uses self.cardinality_rules if not provided)
+            cursor: Database cursor (if within transaction, pass existing cursor)
+
+        Returns:
+            (is_valid: bool, error_message: Optional[str])
+
+        Examples:
+            - 1:1 relationship: Can only have 1 target
+            - 1:N relationship: Can have multiple targets
+            - N:N relationship: Can have multiple targets
+        """
+        # Determine cardinality from rules or parameter
+        if cardinality is None:
+            key = f"{source_type}.{relationship_name}"
+            cardinality = self.cardinality_rules.get(key, CardinalityType.ONE_TO_MANY)
+
+        # If 1:1, check if already has a relationship
+        if cardinality == CardinalityType.ONE_TO_ONE:
+            # Use provided cursor or create new transaction
+            if cursor:
+                cursor.execute("""
+                    SELECT COUNT(*) as count FROM relationships
+                    WHERE source_type = ? AND source_id = ?
+                    AND relationship_name = ? AND removed_at IS NULL
+                """, (source_type, source_id, relationship_name))
+                result = cursor.fetchone()
+                # Handle both tuple and Row object
+                count = result[0] if isinstance(result, tuple) else result['count']
+            else:
+                with self._transaction() as new_cursor:
+                    new_cursor.execute("""
+                        SELECT COUNT(*) as count FROM relationships
+                        WHERE source_type = ? AND source_id = ?
+                        AND relationship_name = ? AND removed_at IS NULL
+                    """, (source_type, source_id, relationship_name))
+                    result = new_cursor.fetchone()
+                    # Handle both tuple and Row object
+                    count = result[0] if isinstance(result, tuple) else result['count']
+
+            if count > 0:
+                self.logger.info(f"1:1 Cardinality violation blocked: {source_type}/{source_id}.{relationship_name} already has {count} target(s)")
+                return False, (
+                    f"Cannot add more targets to 1:1 relationship "
+                    f"{source_type}/{source_id}.{relationship_name}: "
+                    f"already has {count} target(s)"
+                )
+
+        # 1:N and N:N allow multiple
+        return True, None
 
     # ═══════════════════════════════════════════════════════════════════════
     # CONTEXT MANAGER FOR TRANSACTIONS
@@ -86,7 +179,14 @@ class RelationshipRepository(IRelationshipRepository):
         created_by: str,
         metadata: Optional[Dict] = None
     ) -> str:
-        """Create a new relationship."""
+        """
+        Create a new relationship with comprehensive validation and EAGER sync.
+
+        Gap #3: Uses configured sync_strategy (default EAGER)
+        Gap #4: Validates cardinality constraints
+        Gap #6: Validates both source AND target exist
+        Gap #9: Comprehensive logging
+        """
 
         # Validation
         self._validate_relationship_params(
@@ -98,13 +198,27 @@ class RelationshipRepository(IRelationshipRepository):
         rel_id = self._generate_id()
 
         with self._transaction() as cursor:
-            # 1. Verify target exists
+            # 1. Verify SOURCE exists (Gap #6 Fix: was missing!)
+            if not self._record_exists(cursor, source_type, source_id):
+                raise ValueError(
+                    f"Source {source_type}/{source_id} does not exist"
+                )
+
+            # 2. Verify TARGET exists
             if not self._record_exists(cursor, target_type, target_id):
                 raise ValueError(
                     f"Target {target_type}/{target_id} does not exist"
                 )
 
-            # 2. Check for duplicate
+            # 3. Gap #4 Fix: Validate cardinality constraints (pass cursor to avoid nested transaction)
+            is_valid, error_msg = self.validate_cardinality(
+                source_type, source_id, relationship_name,
+                cursor=cursor  # Pass cursor to avoid nested transaction
+            )
+            if not is_valid:
+                raise ValueError(error_msg)
+
+            # 4. Check for duplicate
             if self._relationship_exists(
                 cursor, source_type, source_id,
                 relationship_name, target_id
@@ -135,6 +249,28 @@ class RelationshipRepository(IRelationshipRepository):
                 f"{target_type}/{target_id}"
             )
 
+        # 4. EAGER SYNC: Synchronize display values immediately after creation
+        # This ensures display columns are populated without requiring manual sync
+        try:
+            updated_count = self.sync_display_values(
+                source_type, source_id, relationship_name
+            )
+            if updated_count > 0:
+                self.logger.debug(
+                    f"Synced display values for {source_type}/{source_id}.{relationship_name}: "
+                    f"{updated_count} updated"
+                )
+            else:
+                self.logger.debug(
+                    f"No display values to sync for {source_type}/{source_id}.{relationship_name} "
+                    "(column may not exist, target display field may be null, or target doesn't exist)"
+                )
+        except Exception as e:
+            self.logger.warning(
+                f"Failed to sync display values for {source_type}/{source_id}.{relationship_name}: "
+                f"{str(e)}"
+            )
+
         return rel_id
 
     # ═══════════════════════════════════════════════════════════════════════
@@ -155,7 +291,12 @@ class RelationshipRepository(IRelationshipRepository):
         """, (rel_id,))
 
         row = cursor.fetchone()
-        return self._row_to_relationship(row) if row else None
+        if row:
+            self.logger.debug(f"Retrieved relationship {rel_id}")
+            return self._row_to_relationship(row)
+        else:
+            self.logger.debug(f"Relationship {rel_id} not found")
+            return None
 
     def get_relationships(
         self,
@@ -343,37 +484,65 @@ class RelationshipRepository(IRelationshipRepository):
         source_type: str,
         source_id: Optional[str] = None
     ) -> Dict:
-        """Validate relationship integrity."""
+        """
+        Validate relationship integrity.
+
+        Checks for:
+        - Orphaned relationships (targets that don't exist)
+        - Inconsistent display values (optional)
+        - Missing relationships for required fields (optional)
+
+        Args:
+            source_type: Form path to validate
+            source_id: Optional specific record to validate
+
+        Returns:
+            {
+                'valid': bool,
+                'errors': [list of error descriptions],
+                'orphans': [orphaned relationship IDs],
+                'inconsistencies': [display value mismatches]
+            }
+        """
 
         cursor = self.conn.cursor()
         errors = []
         orphans = []
         inconsistencies = []
 
-        # Find orphaned relationships
+        # Build query to find relationships to validate
         query = """
             SELECT r.rel_id, r.source_type, r.source_id, r.target_type, r.target_id
             FROM relationships r
-            LEFT JOIN {target_table} t ON r.target_id = t.record_id
-            WHERE r.removed_at IS NULL
-              AND r.source_type = ?
-              AND t.record_id IS NULL
+            WHERE r.removed_at IS NULL AND r.source_type = ?
         """
+        params = [source_type]
 
         if source_id:
             query += " AND r.source_id = ?"
-            params = [source_type, source_id]
-        else:
-            params = [source_type]
+            params.append(source_id)
 
         try:
-            cursor.execute(query.format(target_table="{}"), params)
-            orphans = [row[0] for row in cursor.fetchall()]
-        except Exception as e:
-            self.logger.warning(f"Error checking orphans: {str(e)}")
+            cursor.execute(query, params)
+            relationships = cursor.fetchall()
 
-        if orphans:
-            errors.append(f"Found {len(orphans)} orphaned relationships")
+            # Check each relationship for orphans (safe method - no JOIN)
+            for rel in relationships:
+                rel_id = rel['rel_id']
+                target_type = rel['target_type']
+                target_id = rel['target_id']
+
+                # Verify target exists
+                if not self._record_exists(cursor, target_type, target_id):
+                    orphans.append(rel_id)
+                    errors.append(
+                        f"Orphaned relationship {rel_id}: "
+                        f"target {target_type}/{target_id} does not exist"
+                    )
+
+        except Exception as e:
+            self.logger.error(f"Error validating relationships: {str(e)}")
+            errors.append(f"Validation error: {str(e)}")
 
         return {
             'valid': len(errors) == 0,
@@ -412,7 +581,16 @@ class RelationshipRepository(IRelationshipRepository):
             query += " AND removed_at IS NULL"
 
         cursor.execute(query, params)
-        return cursor.fetchone()['count']
+        count = cursor.fetchone()['count']
+
+        filters = f"source_type={source_type}"
+        if source_id:
+            filters += f", source_id={source_id}"
+        if relationship_name:
+            filters += f", relationship_name={relationship_name}"
+        self.logger.debug(f"Counted relationships ({filters}): {count}")
+
+        return count
 
     def get_relationship_stats(self, source_type: str) -> Dict:
         """Get statistics about relationships."""
@@ -441,12 +619,16 @@ class RelationshipRepository(IRelationshipRepository):
         by_name = {row['relationship_name']: row['count']
                    for row in cursor.fetchall()}
 
-        return {
+        result = {
             'total': stats['total'],
             'active': stats['active'],
             'by_name': by_name,
             'by_cardinality': {}  # TODO: Implement when schema available
         }
+
+        self.logger.debug(f"Relationship stats for {source_type}: {result['total']} total, {result['active']} active")
+
+        return result
 
     # ═══════════════════════════════════════════════════════════════════════
     # BATCH OPERATIONS
@@ -645,18 +827,100 @@ class RelationshipRepository(IRelationshipRepository):
             # Table doesn't exist yet
             return False
 
+    def _get_display_field(self, form_path: str) -> Optional[str]:
+        """
+        Detect the primary display field for a table (Convenção #2: Shared Metadata).
+
+        Tries to read from spec file, then falls back to common column names.
+
+        Returns:
+            Field name (e.g., 'nome', 'name', 'descricao') or None if not found
+        """
+
+        # Candidate field names in priority order
+        candidates = ['nome', 'name', 'descricao', 'titulo', 'sigla', 'label', 'title']
+
+        # Strategy 1: Try to read from spec file (Convenção #2)
+        try:
+            import json
+            from pathlib import Path
+
+            # Try to find spec file in various locations
+            spec_paths = [
+                Path(f"src/specs/{form_path}.json"),
+                Path(f"examples/*/specs/{form_path}.json"),
+                Path(f"specs/{form_path}.json"),
+            ]
+
+            for spec_path in spec_paths:
+                if spec_path.exists():
+                    with open(spec_path, 'r', encoding='utf-8') as f:
+                        spec = json.load(f)
+
+                    # Look for display_field in spec
+                    if 'display_field' in spec:
+                        return spec['display_field']
+
+                    # Look for first required text field
+                    for field in spec.get('fields', []):
+                        if field.get('required') and field.get('type') in ['text', 'email', 'tel', 'url']:
+                            return field['name']
+
+                    break
+        except Exception as e:
+            self.logger.debug(f"Could not read spec for {form_path}: {str(e)}")
+
+        # Strategy 2: Try candidate columns in order
+        cursor = self.conn.cursor()
+        try:
+            cursor.execute(f"PRAGMA table_info({form_path})")
+            columns = {col[1] for col in cursor.fetchall()}
+
+            for candidate in candidates:
+                if candidate in columns:
+                    self.logger.debug(f"Display field for {form_path}: {candidate}")
+                    return candidate
+        except Exception as e:
+            self.logger.warning(f"Error detecting display field for {form_path}: {str(e)}")
+
+        # Fallback: return None (caller should handle)
+        return None
+
     def _get_display_value(
         self, cursor, form_path: str, record_id: str
     ) -> Optional[str]:
-        """Get the display value from a record."""
+        """
+        Get the display value from a record.
+
+        Uses _get_display_field() to dynamically detect the field name.
+
+        Args:
+            cursor: Database cursor
+            form_path: Form/table name (e.g., 'clientes')
+            record_id: Record ID to fetch
+
+        Returns:
+            Display value or None if not found/error
+        """
+
+        # Dynamically detect which field to use (não hardcoded!)
+        display_field = self._get_display_field(form_path)
+
+        if not display_field:
+            self.logger.warning(f"No display field found for {form_path}")
+            return None
+
         try:
             cursor.execute(
-                f"SELECT nome FROM {form_path} WHERE record_id = ?",
+                f"SELECT {display_field} FROM {form_path} WHERE record_id = ?",
                 (record_id,)
             )
             row = cursor.fetchone()
-            return row['nome'] if row else None
-        except sqlite3.OperationalError:
+            return row[display_field] if row else None
+        except sqlite3.OperationalError as e:
+            self.logger.warning(
+                f"Error getting display value from {form_path}.{display_field}: {str(e)}"
+            )
             return None
 
     def _row_to_relationship(self, row: sqlite3.Row) -> Relationship:
