@@ -1,0 +1,53 @@
+{
+  "title": "Teste Relationship",
+  "icon": "fa-link",
+  "fields": [
+    {
+      "name": "cliente",
+      "label": "Cliente",
+      "type": "relationship",
+      "target": "clientes",
+      "cardinality": "one",
+      "display_field": "nome",
+      "required": true
+    },
+    {
+      "name": "funcionario",
+      "label": "Funcionário Responsável",
+      "type": "relationship",
+      "target": "funcionarios",
+      "cardinality": "one",
+      "display_field": "nome",
+      "required": true
+    },
+    {
+      "name": "tipos_amostra",
+      "label": "Tipos de Amostra",
+      "type": "relationship",
+      "target": "tipo_amostra",
+      "cardinality": "many",
+      "display_field": "nome",
+      "required": false
+    },
+    {
+      "name": "metodologias",
+      "label": "Metodologias Aplicadas",
+      "type": "relationship",
+      "target": "metodologias",
+      "cardinality": "many",
+      "display_field": "nome",
+      "required": false
+    },
+    {
+      "name": "observacoes",
+      "label": "Observações",
+      "type": "textarea",
+      "required": false
+    }
+  ],
+  "validation_messages": {
+    "all_empty": "Por favor, preencha os dados do teste",
+    "cliente": "Selecione o cliente",
+    "funcionario": "Selecione o funcionário responsável"
+  }
+}

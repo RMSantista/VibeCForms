@@ -201,3 +201,150 @@ class RepositoryFactory:
             ['txt', 'sqlite']
         """
         return list(_repository_cache.keys())
+
+    @staticmethod
+    def create_relationship_repository(form_path: str):
+        """
+        Create a RelationshipRepository instance for managing relationships.
+
+        FASE 3.1: Factory Pattern Integration
+
+        This method creates a RelationshipRepository with appropriate configuration:
+        - Reads sync_strategy from persistence.json
+        - Reads cardinality_rules from persistence.json
+        - Uses the same connection as the form's repository
+
+        Args:
+            form_path: Path to the form (e.g., 'pedidos', 'contatos')
+
+        Returns:
+            RelationshipRepository instance configured for the form
+
+        Example:
+            >>> rel_repo = RepositoryFactory.create_relationship_repository('pedidos')
+            >>> rel_repo.create_relationship(...)
+        """
+        from persistence.relationship_repository import RelationshipRepository
+        from persistence.contracts.relationship_interface import (
+            SyncStrategy,
+            CardinalityType,
+        )
+
+        # Get main repository to access its connection
+        repo = RepositoryFactory.get_repository(form_path)
+
+        # Check if repository supports relationships
+        if not hasattr(repo, "get_relationship_repository"):
+            logger.warning(
+                f"Repository for '{form_path}' does not support relationships "
+                f"(backend does not implement get_relationship_repository)"
+            )
+            return None
+
+        # Get relationship repository from base repository
+        # This ensures connection is initialized properly
+        rel_repo = repo.get_relationship_repository()
+
+        if rel_repo is None:
+            logger.warning(
+                f"Failed to create relationship repository for '{form_path}'"
+            )
+            return None
+
+        # Update sync strategy and cardinality rules from config
+        sync_strategy = RepositoryFactory.get_sync_strategy(form_path)
+        cardinality_rules = RepositoryFactory.get_cardinality_rules()
+
+        rel_repo.sync_strategy = sync_strategy
+        rel_repo.cardinality_rules = cardinality_rules
+
+        logger.info(
+            f"Created RelationshipRepository for '{form_path}' "
+            f"with sync_strategy={sync_strategy.name}"
+        )
+
+        return rel_repo
+
+    @staticmethod
+    def get_sync_strategy(form_path: str):
+        """
+        Get the sync strategy for a specific form's relationships.
+
+        Reads from persistence.json:
+        - relationships.sync_strategy_mappings.<form>.<field>
+        - relationships.default_sync_strategy
+
+        Args:
+            form_path: Path to the form (e.g., 'pedidos')
+
+        Returns:
+            SyncStrategy enum value (EAGER, LAZY, or SCHEDULED)
+
+        Example:
+            >>> strategy = RepositoryFactory.get_sync_strategy('pedidos')
+            >>> # Returns SyncStrategy.EAGER for most critical forms
+        """
+        from persistence.contracts.relationship_interface import SyncStrategy
+
+        config = get_config()
+        relationships_config = config.config.get("relationships", {})
+
+        # Get default strategy
+        default_strategy = relationships_config.get("default_sync_strategy", "eager")
+
+        # Try to map string to enum
+        strategy_map = {
+            "eager": SyncStrategy.EAGER,
+            "lazy": SyncStrategy.LAZY,
+            "scheduled": SyncStrategy.SCHEDULED,
+        }
+
+        strategy = strategy_map.get(default_strategy.lower(), SyncStrategy.EAGER)
+
+        logger.debug(
+            f"Sync strategy for '{form_path}': {strategy.name} "
+            f"(default: {default_strategy})"
+        )
+
+        return strategy
+
+    @staticmethod
+    def get_cardinality_rules() -> Dict:
+        """
+        Get cardinality rules from configuration.
+
+        Reads from persistence.json:
+        - relationships.cardinality_rules
+
+        Returns:
+            Dictionary mapping relationship names to CardinalityType
+            Example: {"pedidos.cliente": CardinalityType.ONE_TO_ONE}
+
+        Example:
+            >>> rules = RepositoryFactory.get_cardinality_rules()
+            >>> rules.get("pedidos.cliente")
+            CardinalityType.ONE_TO_ONE
+        """
+        from persistence.contracts.relationship_interface import CardinalityType
+
+        config = get_config()
+        relationships_config = config.config.get("relationships", {})
+        cardinality_config = relationships_config.get("cardinality_rules", {})
+
+        # Map string values to CardinalityType enum
+        cardinality_map = {
+            "one_to_one": CardinalityType.ONE_TO_ONE,
+            "one_to_many": CardinalityType.ONE_TO_MANY,
+            "many_to_many": CardinalityType.MANY_TO_MANY,
+        }
+
+        # Convert strings to enums
+        cardinality_rules = {}
+        for key, value in cardinality_config.items():
+            cardinality_rules[key] = cardinality_map.get(
+                value.lower(), CardinalityType.ONE_TO_MANY  # Default
+            )
+
+        logger.debug(f"Loaded {len(cardinality_rules)} cardinality rules from config")
+
+        return cardinality_rules

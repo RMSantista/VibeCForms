@@ -46,7 +46,7 @@ class RelationshipRepository(IRelationshipRepository):
         self,
         connection: sqlite3.Connection,
         sync_strategy: SyncStrategy = SyncStrategy.EAGER,
-        cardinality_rules: Optional[Dict] = None
+        cardinality_rules: Optional[Dict] = None,
     ):
         """
         Initialize repository with database connection and sync strategy.
@@ -67,12 +67,16 @@ class RelationshipRepository(IRelationshipRepository):
 
         # Gap #3: Store sync strategy for use in sync_display_values
         self.sync_strategy = sync_strategy
-        self.logger.info(f"RelationshipRepository initialized with sync_strategy={sync_strategy.name}")
+        self.logger.info(
+            f"RelationshipRepository initialized with sync_strategy={sync_strategy.name}"
+        )
 
         # Gap #4: Store cardinality rules for validation
         self.cardinality_rules = cardinality_rules or {}
         if self.cardinality_rules:
-            self.logger.info(f"Cardinality rules loaded: {list(self.cardinality_rules.keys())}")
+            self.logger.info(
+                f"Cardinality rules loaded: {list(self.cardinality_rules.keys())}"
+            )
 
     # ═══════════════════════════════════════════════════════════════════════
     # GAP #4 FIX: CARDINALITY VALIDATION
@@ -84,7 +88,7 @@ class RelationshipRepository(IRelationshipRepository):
         source_id: str,
         relationship_name: str,
         cardinality: Optional[CardinalityType] = None,
-        cursor: Optional[sqlite3.Cursor] = None
+        cursor: Optional[sqlite3.Cursor] = None,
     ) -> tuple[bool, Optional[str]]:
         """
         Validate relationship cardinality constraints.
@@ -116,27 +120,35 @@ class RelationshipRepository(IRelationshipRepository):
         if cardinality == CardinalityType.ONE_TO_ONE:
             # Use provided cursor or create new transaction
             if cursor:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT COUNT(*) as count FROM relationships
                     WHERE source_type = ? AND source_id = ?
                     AND relationship_name = ? AND removed_at IS NULL
-                """, (source_type, source_id, relationship_name))
+                """,
+                    (source_type, source_id, relationship_name),
+                )
                 result = cursor.fetchone()
                 # Handle both tuple and Row object
-                count = result[0] if isinstance(result, tuple) else result['count']
+                count = result[0] if isinstance(result, tuple) else result["count"]
             else:
                 with self._transaction() as new_cursor:
-                    new_cursor.execute("""
+                    new_cursor.execute(
+                        """
                         SELECT COUNT(*) as count FROM relationships
                         WHERE source_type = ? AND source_id = ?
                         AND relationship_name = ? AND removed_at IS NULL
-                    """, (source_type, source_id, relationship_name))
+                    """,
+                        (source_type, source_id, relationship_name),
+                    )
                     result = new_cursor.fetchone()
                     # Handle both tuple and Row object
-                    count = result[0] if isinstance(result, tuple) else result['count']
+                    count = result[0] if isinstance(result, tuple) else result["count"]
 
             if count > 0:
-                self.logger.info(f"1:1 Cardinality violation blocked: {source_type}/{source_id}.{relationship_name} already has {count} target(s)")
+                self.logger.info(
+                    f"1:1 Cardinality violation blocked: {source_type}/{source_id}.{relationship_name} already has {count} target(s)"
+                )
                 return False, (
                     f"Cannot add more targets to 1:1 relationship "
                     f"{source_type}/{source_id}.{relationship_name}: "
@@ -177,7 +189,7 @@ class RelationshipRepository(IRelationshipRepository):
         target_type: str,
         target_id: str,
         created_by: str,
-        metadata: Optional[Dict] = None
+        metadata: Optional[Dict] = None,
     ) -> str:
         """
         Create a new relationship with comprehensive validation and EAGER sync.
@@ -190,8 +202,7 @@ class RelationshipRepository(IRelationshipRepository):
 
         # Validation
         self._validate_relationship_params(
-            source_type, source_id, relationship_name,
-            target_type, target_id
+            source_type, source_id, relationship_name, target_type, target_id
         )
 
         # Generate UUID
@@ -200,28 +211,25 @@ class RelationshipRepository(IRelationshipRepository):
         with self._transaction() as cursor:
             # 1. Verify SOURCE exists (Gap #6 Fix: was missing!)
             if not self._record_exists(cursor, source_type, source_id):
-                raise ValueError(
-                    f"Source {source_type}/{source_id} does not exist"
-                )
+                raise ValueError(f"Source {source_type}/{source_id} does not exist")
 
             # 2. Verify TARGET exists
             if not self._record_exists(cursor, target_type, target_id):
-                raise ValueError(
-                    f"Target {target_type}/{target_id} does not exist"
-                )
+                raise ValueError(f"Target {target_type}/{target_id} does not exist")
 
             # 3. Gap #4 Fix: Validate cardinality constraints (pass cursor to avoid nested transaction)
             is_valid, error_msg = self.validate_cardinality(
-                source_type, source_id, relationship_name,
-                cursor=cursor  # Pass cursor to avoid nested transaction
+                source_type,
+                source_id,
+                relationship_name,
+                cursor=cursor,  # Pass cursor to avoid nested transaction
             )
             if not is_valid:
                 raise ValueError(error_msg)
 
             # 4. Check for duplicate
             if self._relationship_exists(
-                cursor, source_type, source_id,
-                relationship_name, target_id
+                cursor, source_type, source_id, relationship_name, target_id
             ):
                 raise ValueError(
                     f"Relationship already exists: "
@@ -230,18 +238,26 @@ class RelationshipRepository(IRelationshipRepository):
                 )
 
             # 3. Insert relationship
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO relationships (
                     rel_id, source_type, source_id,
                     relationship_name, target_type, target_id,
                     created_at, created_by, metadata
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                rel_id, source_type, source_id,
-                relationship_name, target_type, target_id,
-                self._now(), created_by,
-                json.dumps(metadata) if metadata else None
-            ))
+            """,
+                (
+                    rel_id,
+                    source_type,
+                    source_id,
+                    relationship_name,
+                    target_type,
+                    target_id,
+                    self._now(),
+                    created_by,
+                    json.dumps(metadata) if metadata else None,
+                ),
+            )
 
             self.logger.info(
                 f"Created relationship {rel_id}: "
@@ -284,11 +300,14 @@ class RelationshipRepository(IRelationshipRepository):
             raise ValueError("Invalid rel_id")
 
         cursor = self.conn.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT *
             FROM relationships
             WHERE rel_id = ?
-        """, (rel_id,))
+        """,
+            (rel_id,),
+        )
 
         row = cursor.fetchone()
         if row:
@@ -303,7 +322,7 @@ class RelationshipRepository(IRelationshipRepository):
         source_type: str,
         source_id: str,
         relationship_name: Optional[str] = None,
-        active_only: bool = True
+        active_only: bool = True,
     ) -> List[Relationship]:
         """Get all relationships for an entity (forward navigation)."""
 
@@ -339,7 +358,7 @@ class RelationshipRepository(IRelationshipRepository):
         target_type: str,
         target_id: str,
         relationship_name: Optional[str] = None,
-        active_only: bool = True
+        active_only: bool = True,
     ) -> List[Relationship]:
         """Get all entities that point to this entity (reverse navigation)."""
 
@@ -381,11 +400,14 @@ class RelationshipRepository(IRelationshipRepository):
             raise ValueError("rel_id and removed_by are required")
 
         with self._transaction() as cursor:
-            cursor.execute("""
+            cursor.execute(
+                """
                 UPDATE relationships
                 SET removed_at = ?, removed_by = ?
                 WHERE rel_id = ?
-            """, (self._now(), removed_by, rel_id))
+            """,
+                (self._now(), removed_by, rel_id),
+            )
 
             if cursor.rowcount == 0:
                 return False
@@ -400,11 +422,14 @@ class RelationshipRepository(IRelationshipRepository):
             raise ValueError("rel_id and restored_by are required")
 
         with self._transaction() as cursor:
-            cursor.execute("""
+            cursor.execute(
+                """
                 UPDATE relationships
                 SET removed_at = NULL, removed_by = NULL
                 WHERE rel_id = ?
-            """, (rel_id,))
+            """,
+                (rel_id,),
+            )
 
             if cursor.rowcount == 0:
                 return False
@@ -417,10 +442,7 @@ class RelationshipRepository(IRelationshipRepository):
     # ═══════════════════════════════════════════════════════════════════════
 
     def sync_display_values(
-        self,
-        source_type: str,
-        source_id: str,
-        relationship_name: Optional[str] = None
+        self, source_type: str, source_id: str, relationship_name: Optional[str] = None
     ) -> int:
         """Synchronize display values (eager sync)."""
 
@@ -447,14 +469,12 @@ class RelationshipRepository(IRelationshipRepository):
             updated_count = 0
 
             for rel in relationships:
-                rel_name = rel['relationship_name']
-                target_type = rel['target_type']
-                target_id = rel['target_id']
+                rel_name = rel["relationship_name"]
+                target_type = rel["target_type"]
+                target_id = rel["target_id"]
 
                 # Get target's display value
-                display_value = self._get_display_value(
-                    cursor, target_type, target_id
-                )
+                display_value = self._get_display_value(cursor, target_type, target_id)
 
                 if display_value:
                     # Update source's display column
@@ -467,8 +487,7 @@ class RelationshipRepository(IRelationshipRepository):
 
                     try:
                         cursor.execute(
-                            update_query,
-                            (display_value, self._now(), source_id)
+                            update_query, (display_value, self._now(), source_id)
                         )
                         updated_count += cursor.rowcount
                     except sqlite3.OperationalError:
@@ -480,9 +499,7 @@ class RelationshipRepository(IRelationshipRepository):
             return updated_count
 
     def validate_relationships(
-        self,
-        source_type: str,
-        source_id: Optional[str] = None
+        self, source_type: str, source_id: Optional[str] = None
     ) -> Dict:
         """
         Validate relationship integrity.
@@ -528,9 +545,9 @@ class RelationshipRepository(IRelationshipRepository):
 
             # Check each relationship for orphans (safe method - no JOIN)
             for rel in relationships:
-                rel_id = rel['rel_id']
-                target_type = rel['target_type']
-                target_id = rel['target_id']
+                rel_id = rel["rel_id"]
+                target_type = rel["target_type"]
+                target_id = rel["target_id"]
 
                 # Verify target exists
                 if not self._record_exists(cursor, target_type, target_id):
@@ -545,10 +562,10 @@ class RelationshipRepository(IRelationshipRepository):
             errors.append(f"Validation error: {str(e)}")
 
         return {
-            'valid': len(errors) == 0,
-            'errors': errors,
-            'orphans': orphans,
-            'inconsistencies': inconsistencies
+            "valid": len(errors) == 0,
+            "errors": errors,
+            "orphans": orphans,
+            "inconsistencies": inconsistencies,
         }
 
     # ═══════════════════════════════════════════════════════════════════════
@@ -560,7 +577,7 @@ class RelationshipRepository(IRelationshipRepository):
         source_type: str,
         source_id: Optional[str] = None,
         relationship_name: Optional[str] = None,
-        active_only: bool = True
+        active_only: bool = True,
     ) -> int:
         """Count relationships matching criteria."""
 
@@ -581,7 +598,7 @@ class RelationshipRepository(IRelationshipRepository):
             query += " AND removed_at IS NULL"
 
         cursor.execute(query, params)
-        count = cursor.fetchone()['count']
+        count = cursor.fetchone()["count"]
 
         filters = f"source_type={source_type}"
         if source_id:
@@ -598,35 +615,42 @@ class RelationshipRepository(IRelationshipRepository):
         cursor = self.conn.cursor()
 
         # Total and active count
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT
                 COUNT(*) as total,
                 SUM(CASE WHEN removed_at IS NULL THEN 1 ELSE 0 END) as active
             FROM relationships
             WHERE source_type = ?
-        """, (source_type,))
+        """,
+            (source_type,),
+        )
 
         stats = cursor.fetchone()
 
         # By relationship name
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT relationship_name, COUNT(*) as count
             FROM relationships
             WHERE source_type = ? AND removed_at IS NULL
             GROUP BY relationship_name
-        """, (source_type,))
+        """,
+            (source_type,),
+        )
 
-        by_name = {row['relationship_name']: row['count']
-                   for row in cursor.fetchall()}
+        by_name = {row["relationship_name"]: row["count"] for row in cursor.fetchall()}
 
         result = {
-            'total': stats['total'],
-            'active': stats['active'],
-            'by_name': by_name,
-            'by_cardinality': {}  # TODO: Implement when schema available
+            "total": stats["total"],
+            "active": stats["active"],
+            "by_name": by_name,
+            "by_cardinality": {},  # TODO: Implement when schema available
         }
 
-        self.logger.debug(f"Relationship stats for {source_type}: {result['total']} total, {result['active']} active")
+        self.logger.debug(
+            f"Relationship stats for {source_type}: {result['total']} total, {result['active']} active"
+        )
 
         return result
 
@@ -635,9 +659,7 @@ class RelationshipRepository(IRelationshipRepository):
     # ═══════════════════════════════════════════════════════════════════════
 
     def create_relationships_batch(
-        self,
-        relationships: List[Dict],
-        created_by: str
+        self, relationships: List[Dict], created_by: str
     ) -> List[str]:
         """Create multiple relationships atomically."""
 
@@ -649,8 +671,13 @@ class RelationshipRepository(IRelationshipRepository):
         with self._transaction() as cursor:
             for rel_data in relationships:
                 # Validate
-                required = ['source_type', 'source_id', 'relationship_name',
-                           'target_type', 'target_id']
+                required = [
+                    "source_type",
+                    "source_id",
+                    "relationship_name",
+                    "target_type",
+                    "target_id",
+                ]
                 if not all(k in rel_data for k in required):
                     raise ValueError(f"Missing required fields: {rel_data}")
 
@@ -658,46 +685,51 @@ class RelationshipRepository(IRelationshipRepository):
                 rel_id = self._generate_id()
 
                 # Insert
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT INTO relationships (
                         rel_id, source_type, source_id,
                         relationship_name, target_type, target_id,
                         created_at, created_by, metadata
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    rel_id,
-                    rel_data['source_type'],
-                    rel_data['source_id'],
-                    rel_data['relationship_name'],
-                    rel_data['target_type'],
-                    rel_data['target_id'],
-                    self._now(),
-                    created_by,
-                    json.dumps(rel_data.get('metadata'))
-                    if rel_data.get('metadata') else None
-                ))
+                """,
+                    (
+                        rel_id,
+                        rel_data["source_type"],
+                        rel_data["source_id"],
+                        rel_data["relationship_name"],
+                        rel_data["target_type"],
+                        rel_data["target_id"],
+                        self._now(),
+                        created_by,
+                        (
+                            json.dumps(rel_data.get("metadata"))
+                            if rel_data.get("metadata")
+                            else None
+                        ),
+                    ),
+                )
 
                 rel_ids.append(rel_id)
 
         self.logger.info(f"Created {len(rel_ids)} relationships in batch")
         return rel_ids
 
-    def remove_relationships_batch(
-        self,
-        rel_ids: List[str],
-        removed_by: str
-    ) -> int:
+    def remove_relationships_batch(self, rel_ids: List[str], removed_by: str) -> int:
         """Remove multiple relationships atomically."""
 
         if not rel_ids:
             return 0
 
         with self._transaction() as cursor:
-            cursor.execute(f"""
+            cursor.execute(
+                f"""
                 UPDATE relationships
                 SET removed_at = ?, removed_by = ?
                 WHERE rel_id IN ({','.join(['?'] * len(rel_ids))})
-            """, [self._now(), removed_by] + rel_ids)
+            """,
+                [self._now(), removed_by] + rel_ids,
+            )
 
             count = cursor.rowcount
 
@@ -715,7 +747,8 @@ class RelationshipRepository(IRelationshipRepository):
 
         try:
             # Create main table
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS relationships (
                     rel_id TEXT PRIMARY KEY,
                     source_type TEXT NOT NULL,
@@ -731,28 +764,37 @@ class RelationshipRepository(IRelationshipRepository):
 
                     UNIQUE(source_type, source_id, relationship_name, target_id)
                 )
-            """)
+            """
+            )
 
             # Create indexes
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_rel_source
                 ON relationships(source_type, source_id)
-            """)
+            """
+            )
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_rel_target
                 ON relationships(target_type, target_id)
-            """)
+            """
+            )
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_rel_name
                 ON relationships(source_type, relationship_name)
-            """)
+            """
+            )
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_rel_active
                 ON relationships(source_type, source_id, removed_at)
-            """)
+            """
+            )
 
             self.conn.commit()
             self.logger.info("Relationships table created successfully")
@@ -780,10 +822,12 @@ class RelationshipRepository(IRelationshipRepository):
         """Check if relationships table exists."""
 
         cursor = self.conn.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT name FROM sqlite_master
             WHERE type='table' AND name='relationships'
-        """)
+        """
+        )
         return cursor.fetchone() is not None
 
     # ═══════════════════════════════════════════════════════════════════════
@@ -791,36 +835,35 @@ class RelationshipRepository(IRelationshipRepository):
     # ═══════════════════════════════════════════════════════════════════════
 
     def _validate_relationship_params(
-        self, source_type, source_id, relationship_name,
-        target_type, target_id
+        self, source_type, source_id, relationship_name, target_type, target_id
     ):
         """Validate relationship parameters."""
-        if not all([source_type, source_id, relationship_name,
-                   target_type, target_id]):
+        if not all([source_type, source_id, relationship_name, target_type, target_id]):
             raise ValueError("All relationship fields are required")
 
         if source_type == target_type and source_id == target_id:
             raise ValueError("Cannot create self-relationship")
 
     def _relationship_exists(
-        self, cursor, source_type, source_id,
-        relationship_name, target_id
+        self, cursor, source_type, source_id, relationship_name, target_id
     ) -> bool:
         """Check if relationship already exists."""
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT 1 FROM relationships
             WHERE source_type = ? AND source_id = ?
               AND relationship_name = ? AND target_id = ?
               AND removed_at IS NULL
-        """, (source_type, source_id, relationship_name, target_id))
+        """,
+            (source_type, source_id, relationship_name, target_id),
+        )
         return cursor.fetchone() is not None
 
     def _record_exists(self, cursor, form_path: str, record_id: str) -> bool:
         """Check if a record exists in a table."""
         try:
             cursor.execute(
-                f"SELECT 1 FROM {form_path} WHERE record_id = ?",
-                (record_id,)
+                f"SELECT 1 FROM {form_path} WHERE record_id = ?", (record_id,)
             )
             return cursor.fetchone() is not None
         except sqlite3.OperationalError:
@@ -838,7 +881,7 @@ class RelationshipRepository(IRelationshipRepository):
         """
 
         # Candidate field names in priority order
-        candidates = ['nome', 'name', 'descricao', 'titulo', 'sigla', 'label', 'title']
+        candidates = ["nome", "name", "descricao", "titulo", "sigla", "label", "title"]
 
         # Strategy 1: Try to read from spec file (Convenção #2)
         try:
@@ -854,17 +897,22 @@ class RelationshipRepository(IRelationshipRepository):
 
             for spec_path in spec_paths:
                 if spec_path.exists():
-                    with open(spec_path, 'r', encoding='utf-8') as f:
+                    with open(spec_path, "r", encoding="utf-8") as f:
                         spec = json.load(f)
 
                     # Look for display_field in spec
-                    if 'display_field' in spec:
-                        return spec['display_field']
+                    if "display_field" in spec:
+                        return spec["display_field"]
 
                     # Look for first required text field
-                    for field in spec.get('fields', []):
-                        if field.get('required') and field.get('type') in ['text', 'email', 'tel', 'url']:
-                            return field['name']
+                    for field in spec.get("fields", []):
+                        if field.get("required") and field.get("type") in [
+                            "text",
+                            "email",
+                            "tel",
+                            "url",
+                        ]:
+                            return field["name"]
 
                     break
         except Exception as e:
@@ -881,7 +929,9 @@ class RelationshipRepository(IRelationshipRepository):
                     self.logger.debug(f"Display field for {form_path}: {candidate}")
                     return candidate
         except Exception as e:
-            self.logger.warning(f"Error detecting display field for {form_path}: {str(e)}")
+            self.logger.warning(
+                f"Error detecting display field for {form_path}: {str(e)}"
+            )
 
         # Fallback: return None (caller should handle)
         return None
@@ -913,7 +963,7 @@ class RelationshipRepository(IRelationshipRepository):
         try:
             cursor.execute(
                 f"SELECT {display_field} FROM {form_path} WHERE record_id = ?",
-                (record_id,)
+                (record_id,),
             )
             row = cursor.fetchone()
             return row[display_field] if row else None
@@ -926,24 +976,24 @@ class RelationshipRepository(IRelationshipRepository):
     def _row_to_relationship(self, row: sqlite3.Row) -> Relationship:
         """Convert database row to Relationship object."""
         metadata = None
-        if row['metadata']:
+        if row["metadata"]:
             try:
-                metadata = json.loads(row['metadata'])
+                metadata = json.loads(row["metadata"])
             except json.JSONDecodeError:
                 pass
 
         return Relationship(
-            rel_id=row['rel_id'],
-            source_type=row['source_type'],
-            source_id=row['source_id'],
-            relationship_name=row['relationship_name'],
-            target_type=row['target_type'],
-            target_id=row['target_id'],
-            created_at=row['created_at'],
-            created_by=row['created_by'],
-            removed_at=row['removed_at'],
-            removed_by=row['removed_by'],
-            metadata=metadata
+            rel_id=row["rel_id"],
+            source_type=row["source_type"],
+            source_id=row["source_id"],
+            relationship_name=row["relationship_name"],
+            target_type=row["target_type"],
+            target_id=row["target_id"],
+            created_at=row["created_at"],
+            created_by=row["created_by"],
+            removed_at=row["removed_at"],
+            removed_by=row["removed_by"],
+            metadata=metadata,
         )
 
     @staticmethod

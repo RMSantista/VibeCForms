@@ -64,6 +64,29 @@
         .tag-color-7 { background: #34495e; }
         .tag-color-8 { background: #16a085; }
         .tag-color-9 { background: #2c3e50; }
+
+        /* Relationships Section Styles */
+        #relationships-section { border-top: 2px solid #eee; padding-top: 20px; }
+        #relationships-section h3 { color: #2c3e50; margin-bottom: 15px; }
+        .relationships-empty { color: #888; text-align: center; font-style: italic; padding: 20px; }
+        .relationships-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .relationship-card { background: #f9f9f9; border: 1px solid #ddd; border-radius: 8px; padding: 15px; transition: all 0.2s; }
+        .relationship-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-color: #3498db; }
+        .relationship-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .relationship-type { font-weight: bold; color: #2c3e50; font-size: 14px; }
+        .relationship-icon { color: #3498db; margin-right: 5px; }
+        .relationship-target { color: #555; font-size: 14px; margin-bottom: 8px; }
+        .relationship-target strong { color: #2c3e50; }
+        .relationship-meta { font-size: 12px; color: #888; margin-bottom: 10px; }
+        .relationship-actions { display: flex; gap: 5px; margin-top: 10px; }
+        .btn-remove-rel { background: #e74c3c; color: #fff; border: none; border-radius: 4px; padding: 5px 10px; cursor: pointer; font-size: 12px; transition: background 0.2s; }
+        .btn-remove-rel:hover { background: #c0392b; }
+        .relationship-section-title { display: flex; align-items: center; gap: 10px; margin: 20px 0 10px; color: #34495e; }
+        .relationship-section-title h4 { margin: 0; font-size: 16px; }
+        .relationship-count { background: #3498db; color: #fff; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; }
+        .tr-clickable { cursor: pointer; }
+        .tr-clickable:hover { background-color: #f0f8ff !important; }
+        .tr-selected { background-color: #e3f2fd !important; }
     </style>
     <script>
         // Tag management functions
@@ -166,6 +189,215 @@
             }
         }
 
+        // Relationships management functions
+        let currentSelectedRecordId = null;
+        let currentFormPath = null;
+
+        async function loadRelationships(recordId, formPath) {
+            const section = document.getElementById('relationships-section');
+            const content = document.getElementById('relationships-content');
+
+            // Show section with loading state
+            section.style.display = 'block';
+            content.innerHTML = '<p style="color:#888; text-align:center;"><i class="fa fa-spinner fa-spin"></i> Carregando relacionamentos...</p>';
+
+            try {
+                const response = await fetch(`/api/relationships/${formPath}/${recordId}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    displayRelationships(data);
+                } else {
+                    console.error('Error loading relationships:', data.error);
+                    // If backend not supported or error, hide section gracefully
+                    if (data.error && data.error.includes('not supported')) {
+                        section.style.display = 'none';
+                    } else {
+                        content.innerHTML = '<p class="relationships-empty">Erro ao carregar relacionamentos.</p>';
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading relationships:', error);
+                // Graceful degradation: hide section if API fails
+                section.style.display = 'none';
+            }
+        }
+
+        function displayRelationships(data) {
+            const section = document.getElementById('relationships-section');
+            const content = document.getElementById('relationships-content');
+
+            // Show section
+            section.style.display = 'block';
+
+            // Check if there are any relationships
+            if (data.count.forward === 0 && data.count.reverse === 0) {
+                content.innerHTML = '<p class="relationships-empty">Este registro não possui relacionamentos.</p>';
+                return;
+            }
+
+            let html = '';
+
+            // Forward relationships
+            if (data.count.forward > 0) {
+                html += '<div class="relationship-section-title">';
+                html += '<h4><i class="fa fa-arrow-right relationship-icon"></i> Relacionamentos Diretos</h4>';
+                html += `<span class="relationship-count">${data.count.forward}</span>`;
+                html += '</div>';
+                html += '<div class="relationships-grid">';
+
+                data.forward.forEach(function(rel) {
+                    html += `
+                        <div class="relationship-card">
+                            <div class="relationship-card-header">
+                                <span class="relationship-type">${rel.relationship_name}</span>
+                            </div>
+                            <div class="relationship-target">
+                                <strong>${rel.target_display}</strong>
+                                <br>
+                                <small style="color:#888;">${rel.target_type}</small>
+                            </div>
+                            <div class="relationship-meta">
+                                <i class="fa fa-clock"></i> ${formatDate(rel.created_at)}
+                            </div>
+                            <div class="relationship-actions">
+                                <button class="btn-remove-rel" onclick="removeRelationship('${rel.rel_id}', '${rel.relationship_name}')">
+                                    <i class="fa fa-trash"></i> Remover
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += '</div>';
+            }
+
+            // Reverse relationships
+            if (data.count.reverse > 0) {
+                html += '<div class="relationship-section-title">';
+                html += '<h4><i class="fa fa-arrow-left relationship-icon"></i> Referenciado Por</h4>';
+                html += `<span class="relationship-count">${data.count.reverse}</span>`;
+                html += '</div>';
+                html += '<div class="relationships-grid">';
+
+                data.reverse.forEach(function(rel) {
+                    html += `
+                        <div class="relationship-card">
+                            <div class="relationship-card-header">
+                                <span class="relationship-type">${rel.relationship_name}</span>
+                            </div>
+                            <div class="relationship-target">
+                                <strong>${rel.source_display}</strong>
+                                <br>
+                                <small style="color:#888;">${rel.source_type}</small>
+                            </div>
+                            <div class="relationship-meta">
+                                <i class="fa fa-clock"></i> ${formatDate(rel.created_at)}
+                            </div>
+                            <div class="relationship-actions">
+                                <button class="btn-remove-rel" onclick="removeRelationship('${rel.rel_id}', '${rel.relationship_name}')">
+                                    <i class="fa fa-trash"></i> Remover
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += '</div>';
+            }
+
+            content.innerHTML = html;
+        }
+
+        async function removeRelationship(relId, relationshipName) {
+            if (!confirm(`Deseja realmente remover o relacionamento "${relationshipName}"?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/relationships/${relId}?removed_by=user`, {
+                    method: 'DELETE'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Reload relationships for current record
+                    if (currentSelectedRecordId && currentFormPath) {
+                        loadRelationships(currentSelectedRecordId, currentFormPath);
+                    }
+                } else {
+                    alert('Erro ao remover relacionamento: ' + (data.error || 'Desconhecido'));
+                }
+            } catch (error) {
+                console.error('Error removing relationship:', error);
+                alert('Erro ao remover relacionamento: ' + error.message);
+            }
+        }
+
+        function formatDate(isoDate) {
+            try {
+                const date = new Date(isoDate);
+                return date.toLocaleDateString('pt-BR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            } catch (e) {
+                return isoDate;
+            }
+        }
+
+        function setupTableRowClicks() {
+            // Get form path from URL (assumes pattern: /form_path)
+            const pathParts = window.location.pathname.split('/').filter(p => p);
+            currentFormPath = pathParts.join('/');
+
+            // Add click handlers to table rows (except header)
+            const table = document.querySelector('.table-wrapper table');
+            if (!table) return;
+
+            const rows = table.querySelectorAll('tr');
+            rows.forEach(function(row, index) {
+                // Skip header row (index 0)
+                if (index === 0) return;
+
+                // Add clickable class
+                row.classList.add('tr-clickable');
+
+                // Find record_id from data-record-id attribute in action buttons
+                const editBtn = row.querySelector('a[href*="/edit/"]');
+                if (!editBtn) return;
+
+                // Extract record_id from href (format: /form_path/edit/RECORD_ID)
+                const href = editBtn.getAttribute('href');
+                const match = href.match(/\/edit\/([^\/]+)$/);
+                if (!match) return;
+
+                const recordId = match[1];
+
+                // Add click handler
+                row.addEventListener('click', function(e) {
+                    // Don't trigger if clicking on action buttons
+                    if (e.target.closest('.icon-btn')) return;
+
+                    // Remove previous selection
+                    rows.forEach(r => r.classList.remove('tr-selected'));
+
+                    // Select this row
+                    row.classList.add('tr-selected');
+
+                    // Store current selection
+                    currentSelectedRecordId = recordId;
+
+                    // Load relationships
+                    loadRelationships(recordId, currentFormPath);
+                });
+            });
+        }
+
         window.onload = function() {
             var form = document.getElementById('cadastroForm');
             if (form) {
@@ -202,6 +434,9 @@
                     loadTags(recordId, formName);
                 }
             });
+
+            // Setup table row clicks for relationships
+            setupTableRowClicks();
         };
     </script>
 </head>
@@ -251,6 +486,14 @@
                     </tr>
                     {{ table_rows|safe }}
                 </table>
+            </div>
+
+            <!-- Relationships Section -->
+            <div id="relationships-section" style="display:none; margin-top:40px;">
+                <h3>Relacionamentos deste registro</h3>
+                <div id="relationships-content">
+                    <p style="color:#888; text-align:center;">Selecione um registro na tabela acima para visualizar seus relacionamentos.</p>
+                </div>
             </div>
         </div>
     </div>

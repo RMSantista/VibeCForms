@@ -102,13 +102,20 @@ def test_business_case(tmp_path_factory):
 
 
 @pytest.fixture(scope="function", autouse=True)
-def initialize_test_app(test_business_case):
+def initialize_test_app(test_business_case, request):
     """
     Automatically initialize the VibeCForms app with test business case.
 
     This fixture runs before each test and initializes the app with the
     test business case directory.
+
+    Tests can opt-out by using the marker: @pytest.mark.no_autoinit
     """
+    # Check if test has no_autoinit marker
+    if "no_autoinit" in request.keywords:
+        yield
+        return
+
     # Import using the same path as tests
     from src import VibeCForms
 

@@ -15,6 +15,7 @@ from pathlib import Path
 from datetime import datetime
 from persistence.base import BaseRepository
 from persistence.schema_detector import SchemaChangeDetector, ChangeType
+from persistence.contracts.relationship_interface import IRelationshipRepository
 from utils.crockford import generate_id
 
 logger = logging.getLogger(__name__)
@@ -221,7 +222,33 @@ class TxtRepository(BaseRepository):
                 elif field_type == "number":
                     if value:
                         try:
-                            form_data[field_name] = int(value)
+                            # Check if field should use decimal (float) instead of integer
+                            # Convention: fields named valor, preco, custo, price, cost, amount use decimals
+                            # Configuration: explicit "decimal": true in field spec
+                            is_decimal = field.get(
+                                "decimal", False
+                            ) or field_name.lower() in [
+                                "valor",
+                                "preco",
+                                "custo",
+                                "price",
+                                "cost",
+                                "amount",
+                                "total",
+                                "subtotal",
+                                "desconto",
+                                "discount",
+                                "taxa",
+                                "fee",
+                                "valor_total",
+                                "valor_unitario",
+                                "preco_unitario",
+                                "valor_desconto",
+                            ]
+                            if is_decimal:
+                                form_data[field_name] = float(value)
+                            else:
+                                form_data[field_name] = int(value)
                         except ValueError as e:
                             raise ValueError(
                                 f"Invalid number value '{value}' for field '{field_name}' "
@@ -233,8 +260,13 @@ class TxtRepository(BaseRepository):
                     form_data[field_name] = value
 
             # Store record_id internally for ID-based operations (not exposed in read_all)
-            if record_id:
-                form_data["_record_id"] = record_id
+            # Generate UUID for old records without one (migration scenario)
+            if not record_id:
+                record_id = generate_id()
+                logger.info(
+                    f"Generated UUID {record_id} for legacy record without UUID in {form_path}"
+                )
+            form_data["_record_id"] = record_id
 
             forms.append(form_data)
 
@@ -284,11 +316,9 @@ class TxtRepository(BaseRepository):
             logger.error(f"Cannot update: index {idx} out of bounds for {form_path}")
             return False
 
-        # Preserve the record_id when updating
-        record_id = forms[idx].get("_record_id", "")
-        updated_data = {**data}
-        if record_id:
-            updated_data["_record_id"] = record_id
+        # Preserve the record_id when updating, generate if missing (migration scenario)
+        record_id = forms[idx].get("_record_id") or generate_id()
+        updated_data = {**data, "_record_id": record_id}
 
         # Update the record
         forms[idx] = updated_data
@@ -333,8 +363,14 @@ class TxtRepository(BaseRepository):
                 for form_data in forms:
                     values = []
 
-                    # First, write record_id (or empty if not present for backwards compatibility)
-                    record_id = form_data.get("_record_id", "")
+                    # First, write record_id (generate if missing - all records MUST have UUID)
+                    record_id = form_data.get("_record_id")
+                    if not record_id:
+                        record_id = generate_id()
+                        form_data["_record_id"] = record_id
+                        logger.warning(
+                            f"Generated UUID {record_id} for record without UUID during write to {form_path}"
+                        )
                     values.append(record_id)
 
                     # Then write field values
@@ -1227,3 +1263,12 @@ class TxtRepository(BaseRepository):
             logger.error(f"Failed to bulk insert into {form_path}")
             # Return None for all records on failure
             return [None] * len(records)
+
+    # =========================================================================
+    # RELATIONSHIP REPOSITORY ACCESS
+    # =========================================================================
+
+    def get_relationship_repository(self) -> Optional[IRelationshipRepository]:
+        """TXT backend does not support relationships."""
+        logger.warning("Relationships are not supported in TXT backend")
+        return None

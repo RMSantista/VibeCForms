@@ -58,3 +58,6 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+markers = [
+    "no_autoinit: mark test to disable automatic app initialization from conftest.py"
+]

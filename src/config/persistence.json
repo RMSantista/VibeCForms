@@ -73,5 +73,22 @@
   "auto_create_storage": true,
   "auto_migrate_schema": true,
   "backup_before_migrate": true,
-  "backup_path": "data/backups/migrations/"
+  "backup_path": "data/backups/migrations/",
+  "relationships": {
+    "default_sync_strategy": "eager",
+    "sync_strategy_mappings": {
+      "pedidos.cliente": "eager",
+      "pedidos.fornecedor": "eager",
+      "pedidos.produtos": "lazy",
+      "contatos.categoria": "lazy",
+      "*": "default_sync_strategy"
+    },
+    "cardinality_rules": {
+      "pedidos.cliente": "one_to_one",
+      "pedidos.fornecedor": "one_to_one",
+      "pedidos.produtos": "one_to_many",
+      "contatos.tags": "many_to_many",
+      "contatos.responsavel": "one_to_one"
+    }
+  }
 }

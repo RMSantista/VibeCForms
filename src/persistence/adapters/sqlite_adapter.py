@@ -17,6 +17,8 @@ from pathlib import Path
 from datetime import datetime
 from persistence.base import BaseRepository
 from persistence.schema_detector import SchemaChangeDetector, ChangeType
+from persistence.relationship_repository import RelationshipRepository
+from persistence.contracts.relationship_interface import IRelationshipRepository
 from utils.crockford import generate_id
 
 logger = logging.getLogger(__name__)
@@ -56,6 +58,7 @@ class SQLiteRepository(BaseRepository):
         "color": "TEXT",
         "range": "INTEGER",
         "hidden": "TEXT",
+        "relationship": "TEXT",  # Stores UUID of target entity
     }
 
     def __init__(self, config: Dict[str, Any]):
@@ -71,6 +74,8 @@ class SQLiteRepository(BaseRepository):
         self.database = config.get("database", "data/sqlite/vibecforms.db")
         self.timeout = config.get("timeout", 10)
         self.check_same_thread = config.get("check_same_thread", False)
+        self._relationship_repo = None
+        self.conn = None  # Persistent connection for relationship repository
 
         # Ensure database directory exists
         db_dir = os.path.dirname(self.database)
@@ -111,6 +116,45 @@ class SQLiteRepository(BaseRepository):
     def _validate_field_name(self, field_name: str) -> bool:
         """Validate that field name contains only safe characters."""
         return bool(re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", field_name))
+
+    def _get_sql_type(self, field: Dict[str, Any]) -> str:
+        """
+        Get the SQL type for a field, considering decimal convention.
+
+        Args:
+            field: Field dictionary from spec
+
+        Returns:
+            SQL type string (TEXT, INTEGER, REAL, etc.)
+        """
+        field_type = field["type"]
+        field_name = field["name"]
+
+        # For number/range types, check if should use REAL (float) instead of INTEGER
+        if field_type in ("number", "range"):
+            # Convention: fields named valor, preco, custo, etc. use REAL
+            # Configuration: explicit "decimal": true in field spec
+            is_decimal = field.get("decimal", False) or field_name.lower() in [
+                "valor",
+                "preco",
+                "custo",
+                "price",
+                "cost",
+                "amount",
+                "total",
+                "subtotal",
+                "desconto",
+                "discount",
+                "taxa",
+                "fee",
+                "valor_total",
+                "valor_unitario",
+                "preco_unitario",
+                "valor_desconto",
+            ]
+            return "REAL" if is_decimal else "INTEGER"
+
+        return self.TYPE_MAPPING.get(field_type, "TEXT")
 
     def _ensure_tags_table(self) -> None:
         """Ensure the tags table exists in the database."""
@@ -171,7 +215,7 @@ class SQLiteRepository(BaseRepository):
         for field in spec["fields"]:
             field_name = field["name"]
             field_type = field["type"]
-            sql_type = self.TYPE_MAPPING.get(field_type, "TEXT")
+            sql_type = self._get_sql_type(field)
 
             # Add NOT NULL constraint for required fields (except checkbox)
             required = field.get("required", False)
@@ -232,7 +276,31 @@ class SQLiteRepository(BaseRepository):
                             bool(value) if value is not None else False
                         )
                     elif field_type == "number" or field_type == "range":
-                        form_data[field_name] = int(value) if value is not None else 0
+                        # Check if field should use decimal (float) instead of integer
+                        is_decimal = field.get(
+                            "decimal", False
+                        ) or field_name.lower() in [
+                            "valor",
+                            "preco",
+                            "custo",
+                            "price",
+                            "cost",
+                            "amount",
+                            "total",
+                            "subtotal",
+                            "desconto",
+                            "discount",
+                            "taxa",
+                            "fee",
+                        ]
+                        if is_decimal:
+                            form_data[field_name] = (
+                                float(value) if value is not None else 0.0
+                            )
+                        else:
+                            form_data[field_name] = (
+                                int(value) if value is not None else 0
+                            )
                     else:
                         form_data[field_name] = value if value is not None else ""
 
@@ -294,7 +362,27 @@ class SQLiteRepository(BaseRepository):
                 values.append(1 if value else 0)
             elif field_type == "number" or field_type == "range":
                 try:
-                    values.append(int(value) if value else 0)
+                    # Check if field should use decimal (float) instead of integer
+                    # Convention: fields named valor, preco, custo, price, cost, amount use decimals
+                    # Configuration: explicit "decimal": true in field spec
+                    is_decimal = field.get("decimal", False) or field_name.lower() in [
+                        "valor",
+                        "preco",
+                        "custo",
+                        "price",
+                        "cost",
+                        "amount",
+                        "total",
+                        "subtotal",
+                        "desconto",
+                        "discount",
+                        "taxa",
+                        "fee",
+                    ]
+                    if is_decimal:
+                        values.append(float(value) if value else 0.0)
+                    else:
+                        values.append(int(value) if value else 0)
                 except ValueError:
                     values.append(0)
             else:
@@ -359,7 +447,27 @@ class SQLiteRepository(BaseRepository):
                     values.append(1 if value else 0)
                 elif field_type == "number" or field_type == "range":
                     try:
-                        values.append(int(value) if value else 0)
+                        # Check if field should use decimal (float) instead of integer
+                        is_decimal = field.get(
+                            "decimal", False
+                        ) or field_name.lower() in [
+                            "valor",
+                            "preco",
+                            "custo",
+                            "price",
+                            "cost",
+                            "amount",
+                            "total",
+                            "subtotal",
+                            "desconto",
+                            "discount",
+                            "taxa",
+                            "fee",
+                        ]
+                        if is_decimal:
+                            values.append(float(value) if value else 0.0)
+                        else:
+                            values.append(int(value) if value else 0)
                     except ValueError:
                         values.append(0)
                 else:
@@ -600,7 +708,9 @@ class SQLiteRepository(BaseRepository):
 
                     field_name = change.field_name
                     field_type = change.field_type
-                    sql_type = self.TYPE_MAPPING.get(field_type, "TEXT")
+                    # Create a minimal field dict for _get_sql_type
+                    field_dict = {"name": field_name, "type": field_type}
+                    sql_type = self._get_sql_type(field_dict)
 
                     # Get default value for the field type
                     default_value = self._get_default_value_sql(field_type)
@@ -712,7 +822,7 @@ class SQLiteRepository(BaseRepository):
             for field in spec["fields"]:
                 field_name = field["name"]
                 field_type = field["type"]
-                sql_type = self.TYPE_MAPPING.get(field_type, "TEXT")
+                sql_type = self._get_sql_type(field)
 
                 required = field.get("required", False)
                 constraint = (
@@ -811,7 +921,7 @@ class SQLiteRepository(BaseRepository):
             for field in spec["fields"]:
                 fname = field["name"]
                 ftype = field["type"]
-                sql_type = self.TYPE_MAPPING.get(ftype, "TEXT")
+                sql_type = self._get_sql_type(field)
 
                 required = field.get("required", False)
                 constraint = " NOT NULL" if required and ftype != "checkbox" else ""
@@ -931,7 +1041,7 @@ class SQLiteRepository(BaseRepository):
             for field in spec["fields"]:
                 fname = field["name"]
                 ftype = field["type"]
-                sql_type = self.TYPE_MAPPING.get(ftype, "TEXT")
+                sql_type = self._get_sql_type(field)
 
                 required = field.get("required", False)
                 constraint = " NOT NULL" if required and ftype != "checkbox" else ""
@@ -1142,7 +1252,25 @@ class SQLiteRepository(BaseRepository):
                 if field_type == "checkbox":
                     data[field_name] = bool(value) if value else False
                 elif field_type == "number" or field_type == "range":
-                    data[field_name] = int(value) if value else 0
+                    # Check if field should use decimal (float) instead of integer
+                    is_decimal = field.get("decimal", False) or field_name.lower() in [
+                        "valor",
+                        "preco",
+                        "custo",
+                        "price",
+                        "cost",
+                        "amount",
+                        "total",
+                        "subtotal",
+                        "desconto",
+                        "discount",
+                        "taxa",
+                        "fee",
+                    ]
+                    if is_decimal:
+                        data[field_name] = float(value) if value else 0.0
+                    else:
+                        data[field_name] = int(value) if value else 0
                 else:
                     data[field_name] = str(value) if value else ""
 
@@ -1182,7 +1310,27 @@ class SQLiteRepository(BaseRepository):
                 values.append(1 if value else 0)
             elif field_type == "number" or field_type == "range":
                 try:
-                    values.append(int(value) if value else 0)
+                    # Check if field should use decimal (float) instead of integer
+                    # Convention: fields named valor, preco, custo, price, cost, amount use decimals
+                    # Configuration: explicit "decimal": true in field spec
+                    is_decimal = field.get("decimal", False) or field_name.lower() in [
+                        "valor",
+                        "preco",
+                        "custo",
+                        "price",
+                        "cost",
+                        "amount",
+                        "total",
+                        "subtotal",
+                        "desconto",
+                        "discount",
+                        "taxa",
+                        "fee",
+                    ]
+                    if is_decimal:
+                        values.append(float(value) if value else 0.0)
+                    else:
+                        values.append(int(value) if value else 0)
                 except ValueError:
                     values.append(0)
             else:
@@ -1635,7 +1783,27 @@ class SQLiteRepository(BaseRepository):
                     values.append(1 if value else 0)
                 elif field_type == "number" or field_type == "range":
                     try:
-                        values.append(int(value) if value else 0)
+                        # Check if field should use decimal (float) instead of integer
+                        is_decimal = field.get(
+                            "decimal", False
+                        ) or field_name.lower() in [
+                            "valor",
+                            "preco",
+                            "custo",
+                            "price",
+                            "cost",
+                            "amount",
+                            "total",
+                            "subtotal",
+                            "desconto",
+                            "discount",
+                            "taxa",
+                            "fee",
+                        ]
+                        if is_decimal:
+                            values.append(float(value) if value else 0.0)
+                        else:
+                            values.append(int(value) if value else 0)
                     except ValueError:
                         values.append(0)
                 else:
@@ -1675,3 +1843,20 @@ class SQLiteRepository(BaseRepository):
             logger.error(f"❌ Failed to bulk insert into {table_name}: {e}")
             # Return None for all records on failure
             return [None] * len(records)
+
+    # =========================================================================
+    # RELATIONSHIP REPOSITORY ACCESS
+    # =========================================================================
+
+    def get_relationship_repository(self) -> Optional[IRelationshipRepository]:
+        """Get relationship repository instance using persistent SQLite connection."""
+        if self._relationship_repo is None:
+            # Create persistent connection if not exists
+            if self.conn is None:
+                self.conn = self._get_connection()
+
+            self._relationship_repo = RelationshipRepository(self.conn)
+            # Ensure relationships table exists
+            if not self._relationship_repo.table_exists():
+                self._relationship_repo.create_relationship_table()
+        return self._relationship_repo

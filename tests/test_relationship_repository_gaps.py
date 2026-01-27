@@ -15,10 +15,7 @@ from datetime import datetime
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from persistence.relationship_repository import RelationshipRepository
-from persistence.contracts.relationship_interface import (
-    SyncStrategy,
-    CardinalityType
-)
+from persistence.contracts.relationship_interface import SyncStrategy, CardinalityType
 
 
 @pytest.fixture
@@ -34,22 +31,25 @@ def db_complete(test_db_path):
     cursor = conn.cursor()
 
     # form_metadata table (Gap #8: form_metadata handling)
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE form_metadata (
             form_path TEXT PRIMARY KEY,
             display_name TEXT,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
-    """)
+    """
+    )
 
-    for form_name in ['clientes', 'produtos', 'pedidos', 'funcionarios']:
+    for form_name in ["clientes", "produtos", "pedidos", "funcionarios"]:
         cursor.execute(
             "INSERT INTO form_metadata (form_path, display_name) VALUES (?, ?)",
-            (form_name, form_name.upper())
+            (form_name, form_name.upper()),
         )
 
     # relationships table with full schema
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE relationships (
             rel_id TEXT PRIMARY KEY,
             source_type TEXT NOT NULL,
@@ -66,13 +66,19 @@ def db_complete(test_db_path):
             FOREIGN KEY(source_type) REFERENCES form_metadata(form_path),
             FOREIGN KEY(target_type) REFERENCES form_metadata(form_path)
         )
-    """)
+    """
+    )
 
-    cursor.execute("CREATE INDEX idx_rel_source ON relationships(source_type, source_id)")
-    cursor.execute("CREATE INDEX idx_rel_target ON relationships(target_type, target_id)")
+    cursor.execute(
+        "CREATE INDEX idx_rel_source ON relationships(source_type, source_id)"
+    )
+    cursor.execute(
+        "CREATE INDEX idx_rel_target ON relationships(target_type, target_id)"
+    )
 
     # Test tables with various display field names
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE clientes (
             record_id TEXT PRIMARY KEY,
             nome TEXT NOT NULL,
@@ -80,18 +86,22 @@ def db_complete(test_db_path):
             _pedido_display TEXT,
             _fornecedor_display TEXT
         )
-    """)
+    """
+    )
 
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE produtos (
             record_id TEXT PRIMARY KEY,
             nome TEXT NOT NULL,
             preco REAL,
             _fornecedor_display TEXT
         )
-    """)
+    """
+    )
 
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE pedidos (
             record_id TEXT PRIMARY KEY,
             numero TEXT NOT NULL,
@@ -99,43 +109,45 @@ def db_complete(test_db_path):
             _cliente_display TEXT,
             _produto_display TEXT
         )
-    """)
+    """
+    )
 
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE funcionarios (
             record_id TEXT PRIMARY KEY,
             nome TEXT NOT NULL,
             departamento TEXT
         )
-    """)
+    """
+    )
 
     # Insert test data
     cursor.execute(
         "INSERT INTO clientes (record_id, nome, email) VALUES (?, ?, ?)",
-        ('cliente-1', 'Cliente A', 'a@example.com')
+        ("cliente-1", "Cliente A", "a@example.com"),
     )
     cursor.execute(
         "INSERT INTO clientes (record_id, nome, email) VALUES (?, ?, ?)",
-        ('cliente-2', 'Cliente B', 'b@example.com')
+        ("cliente-2", "Cliente B", "b@example.com"),
     )
 
     cursor.execute(
         "INSERT INTO produtos (record_id, nome, preco) VALUES (?, ?, ?)",
-        ('produto-1', 'Produto X', 99.99)
+        ("produto-1", "Produto X", 99.99),
     )
     cursor.execute(
         "INSERT INTO produtos (record_id, nome, preco) VALUES (?, ?, ?)",
-        ('produto-2', 'Produto Y', 149.99)
+        ("produto-2", "Produto Y", 149.99),
     )
 
     cursor.execute(
-        "INSERT INTO pedidos (record_id, numero) VALUES (?, ?)",
-        ('pedido-1', 'PED-001')
+        "INSERT INTO pedidos (record_id, numero) VALUES (?, ?)", ("pedido-1", "PED-001")
     )
 
     cursor.execute(
         "INSERT INTO funcionarios (record_id, nome, departamento) VALUES (?, ?, ?)",
-        ('func-1', 'João Silva', 'TI')
+        ("func-1", "João Silva", "TI"),
     )
 
     conn.commit()
@@ -152,6 +164,7 @@ def user_id():
 # GAP #3 & #4: SyncStrategy and CardinalityType
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class TestGap3And4:
     """Test Gap #3 (SyncStrategy) and Gap #4 (CardinalityType)."""
 
@@ -161,17 +174,11 @@ class TestGap3And4:
         conn.row_factory = sqlite3.Row
 
         # Should not raise error
-        repo_eager = RelationshipRepository(
-            conn,
-            sync_strategy=SyncStrategy.EAGER
-        )
+        repo_eager = RelationshipRepository(conn, sync_strategy=SyncStrategy.EAGER)
         assert repo_eager.sync_strategy == SyncStrategy.EAGER
 
         # Should accept LAZY
-        repo_lazy = RelationshipRepository(
-            conn,
-            sync_strategy=SyncStrategy.LAZY
-        )
+        repo_lazy = RelationshipRepository(conn, sync_strategy=SyncStrategy.LAZY)
         assert repo_lazy.sync_strategy == SyncStrategy.LAZY
 
         conn.close()
@@ -186,10 +193,7 @@ class TestGap3And4:
             "pedidos.produtos": CardinalityType.ONE_TO_MANY,
         }
 
-        repo = RelationshipRepository(
-            conn,
-            cardinality_rules=cardinality_rules
-        )
+        repo = RelationshipRepository(conn, cardinality_rules=cardinality_rules)
 
         assert repo.cardinality_rules == cardinality_rules
         conn.close()
@@ -200,31 +204,28 @@ class TestGap3And4:
         conn.row_factory = sqlite3.Row
 
         repo = RelationshipRepository(
-            conn,
-            cardinality_rules={
-                "pedidos.cliente": CardinalityType.ONE_TO_ONE
-            }
+            conn, cardinality_rules={"pedidos.cliente": CardinalityType.ONE_TO_ONE}
         )
 
         # Create first 1:1 relationship
         rel_id_1 = repo.create_relationship(
-            source_type='pedidos',
-            source_id='pedido-1',
-            relationship_name='cliente',
-            target_type='clientes',
-            target_id='cliente-1',
-            created_by=user_id
+            source_type="pedidos",
+            source_id="pedido-1",
+            relationship_name="cliente",
+            target_type="clientes",
+            target_id="cliente-1",
+            created_by=user_id,
         )
 
         # Try to create second - should fail
         with pytest.raises(ValueError, match="Cannot add more targets to 1:1"):
             repo.create_relationship(
-                source_type='pedidos',
-                source_id='pedido-1',
-                relationship_name='cliente',
-                target_type='clientes',
-                target_id='cliente-2',
-                created_by=user_id
+                source_type="pedidos",
+                source_id="pedido-1",
+                relationship_name="cliente",
+                target_type="clientes",
+                target_id="cliente-2",
+                created_by=user_id,
             )
 
         conn.close()
@@ -235,30 +236,27 @@ class TestGap3And4:
         conn.row_factory = sqlite3.Row
 
         repo = RelationshipRepository(
-            conn,
-            cardinality_rules={
-                "pedidos.produtos": CardinalityType.ONE_TO_MANY
-            }
+            conn, cardinality_rules={"pedidos.produtos": CardinalityType.ONE_TO_MANY}
         )
 
         # Create first 1:N relationship
         rel_id_1 = repo.create_relationship(
-            source_type='pedidos',
-            source_id='pedido-1',
-            relationship_name='produtos',
-            target_type='produtos',
-            target_id='produto-1',
-            created_by=user_id
+            source_type="pedidos",
+            source_id="pedido-1",
+            relationship_name="produtos",
+            target_type="produtos",
+            target_id="produto-1",
+            created_by=user_id,
         )
 
         # Create second should succeed
         rel_id_2 = repo.create_relationship(
-            source_type='pedidos',
-            source_id='pedido-1',
-            relationship_name='produtos',
-            target_type='produtos',
-            target_id='produto-2',  # Different target
-            created_by=user_id
+            source_type="pedidos",
+            source_id="pedido-1",
+            relationship_name="produtos",
+            target_type="produtos",
+            target_id="produto-2",  # Different target
+            created_by=user_id,
         )
 
         assert rel_id_1 != rel_id_2
@@ -268,6 +266,7 @@ class TestGap3And4:
 # ═══════════════════════════════════════════════════════════════════════════
 # GAP #6: Complete Validation in create_relationship
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 class TestGap6:
     """Test Gap #6: Complete validation (source + target + cardinality)."""
@@ -281,12 +280,12 @@ class TestGap6:
 
         with pytest.raises(ValueError, match="Source.*does not exist"):
             repo.create_relationship(
-                source_type='pedidos',
-                source_id='pedido-nonexistent',
-                relationship_name='cliente',
-                target_type='clientes',
-                target_id='cliente-1',
-                created_by=user_id
+                source_type="pedidos",
+                source_id="pedido-nonexistent",
+                relationship_name="cliente",
+                target_type="clientes",
+                target_id="cliente-1",
+                created_by=user_id,
             )
 
         conn.close()
@@ -300,12 +299,12 @@ class TestGap6:
 
         with pytest.raises(ValueError, match="Target.*does not exist"):
             repo.create_relationship(
-                source_type='pedidos',
-                source_id='pedido-1',
-                relationship_name='cliente',
-                target_type='clientes',
-                target_id='cliente-nonexistent',
-                created_by=user_id
+                source_type="pedidos",
+                source_id="pedido-1",
+                relationship_name="cliente",
+                target_type="clientes",
+                target_id="cliente-nonexistent",
+                created_by=user_id,
             )
 
         conn.close()
@@ -314,6 +313,7 @@ class TestGap6:
 # ═══════════════════════════════════════════════════════════════════════════
 # GAP #8: form_metadata Validation (FK enforcement)
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 class TestGap8:
     """Test Gap #8: form_metadata validation (FK constraints)."""
@@ -327,12 +327,12 @@ class TestGap8:
 
         # pedidos and clientes are registered in form_metadata
         rel_id = repo.create_relationship(
-            source_type='pedidos',
-            source_id='pedido-1',
-            relationship_name='cliente',
-            target_type='clientes',
-            target_id='cliente-1',
-            created_by=user_id
+            source_type="pedidos",
+            source_id="pedido-1",
+            relationship_name="cliente",
+            target_type="clientes",
+            target_id="cliente-1",
+            created_by=user_id,
         )
 
         assert rel_id is not None
@@ -348,12 +348,12 @@ class TestGap8:
         # 'unregistered' is not in form_metadata
         with pytest.raises(Exception):  # Could be ValueError or DB error
             repo.create_relationship(
-                source_type='unregistered',
-                source_id='test-1',
-                relationship_name='rel',
-                target_type='clientes',
-                target_id='cliente-1',
-                created_by=user_id
+                source_type="unregistered",
+                source_id="test-1",
+                relationship_name="rel",
+                target_type="clientes",
+                target_id="cliente-1",
+                created_by=user_id,
             )
 
         conn.close()
@@ -362,6 +362,7 @@ class TestGap8:
 # ═══════════════════════════════════════════════════════════════════════════
 # INTEGRATION: All gaps together
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 class TestAllGapsTogether:
     """Integration test: All gaps fixed working together."""
@@ -383,19 +384,17 @@ class TestAllGapsTogether:
         }
 
         repo = RelationshipRepository(
-            conn,
-            sync_strategy=SyncStrategy.EAGER,
-            cardinality_rules=cardinality_rules
+            conn, sync_strategy=SyncStrategy.EAGER, cardinality_rules=cardinality_rules
         )
 
         # Should validate everything
         rel_1 = repo.create_relationship(
-            source_type='pedidos',
-            source_id='pedido-1',
-            relationship_name='cliente',
-            target_type='clientes',
-            target_id='cliente-1',
-            created_by=user_id
+            source_type="pedidos",
+            source_id="pedido-1",
+            relationship_name="cliente",
+            target_type="clientes",
+            target_id="cliente-1",
+            created_by=user_id,
         )
 
         assert rel_1 is not None
@@ -403,22 +402,22 @@ class TestAllGapsTogether:
         # Try to add 2nd 1:1 relationship - should fail due to cardinality
         with pytest.raises(ValueError, match="Cannot add more targets"):
             repo.create_relationship(
-                source_type='pedidos',
-                source_id='pedido-1',
-                relationship_name='cliente',
-                target_type='clientes',
-                target_id='cliente-2',
-                created_by=user_id
+                source_type="pedidos",
+                source_id="pedido-1",
+                relationship_name="cliente",
+                target_type="clientes",
+                target_id="cliente-2",
+                created_by=user_id,
             )
 
         # But 1:N should work
         rel_2 = repo.create_relationship(
-            source_type='pedidos',
-            source_id='pedido-1',
-            relationship_name='funcionarios',
-            target_type='funcionarios',
-            target_id='func-1',
-            created_by=user_id
+            source_type="pedidos",
+            source_id="pedido-1",
+            relationship_name="funcionarios",
+            target_type="funcionarios",
+            target_id="func-1",
+            created_by=user_id,
         )
 
         assert rel_2 is not None

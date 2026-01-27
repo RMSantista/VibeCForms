@@ -6,6 +6,7 @@ Internal implementation details are private (prefixed with _).
 """
 
 import os
+import json
 import logging
 from typing import Dict, Any, List
 from flask import render_template_string, current_app
@@ -171,6 +172,42 @@ def _render_field(field: Dict[str, Any], form_data: Dict[str, Any] = None) -> st
             field_label=field_label,
             required=required,
             value=value,
+            datasource=field.get("datasource"),
+        )
+
+    elif field_type == "relationship":
+        # Relationship field with autocomplete to target entity
+        # Stores UUID of related record in hidden field (cardinality=one)
+        # or JSON array of UUIDs (cardinality=many)
+        template_content = _read_template("fields/relationship.html")
+        target_type = field.get("target")
+        cardinality = field.get("cardinality", "one")  # Default: one
+        display_field = field.get("display_field")  # Optional: campo a exibir no target
+
+        if not target_type:
+            logger.error(
+                f"Field '{field_name}' type 'relationship' requires 'target' attribute"
+            )
+            raise ValueError(
+                f"Relationship field '{field_name}' must specify 'target' attribute"
+            )
+
+        # Validar cardinality
+        if cardinality not in ["one", "many"]:
+            logger.warning(
+                f"Field '{field_name}' has invalid cardinality '{cardinality}', using 'one'"
+            )
+            cardinality = "one"
+
+        return render_template_string(
+            template_content,
+            field_name=field_name,
+            field_label=field_label,
+            target_type=target_type,
+            cardinality=cardinality,
+            display_field=display_field,
+            required=required,
+            value=value,
         )
 
     else:
@@ -197,6 +234,11 @@ def _render_field(field: Dict[str, Any], form_data: Dict[str, Any] = None) -> st
             else "text"
         )
 
+        # For number fields, add step attribute to allow decimals
+        step = None
+        if input_type == "number":
+            step = field.get("step", "any")  # Default: "any" allows any decimal
+
         return render_template_string(
             template_content,
             field_name=field_name,
@@ -204,6 +246,7 @@ def _render_field(field: Dict[str, Any], form_data: Dict[str, Any] = None) -> st
             input_type=input_type,
             required=required,
             value=value,
+            step=step,
         )
 
 
@@ -288,6 +331,40 @@ def _render_table_row(
         elif field_type == "hidden":
             # Don't display hidden values
             display_value = ""
+        elif field_type == "relationship":
+            # Display human-readable value for relationship fields
+            # Check for enriched display value first (added by _enrich_with_display_values)
+            display_field_name = f"_{field_name}_display"
+
+            if display_field_name in form_data:
+                # Use enriched display value (e.g., "João Silva" instead of UUID)
+                display_value = form_data[display_field_name]
+            else:
+                # Fallback: show UUID or parse many relationships
+                cardinality = field.get("cardinality", "one")
+
+                if cardinality == "many" and value:
+                    # Parse JSON array de UUIDs
+                    try:
+                        items = json.loads(value) if isinstance(value, str) else value
+                        if isinstance(items, list):
+                            # Exibir labels se disponível, senão UUIDs
+                            labels = [
+                                (
+                                    item.get("label", item.get("record_id", ""))
+                                    if isinstance(item, dict)
+                                    else str(item)
+                                )
+                                for item in items
+                            ]
+                            display_value = ", ".join(labels) if labels else ""
+                        else:
+                            display_value = value
+                    except Exception as e:
+                        logger.warning(f"Erro ao parsear relationship many: {e}")
+                        display_value = value
+                else:
+                    display_value = value if value else ""
         else:
             display_value = value
 
@@ -401,11 +478,12 @@ def validate_form(spec: Dict[str, Any], form_data: Dict[str, Any]) -> str:
     validation_messages = spec.get("validation_messages", {})
     required_fields = [f for f in spec["fields"] if f.get("required", False)]
 
-    # Check if all required fields are empty
+    # Check if all required fields are empty (excluding relationship fields)
     all_empty = all(
         not form_data.get(f["name"], "").strip()
         for f in required_fields
         if f["type"] != "checkbox"
+        and not (f["type"] == "search" and f.get("datasource"))  # Skip relationships
     )
 
     if all_empty and required_fields:
@@ -415,6 +493,11 @@ def validate_form(spec: Dict[str, Any], form_data: Dict[str, Any]) -> str:
     for field in required_fields:
         field_name = field["name"]
         field_type = field["type"]
+
+        # Skip validation for relationship fields (search with datasource)
+        # Relationships are managed separately and are optional by nature
+        if field_type == "search" and field.get("datasource"):
+            continue
 
         if field_type != "checkbox":
             value = form_data.get(field_name, "").strip()

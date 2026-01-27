@@ -11,7 +11,7 @@
     },
     {
       "name": "valor",
-      "label": "Valor",
+      "label": "Valor (R$)",
       "type": "number",
       "required": true
     },

@@ -16,7 +16,7 @@
     },
     {
       "name": "preco",
-      "label": "Preço",
+      "label": "Preço (R$)",
       "type": "number",
       "required": true
     },

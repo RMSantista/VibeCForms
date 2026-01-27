@@ -40,11 +40,13 @@ from controllers.forms import forms_bp
 from controllers.tags import tags_bp
 from controllers.kanban import kanban_bp
 from controllers.migration import migration_bp
+from controllers.relationships import relationships_bp
 
 app.register_blueprint(forms_bp)
 app.register_blueprint(tags_bp)
 app.register_blueprint(kanban_bp)
 app.register_blueprint(migration_bp)
+app.register_blueprint(relationships_bp)
 
 
 def parse_arguments():

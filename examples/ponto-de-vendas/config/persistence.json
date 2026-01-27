@@ -22,6 +22,8 @@
   "form_mappings": {
     "contatos": "sqlite",
     "produtos": "sqlite",
+    "pedidos": "sqlite",
+    "financeiro/contas": "sqlite",
     "financeiro/pagamentos": "sqlite",
     "*": "default_backend"
   },

@@ -1,0 +1,328 @@
+<div class="form-row">
+    <label for="{{ field_name }}_display">{{ field_label }}:</label>
+    <div class="autocomplete-wrapper" style="position: relative; display: inline-block; width: 100%;">
+        {% if cardinality == 'many' %}
+        <!-- Container para chips de seleção múltipla -->
+        <div id="{{ field_name }}_chips" class="relationship-chips" style="
+            min-height: 38px;
+            padding: 4px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        "></div>
+        {% endif %}
+
+        <!-- Campo visível: exibe o nome do registro relacionado -->
+        <input
+            type="text"
+            id="{{ field_name }}_display"
+            autocomplete="off"
+            {% if required and cardinality != 'many' %}required{% endif %}
+            placeholder="Digite para buscar {{ target_type }}..."
+            style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+
+        <!-- Campo oculto: armazena o UUID (one) ou array JSON de UUIDs (many) -->
+        <input
+            type="hidden"
+            name="{{ field_name }}"
+            id="{{ field_name }}"
+            value="{{ value }}">
+
+        <!-- Dropdown de sugestões -->
+        <div id="{{ field_name }}_suggestions" class="autocomplete-suggestions" style="
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 200px;
+            overflow-y: auto;
+            background: white;
+            border: 1px solid #ccc;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 1000;
+            display: none;
+        "></div>
+    </div>
+</div>
+
+<style>
+.autocomplete-suggestions {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.autocomplete-suggestion {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.autocomplete-suggestion:hover {
+    background-color: #f0f0f0;
+}
+
+.autocomplete-suggestion.active {
+    background-color: #e0e0e0;
+}
+
+.autocomplete-suggestion:last-child {
+    border-bottom: none;
+}
+
+.relationship-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    background-color: #007bff;
+    color: white;
+    border-radius: 16px;
+    font-size: 14px;
+    gap: 6px;
+}
+
+.relationship-chip-remove {
+    cursor: pointer;
+    background: rgba(255,255,255,0.3);
+    border: none;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: white;
+    padding: 0;
+}
+
+.relationship-chip-remove:hover {
+    background: rgba(255,255,255,0.5);
+}
+</style>
+
+<script>
+(function() {
+    const displayInput = document.getElementById('{{ field_name }}_display');
+    const hiddenInput = document.getElementById('{{ field_name }}');
+    const suggestionsDiv = document.getElementById('{{ field_name }}_suggestions');
+    const cardinality = '{{ cardinality }}';
+    const chipsContainer = document.getElementById('{{ field_name }}_chips');
+    let debounceTimer;
+    let currentFocus = -1;
+    let selectedItems = [];  // Para cardinality many
+
+    if (displayInput && hiddenInput && suggestionsDiv) {
+        // Inicializar selectedItems se já houver valores (modo edição)
+        if (cardinality === 'many' && hiddenInput.value) {
+            try {
+                selectedItems = JSON.parse(hiddenInput.value);
+                renderChips();
+            } catch (e) {
+                console.error('Erro ao parsear valores iniciais:', e);
+                selectedItems = [];
+            }
+        }
+
+        // Input event - buscar sugestões via API genérica
+        displayInput.addEventListener('input', function() {
+            clearTimeout(debounceTimer);
+            const query = this.value.trim();
+
+            if (query.length < 1) {
+                suggestionsDiv.style.display = 'none';
+                suggestionsDiv.innerHTML = '';
+                if (cardinality === 'one') {
+                    hiddenInput.value = '';  // Limpa UUID se campo foi limpo
+                }
+                return;
+            }
+
+            // Debounce: aguardar 200ms após parar de digitar
+            debounceTimer = setTimeout(function() {
+                // API genérica: /api/search/<target_type>?q=<query>
+                fetch('/api/search/{{ target_type }}?q=' + encodeURIComponent(query))
+                    .then(response => response.json())
+                    .then(data => {
+                        suggestionsDiv.innerHTML = '';
+
+                        if (data.length === 0) {
+                            suggestionsDiv.style.display = 'none';
+                            return;
+                        }
+
+                        // Filtrar itens já selecionados (para cardinality many)
+                        let availableData = data;
+                        if (cardinality === 'many') {
+                            const selectedIds = selectedItems.map(item => item.record_id);
+                            availableData = data.filter(item => !selectedIds.includes(item.record_id));
+                        }
+
+                        // Renderizar até 5 sugestões
+                        availableData.slice(0, 5).forEach(function(item) {
+                            const div = document.createElement('div');
+                            div.className = 'autocomplete-suggestion';
+                            div.textContent = item.label;
+                            div.dataset.recordId = item.record_id;
+                            div.dataset.label = item.label;
+
+                            div.addEventListener('click', function() {
+                                if (cardinality === 'many') {
+                                    // Adicionar item à lista de selecionados
+                                    selectedItems.push({
+                                        record_id: item.record_id,
+                                        label: item.label
+                                    });
+                                    hiddenInput.value = JSON.stringify(selectedItems);
+                                    renderChips();
+                                    displayInput.value = '';  // Limpa campo para próxima seleção
+                                } else {
+                                    // Cardinalidade one (comportamento original)
+                                    displayInput.value = item.label;
+                                    hiddenInput.value = item.record_id;
+
+                                    // Auto-fill price fields for produtos relationship
+                                    if ('{{ field_name }}' === 'produtos' && '{{ target_type }}' === 'produtos') {
+                                        // Fetch full product data to get price
+                                        fetch('/api/get-by-id/{{ target_type }}/' + item.record_id + '?full=true')
+                                            .then(response => response.json())
+                                            .then(productData => {
+                                                // Try common price field names
+                                                const priceFieldNames = ['preco', 'valor', 'valor_unitario', 'preco_unitario', 'price'];
+                                                const targetFieldNames = ['valor_total', 'valor', 'preco', 'total'];
+
+                                                // Find the price in the product
+                                                let price = null;
+                                                for (const fieldName of priceFieldNames) {
+                                                    if (productData[fieldName] !== undefined && productData[fieldName] !== null) {
+                                                        price = productData[fieldName];
+                                                        break;
+                                                    }
+                                                }
+
+                                                // If price found, populate target field
+                                                if (price !== null) {
+                                                    for (const targetField of targetFieldNames) {
+                                                        const targetInput = document.getElementById(targetField) ||
+                                                                          document.querySelector(`input[name="${targetField}"]`);
+                                                        if (targetInput) {
+                                                            targetInput.value = price;
+                                                            // Trigger change event for any listeners
+                                                            targetInput.dispatchEvent(new Event('change'));
+                                                            break;
+                                                        }
+                                                    }
+                                                }
+                                            })
+                                            .catch(error => {
+                                                console.error('Error fetching product price:', error);
+                                            });
+                                    }
+                                }
+
+                                // Fecha dropdown
+                                suggestionsDiv.style.display = 'none';
+                                suggestionsDiv.innerHTML = '';
+                                currentFocus = -1;
+                            });
+
+                            suggestionsDiv.appendChild(div);
+                        });
+
+                        if (availableData.length > 0) {
+                            suggestionsDiv.style.display = 'block';
+                        } else {
+                            suggestionsDiv.style.display = 'none';
+                        }
+                        currentFocus = -1;
+                    })
+                    .catch(error => {
+                        console.error('Erro ao buscar {{ target_type }}:', error);
+                        suggestionsDiv.style.display = 'none';
+                    });
+            }, 200);
+        });
+
+        // Renderizar chips para cardinality many
+        function renderChips() {
+            if (!chipsContainer || cardinality !== 'many') return;
+
+            chipsContainer.innerHTML = '';
+
+            selectedItems.forEach(function(item, index) {
+                const chip = document.createElement('div');
+                chip.className = 'relationship-chip';
+                chip.innerHTML = `
+                    <span>${item.label}</span>
+                    <button type="button" class="relationship-chip-remove" data-index="${index}">×</button>
+                `;
+
+                chip.querySelector('.relationship-chip-remove').addEventListener('click', function() {
+                    const idx = parseInt(this.dataset.index);
+                    selectedItems.splice(idx, 1);
+                    hiddenInput.value = JSON.stringify(selectedItems);
+                    renderChips();
+                });
+
+                chipsContainer.appendChild(chip);
+            });
+        }
+
+        // Fechar dropdown ao clicar fora
+        document.addEventListener('click', function(e) {
+            if (e.target !== displayInput && !suggestionsDiv.contains(e.target)) {
+                suggestionsDiv.style.display = 'none';
+            }
+        });
+
+        // Navegação com teclado (setas e Enter)
+        displayInput.addEventListener('keydown', function(e) {
+            const suggestions = suggestionsDiv.getElementsByClassName('autocomplete-suggestion');
+
+            if (e.keyCode === 40) { // Seta para baixo
+                currentFocus++;
+                addActive(suggestions);
+                e.preventDefault();
+            } else if (e.keyCode === 38) { // Seta para cima
+                currentFocus--;
+                addActive(suggestions);
+                e.preventDefault();
+            } else if (e.keyCode === 13) { // Enter
+                e.preventDefault();
+                if (currentFocus > -1 && suggestions[currentFocus]) {
+                    suggestions[currentFocus].click();
+                }
+            } else if (e.keyCode === 27) { // ESC
+                suggestionsDiv.style.display = 'none';
+                currentFocus = -1;
+            }
+        });
+
+        function addActive(suggestions) {
+            if (!suggestions || suggestions.length === 0) return false;
+            removeActive(suggestions);
+            if (currentFocus >= suggestions.length) currentFocus = 0;
+            if (currentFocus < 0) currentFocus = (suggestions.length - 1);
+            suggestions[currentFocus].classList.add('active');
+        }
+
+        function removeActive(suggestions) {
+            for (let i = 0; i < suggestions.length; i++) {
+                suggestions[i].classList.remove('active');
+            }
+        }
+
+        // Carregar nome do registro se há UUID inicial (para edição em cardinality one)
+        if (cardinality === 'one' && hiddenInput.value) {
+            // TODO: Implementar busca reversa UUID -> Nome se necessário
+            // Por enquanto, deixar campo display vazio quando editando
+            // Uma solução futura seria adicionar endpoint /api/reverse/<target_type>/<uuid>
+        }
+    }
+})();
+</script>

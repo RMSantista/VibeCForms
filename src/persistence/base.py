@@ -17,6 +17,7 @@ Version 2.0 - UUID-based IDs and Tags as State:
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
 import warnings
+from persistence.contracts.relationship_interface import IRelationshipRepository
 
 
 class BaseRepository(ABC):
@@ -818,5 +819,45 @@ class BaseRepository(ABC):
             #     'won': 8,
             #     'lost': 15
             # }
+        """
+        pass
+
+    # =========================================================================
+    # RELATIONSHIP MANAGEMENT
+    # =========================================================================
+
+    @abstractmethod
+    def get_relationship_repository(self) -> Optional[IRelationshipRepository]:
+        """
+        Get relationship repository instance for managing entity relationships.
+
+        This method provides access to the relationship management system,
+        which handles all CRUD operations for relationships between entities.
+        Implementations may return None if relationship management is not
+        supported by the backend (e.g., TXT files).
+
+        Returns:
+            IRelationshipRepository instance if supported, None otherwise
+
+        Example:
+            rel_repo = repo.get_relationship_repository()
+            if rel_repo:
+                # Create a relationship between entities
+                rel_id = rel_repo.create_relationship(
+                    source_type='pedidos',
+                    source_id='PEDIDO_001',
+                    relationship_name='cliente',
+                    target_type='clientes',
+                    target_id='CLIENTE_001',
+                    created_by='user@example.com'
+                )
+
+                # Get all relationships for an entity
+                relationships = rel_repo.get_relationships(
+                    'pedidos', 'PEDIDO_001'
+                )
+            else:
+                # Backend doesn't support relationships
+                print("Relationships not supported by this backend")
         """
         pass

@@ -171,10 +171,23 @@
             }
         }
 
-        // Carregar nome do registro se há UUID inicial
+        // Carregar nome do registro se há UUID inicial (modo edição)
         if (hiddenInput.value) {
-            // TODO: Implementar busca reversa UUID -> Nome se necessário
-            // Por enquanto, deixar campo display vazio quando editando
+            // Busca reversa: UUID -> Nome
+            fetch(`/api/get-by-id/{{ datasource }}/${hiddenInput.value}`)
+                .then(response => {
+                    if (response.ok) {
+                        return response.json();
+                    }
+                    throw new Error('Record not found');
+                })
+                .then(data => {
+                    displayInput.value = data.label || '';
+                })
+                .catch(error => {
+                    console.error('Error loading initial value:', error);
+                    displayInput.placeholder = 'UUID: ' + hiddenInput.value;
+                });
         }
     }
 })();

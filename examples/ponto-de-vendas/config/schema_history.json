@@ -2,25 +2,31 @@
   "contatos": {
     "last_spec_hash": "ee014237f822ba2d7ea15758cd6056dd",
     "last_backend": "sqlite",
-    "last_updated": "2025-12-07T12:26:36.127215",
-    "record_count": 1
-  },
-  "financeiro/contas": {
-    "last_spec_hash": "5b7f40de8f2d127347e9096e73db5e38",
-    "last_backend": "txt",
-    "last_updated": "2025-12-07T12:26:17.899734",
+    "last_updated": "2026-01-26T22:05:28.456885",
     "record_count": 2
   },
-  "produtos": {
-    "last_spec_hash": "8e699969d9a6b89b7fc69a8901a4b138",
+  "financeiro/contas": {
+    "last_spec_hash": "00984268bd47d64aba9bc0501725155f",
     "last_backend": "sqlite",
-    "last_updated": "2025-11-19T21:33:28.037759",
-    "record_count": 0
+    "last_updated": "2026-01-26T18:19:59.313643",
+    "record_count": 3
+  },
+  "produtos": {
+    "last_spec_hash": "5cf914a52a9f619fa038d70654d9d8f5",
+    "last_backend": "sqlite",
+    "last_updated": "2026-01-26T22:05:57.439785",
+    "record_count": 4
   },
   "financeiro/pagamentos": {
-    "last_spec_hash": "31a89c6f61ac4fe2b4441601460e163f",
+    "last_spec_hash": "ec742f7a082301da9f814efb24b193b9",
     "last_backend": "sqlite",
-    "last_updated": "2025-11-25T21:02:16.675609",
+    "last_updated": "2026-01-26T18:21:15.084126",
+    "record_count": 5
+  },
+  "pedidos": {
+    "last_spec_hash": "7de25bb12fc0d74e5daba9aad476a56a",
+    "last_backend": "sqlite",
+    "last_updated": "2026-01-26T22:06:52.215554",
     "record_count": 4
   }
 }

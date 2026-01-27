@@ -53,14 +53,15 @@ class CardinalityType(Enum):
     Relationship cardinality types
     """
 
-    ONE_TO_ONE = "one_to_one"      # 1:1
-    ONE_TO_MANY = "one_to_many"    # 1:N
+    ONE_TO_ONE = "one_to_one"  # 1:1
+    ONE_TO_MANY = "one_to_many"  # 1:N
     MANY_TO_MANY = "many_to_many"  # N:N
 
 
 @dataclass
 class Relationship:
     """Data class representing a relationship"""
+
     rel_id: str
     source_type: str
     source_id: str
@@ -80,17 +81,17 @@ class Relationship:
     def to_dict(self) -> Dict:
         """Convert to dictionary"""
         return {
-            'rel_id': self.rel_id,
-            'source_type': self.source_type,
-            'source_id': self.source_id,
-            'relationship_name': self.relationship_name,
-            'target_type': self.target_type,
-            'target_id': self.target_id,
-            'created_at': self.created_at,
-            'created_by': self.created_by,
-            'removed_at': self.removed_at,
-            'removed_by': self.removed_by,
-            'metadata': self.metadata,
+            "rel_id": self.rel_id,
+            "source_type": self.source_type,
+            "source_id": self.source_id,
+            "relationship_name": self.relationship_name,
+            "target_type": self.target_type,
+            "target_id": self.target_id,
+            "created_at": self.created_at,
+            "created_by": self.created_by,
+            "removed_at": self.removed_at,
+            "removed_by": self.removed_by,
+            "metadata": self.metadata,
         }
 
 
@@ -122,7 +123,7 @@ class IRelationshipRepository(ABC):
         target_type: str,
         target_id: str,
         created_by: str,
-        metadata: Optional[Dict] = None
+        metadata: Optional[Dict] = None,
     ) -> str:
         """
         Create a relationship between two entities.
@@ -165,10 +166,7 @@ class IRelationshipRepository(ABC):
     # ═══════════════════════════════════════════════════════════════════════
 
     @abstractmethod
-    def get_relationship(
-        self,
-        rel_id: str
-    ) -> Optional[Relationship]:
+    def get_relationship(self, rel_id: str) -> Optional[Relationship]:
         """
         Get a single relationship by ID.
 
@@ -189,7 +187,7 @@ class IRelationshipRepository(ABC):
         source_type: str,
         source_id: str,
         relationship_name: Optional[str] = None,
-        active_only: bool = True
+        active_only: bool = True,
     ) -> List[Relationship]:
         """
         Get all relationships for an entity.
@@ -223,7 +221,7 @@ class IRelationshipRepository(ABC):
         target_type: str,
         target_id: str,
         relationship_name: Optional[str] = None,
-        active_only: bool = True
+        active_only: bool = True,
     ) -> List[Relationship]:
         """
         Get all entities that point TO this entity (reverse navigation).
@@ -251,11 +249,7 @@ class IRelationshipRepository(ABC):
     # ═══════════════════════════════════════════════════════════════════════
 
     @abstractmethod
-    def remove_relationship(
-        self,
-        rel_id: str,
-        removed_by: str
-    ) -> bool:
+    def remove_relationship(self, rel_id: str, removed_by: str) -> bool:
         """
         Soft-delete a relationship (mark as removed, don't actually delete).
 
@@ -279,11 +273,7 @@ class IRelationshipRepository(ABC):
         pass
 
     @abstractmethod
-    def restore_relationship(
-        self,
-        rel_id: str,
-        restored_by: str
-    ) -> bool:
+    def restore_relationship(self, rel_id: str, restored_by: str) -> bool:
         """
         Restore a soft-deleted relationship.
 
@@ -305,10 +295,7 @@ class IRelationshipRepository(ABC):
 
     @abstractmethod
     def sync_display_values(
-        self,
-        source_type: str,
-        source_id: str,
-        relationship_name: Optional[str] = None
+        self, source_type: str, source_id: str, relationship_name: Optional[str] = None
     ) -> int:
         """
         Synchronize display values in source records with target data.
@@ -344,9 +331,7 @@ class IRelationshipRepository(ABC):
 
     @abstractmethod
     def validate_relationships(
-        self,
-        source_type: str,
-        source_id: Optional[str] = None
+        self, source_type: str, source_id: Optional[str] = None
     ) -> Dict:
         """
         Validate integrity of relationships.
@@ -380,7 +365,7 @@ class IRelationshipRepository(ABC):
         source_type: str,
         source_id: Optional[str] = None,
         relationship_name: Optional[str] = None,
-        active_only: bool = True
+        active_only: bool = True,
     ) -> int:
         """
         Count relationships matching criteria.
@@ -397,10 +382,7 @@ class IRelationshipRepository(ABC):
         pass
 
     @abstractmethod
-    def get_relationship_stats(
-        self,
-        source_type: str
-    ) -> Dict:
+    def get_relationship_stats(self, source_type: str) -> Dict:
         """
         Get statistics about relationships for a form.
 
@@ -421,9 +403,7 @@ class IRelationshipRepository(ABC):
 
     @abstractmethod
     def create_relationships_batch(
-        self,
-        relationships: List[Dict],
-        created_by: str
+        self, relationships: List[Dict], created_by: str
     ) -> List[str]:
         """
         Create multiple relationships in a single transaction.
@@ -442,11 +422,7 @@ class IRelationshipRepository(ABC):
         pass
 
     @abstractmethod
-    def remove_relationships_batch(
-        self,
-        rel_ids: List[str],
-        removed_by: str
-    ) -> int:
+    def remove_relationships_batch(self, rel_ids: List[str], removed_by: str) -> int:
         """
         Remove multiple relationships in a single transaction.
 

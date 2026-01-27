@@ -26,6 +26,7 @@ from persistence.contracts.relationship_interface import SyncStrategy
 # FIXTURES
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 @pytest.fixture
 def temp_db_path(tmp_path):
     """Create path for temporary SQLite database."""
@@ -39,23 +40,26 @@ def db_with_schema(temp_db_path):
     cursor = conn.cursor()
 
     # Create form_metadata table (required by relationships schema)
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE form_metadata (
             form_path TEXT PRIMARY KEY,
             display_name TEXT,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
-    """)
+    """
+    )
 
     # Register test forms
-    for form_name in ['clientes', 'produtos', 'pedidos']:
+    for form_name in ["clientes", "produtos", "pedidos"]:
         cursor.execute(
             "INSERT INTO form_metadata (form_path, display_name) VALUES (?, ?)",
-            (form_name, form_name.upper())
+            (form_name, form_name.upper()),
         )
 
     # Create relationships table
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE relationships (
             rel_id TEXT PRIMARY KEY,
             source_type TEXT NOT NULL,
@@ -72,24 +76,36 @@ def db_with_schema(temp_db_path):
             FOREIGN KEY(source_type) REFERENCES form_metadata(form_path),
             FOREIGN KEY(target_type) REFERENCES form_metadata(form_path)
         )
-    """)
+    """
+    )
 
     # Create indexes
-    cursor.execute("CREATE INDEX idx_rel_source ON relationships(source_type, source_id)")
-    cursor.execute("CREATE INDEX idx_rel_target ON relationships(target_type, target_id)")
-    cursor.execute("CREATE INDEX idx_rel_name ON relationships(source_type, relationship_name)")
-    cursor.execute("CREATE INDEX idx_rel_active ON relationships(source_type, source_id, removed_at)")
+    cursor.execute(
+        "CREATE INDEX idx_rel_source ON relationships(source_type, source_id)"
+    )
+    cursor.execute(
+        "CREATE INDEX idx_rel_target ON relationships(target_type, target_id)"
+    )
+    cursor.execute(
+        "CREATE INDEX idx_rel_name ON relationships(source_type, relationship_name)"
+    )
+    cursor.execute(
+        "CREATE INDEX idx_rel_active ON relationships(source_type, source_id, removed_at)"
+    )
 
     # Create views
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE VIEW active_relationships AS
         SELECT rel_id, source_type, source_id, relationship_name, target_type, target_id,
                created_at, created_by, metadata
         FROM relationships
         WHERE removed_at IS NULL
-    """)
+    """
+    )
 
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE VIEW relationship_history AS
         SELECT rel_id, source_type, source_id, relationship_name, target_type, target_id,
                'created' as event_type, created_at as event_at, created_by as event_by
@@ -100,11 +116,13 @@ def db_with_schema(temp_db_path):
         FROM relationships
         WHERE removed_at IS NOT NULL
         ORDER BY event_at DESC
-    """)
+    """
+    )
 
     # Create test entity tables
     # clientes table (with 'nome' as display field - standard case)
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE clientes (
             record_id TEXT PRIMARY KEY,
             nome TEXT NOT NULL,
@@ -113,10 +131,12 @@ def db_with_schema(temp_db_path):
             updated_at TEXT,
             _pedido_display TEXT
         )
-    """)
+    """
+    )
 
     # produtos table (with 'nome' as display field)
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE produtos (
             record_id TEXT PRIMARY KEY,
             nome TEXT NOT NULL,
@@ -124,10 +144,12 @@ def db_with_schema(temp_db_path):
             descricao TEXT,
             updated_at TEXT
         )
-    """)
+    """
+    )
 
     # pedidos table (with 'numero' as display field - non-standard case)
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE pedidos (
             record_id TEXT PRIMARY KEY,
             numero TEXT NOT NULL,
@@ -137,30 +159,31 @@ def db_with_schema(temp_db_path):
             _cliente_display TEXT,
             _produto_display TEXT
         )
-    """)
+    """
+    )
 
     # Insert test data
     cursor.execute(
         "INSERT INTO clientes (record_id, nome, email, telefone) VALUES (?, ?, ?, ?)",
-        ('cliente-1', 'Cliente A', 'a@example.com', '111-1111')
+        ("cliente-1", "Cliente A", "a@example.com", "111-1111"),
     )
     cursor.execute(
         "INSERT INTO clientes (record_id, nome, email, telefone) VALUES (?, ?, ?, ?)",
-        ('cliente-2', 'Cliente B', 'b@example.com', '222-2222')
+        ("cliente-2", "Cliente B", "b@example.com", "222-2222"),
     )
 
     cursor.execute(
         "INSERT INTO produtos (record_id, nome, preco, descricao) VALUES (?, ?, ?, ?)",
-        ('produto-1', 'Produto X', 99.99, 'Description X')
+        ("produto-1", "Produto X", 99.99, "Description X"),
     )
     cursor.execute(
         "INSERT INTO produtos (record_id, nome, preco, descricao) VALUES (?, ?, ?, ?)",
-        ('produto-2', 'Produto Y', 149.99, 'Description Y')
+        ("produto-2", "Produto Y", 149.99, "Description Y"),
     )
 
     cursor.execute(
         "INSERT INTO pedidos (record_id, numero, cliente_id, data) VALUES (?, ?, ?, ?)",
-        ('pedido-1', 'PED-001', 'cliente-1', '2025-01-01')
+        ("pedido-1", "PED-001", "cliente-1", "2025-01-01"),
     )
 
     conn.commit()
@@ -188,6 +211,7 @@ def user_id():
 # TEST: BUG #1 - SQL Injection Fix in validate_relationships()
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class TestValidateRelationships:
     """Tests for validate_relationships() method - BUG #1 fix."""
 
@@ -195,56 +219,65 @@ class TestValidateRelationships:
         """Test validation when all relationships are healthy."""
         # Create a valid relationship
         rel_id = repository.create_relationship(
-            source_type='pedidos',
-            source_id='pedido-1',
-            relationship_name='cliente',
-            target_type='clientes',
-            target_id='cliente-1',
-            created_by=user_id
+            source_type="pedidos",
+            source_id="pedido-1",
+            relationship_name="cliente",
+            target_type="clientes",
+            target_id="cliente-1",
+            created_by=user_id,
         )
 
         # Validate
-        result = repository.validate_relationships('pedidos', 'pedido-1')
+        result = repository.validate_relationships("pedidos", "pedido-1")
 
-        assert result['valid'] is True
-        assert len(result['orphans']) == 0
-        assert len(result['errors']) == 0
+        assert result["valid"] is True
+        assert len(result["orphans"]) == 0
+        assert len(result["errors"]) == 0
 
-    def test_validate_relationships_detects_orphans(self, repository, user_id, db_with_schema):
+    def test_validate_relationships_detects_orphans(
+        self, repository, user_id, db_with_schema
+    ):
         """Test that validate_relationships() detects orphaned relationships."""
         # Create a valid relationship first
         rel_id = repository.create_relationship(
-            source_type='pedidos',
-            source_id='pedido-1',
-            relationship_name='cliente',
-            target_type='clientes',
-            target_id='cliente-1',
-            created_by=user_id
+            source_type="pedidos",
+            source_id="pedido-1",
+            relationship_name="cliente",
+            target_type="clientes",
+            target_id="cliente-1",
+            created_by=user_id,
         )
 
         # Now manually insert a relationship pointing to non-existent record
         conn = sqlite3.connect(str(db_with_schema))
         cursor = conn.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO relationships (
                 rel_id, source_type, source_id, relationship_name,
                 target_type, target_id, created_at, created_by
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            'orphan-rel-1',
-            'pedidos', 'pedido-1', 'cliente',
-            'clientes', 'cliente-nonexistent',
-            datetime.now().isoformat(), user_id
-        ))
+        """,
+            (
+                "orphan-rel-1",
+                "pedidos",
+                "pedido-1",
+                "cliente",
+                "clientes",
+                "cliente-nonexistent",
+                datetime.now().isoformat(),
+                user_id,
+            ),
+        )
         conn.commit()
         conn.close()
 
         # Validate
-        result = repository.validate_relationships('pedidos', 'pedido-1')
+        result = repository.validate_relationships("pedidos", "pedido-1")
 
-        assert result['valid'] is False
-        assert len(result['orphans']) >= 1
-        assert any('orphan-rel-1' in str(err) for err in result['errors'])
+        assert result["valid"] is False
+        assert len(result["orphans"]) >= 1
+        assert any("orphan-rel-1" in str(err) for err in result["errors"])
 
     def test_validate_relationships_no_sql_injection(self, repository):
         """Test that validate_relationships() is safe from SQL injection."""
@@ -255,7 +288,7 @@ class TestValidateRelationships:
         try:
             result = repository.validate_relationships(malicious_form)
             # Should either return empty result or raise ValueError, not SQL error
-            assert result['valid'] is not None
+            assert result["valid"] is not None
         except ValueError:
             # This is acceptable - invalid form path
             pass
@@ -265,20 +298,21 @@ class TestValidateRelationships:
 # TEST: BUG #2 - Dynamic Display Field Detection
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class TestDisplayFieldDetection:
     """Tests for _get_display_field() and _get_display_value() - BUG #2 fix."""
 
     def test_detect_display_field_standard_nome(self, repository):
         """Test detection of 'nome' field (standard case)."""
-        display_field = repository._get_display_field('clientes')
+        display_field = repository._get_display_field("clientes")
 
-        assert display_field == 'nome'
+        assert display_field == "nome"
 
     def test_detect_display_field_custom_numero(self, repository):
         """Test that non-standard display fields require spec file."""
         # 'numero' is not in default candidates, so should return None
         # unless defined in spec file (Convenção #2)
-        display_field = repository._get_display_field('pedidos')
+        display_field = repository._get_display_field("pedidos")
 
         # Returns None because 'numero' is not in candidates and no spec file exists
         assert display_field is None
@@ -286,22 +320,14 @@ class TestDisplayFieldDetection:
     def test_get_display_value_with_nome(self, repository):
         """Test getting display value from 'nome' field."""
         cursor = repository.conn.cursor()
-        display_value = repository._get_display_value(
-            cursor,
-            'clientes',
-            'cliente-1'
-        )
+        display_value = repository._get_display_value(cursor, "clientes", "cliente-1")
 
-        assert display_value == 'Cliente A'
+        assert display_value == "Cliente A"
 
     def test_get_display_value_with_numero(self, repository):
         """Test that non-standard display fields return None without spec."""
         cursor = repository.conn.cursor()
-        display_value = repository._get_display_value(
-            cursor,
-            'pedidos',
-            'pedido-1'
-        )
+        display_value = repository._get_display_value(cursor, "pedidos", "pedido-1")
 
         # Should return None because 'numero' is not a standard candidate
         # and no spec file exists to define it
@@ -311,9 +337,7 @@ class TestDisplayFieldDetection:
         """Test getting display value for non-existent record."""
         cursor = repository.conn.cursor()
         display_value = repository._get_display_value(
-            cursor,
-            'clientes',
-            'cliente-nonexistent'
+            cursor, "clientes", "cliente-nonexistent"
         )
 
         assert display_value is None
@@ -323,19 +347,22 @@ class TestDisplayFieldDetection:
 # TEST: BUG #3 - EAGER Sync of Display Values in create_relationship()
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class TestEagerSyncDisplayValues:
     """Tests for display value sync in create_relationship() - BUG #3 fix."""
 
-    def test_create_relationship_syncs_display_values(self, repository, user_id, db_with_schema):
+    def test_create_relationship_syncs_display_values(
+        self, repository, user_id, db_with_schema
+    ):
         """Test that create_relationship() immediately syncs display values."""
         # Create relationship
         rel_id = repository.create_relationship(
-            source_type='pedidos',
-            source_id='pedido-1',
-            relationship_name='cliente',
-            target_type='clientes',
-            target_id='cliente-1',
-            created_by=user_id
+            source_type="pedidos",
+            source_id="pedido-1",
+            relationship_name="cliente",
+            target_type="clientes",
+            target_id="cliente-1",
+            created_by=user_id,
         )
 
         # Verify relationship was created
@@ -347,25 +374,24 @@ class TestEagerSyncDisplayValues:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT _cliente_display FROM pedidos WHERE record_id = ?",
-            ('pedido-1',)
+            "SELECT _cliente_display FROM pedidos WHERE record_id = ?", ("pedido-1",)
         )
         row = cursor.fetchone()
         conn.close()
 
         # Display value should have been populated (EAGER sync)
-        assert row['_cliente_display'] == 'Cliente A'
+        assert row["_cliente_display"] == "Cliente A"
 
     def test_create_relationship_eager_vs_lazy(self, repository, user_id):
         """Test that create_relationship uses EAGER sync (immediate)."""
         # Create a relationship
         rel_id = repository.create_relationship(
-            source_type='pedidos',
-            source_id='pedido-1',
-            relationship_name='cliente',
-            target_type='clientes',
-            target_id='cliente-2',
-            created_by=user_id
+            source_type="pedidos",
+            source_id="pedido-1",
+            relationship_name="cliente",
+            target_type="clientes",
+            target_id="cliente-2",
+            created_by=user_id,
         )
 
         # Immediately verify the display value (no manual sync needed)
@@ -373,13 +399,14 @@ class TestEagerSyncDisplayValues:
 
         # The relationship should be valid
         assert rel is not None
-        assert rel.source_id == 'pedido-1'
-        assert rel.target_id == 'cliente-2'
+        assert rel.source_id == "pedido-1"
+        assert rel.target_id == "cliente-2"
 
 
 # ═══════════════════════════════════════════════════════════════════════════
 # TEST: Core Functionality
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 class TestRelationshipCRUD:
     """Tests for core CRUD operations."""
@@ -387,12 +414,12 @@ class TestRelationshipCRUD:
     def test_create_relationship_valid(self, repository, user_id):
         """Test creating a valid relationship."""
         rel_id = repository.create_relationship(
-            source_type='pedidos',
-            source_id='pedido-1',
-            relationship_name='cliente',
-            target_type='clientes',
-            target_id='cliente-1',
-            created_by=user_id
+            source_type="pedidos",
+            source_id="pedido-1",
+            relationship_name="cliente",
+            target_type="clientes",
+            target_id="cliente-1",
+            created_by=user_id,
         )
 
         assert rel_id is not None
@@ -403,47 +430,47 @@ class TestRelationshipCRUD:
         """Test that creating relationship to non-existent target fails."""
         with pytest.raises(ValueError, match="does not exist"):
             repository.create_relationship(
-                source_type='pedidos',
-                source_id='pedido-1',
-                relationship_name='cliente',
-                target_type='clientes',
-                target_id='cliente-nonexistent',
-                created_by=user_id
+                source_type="pedidos",
+                source_id="pedido-1",
+                relationship_name="cliente",
+                target_type="clientes",
+                target_id="cliente-nonexistent",
+                created_by=user_id,
             )
 
     def test_create_relationship_duplicate(self, repository, user_id):
         """Test that duplicate relationships are rejected."""
         # Create first relationship
         repository.create_relationship(
-            source_type='pedidos',
-            source_id='pedido-1',
-            relationship_name='cliente',
-            target_type='clientes',
-            target_id='cliente-1',
-            created_by=user_id
+            source_type="pedidos",
+            source_id="pedido-1",
+            relationship_name="cliente",
+            target_type="clientes",
+            target_id="cliente-1",
+            created_by=user_id,
         )
 
         # Try to create duplicate
         with pytest.raises(ValueError, match="already exists"):
             repository.create_relationship(
-                source_type='pedidos',
-                source_id='pedido-1',
-                relationship_name='cliente',
-                target_type='clientes',
-                target_id='cliente-1',
-                created_by=user_id
+                source_type="pedidos",
+                source_id="pedido-1",
+                relationship_name="cliente",
+                target_type="clientes",
+                target_id="cliente-1",
+                created_by=user_id,
             )
 
     def test_get_relationship(self, repository, user_id):
         """Test retrieving a relationship."""
         # Create
         rel_id = repository.create_relationship(
-            source_type='pedidos',
-            source_id='pedido-1',
-            relationship_name='cliente',
-            target_type='clientes',
-            target_id='cliente-1',
-            created_by=user_id
+            source_type="pedidos",
+            source_id="pedido-1",
+            relationship_name="cliente",
+            target_type="clientes",
+            target_id="cliente-1",
+            created_by=user_id,
         )
 
         # Retrieve
@@ -451,36 +478,36 @@ class TestRelationshipCRUD:
 
         assert rel is not None
         assert rel.rel_id == rel_id
-        assert rel.source_type == 'pedidos'
-        assert rel.source_id == 'pedido-1'
-        assert rel.relationship_name == 'cliente'
-        assert rel.target_type == 'clientes'
-        assert rel.target_id == 'cliente-1'
+        assert rel.source_type == "pedidos"
+        assert rel.source_id == "pedido-1"
+        assert rel.relationship_name == "cliente"
+        assert rel.target_type == "clientes"
+        assert rel.target_id == "cliente-1"
         assert rel.is_active() is True
 
     def test_get_relationships(self, repository, user_id):
         """Test retrieving multiple relationships."""
         # Create multiple relationships
         rel_id1 = repository.create_relationship(
-            source_type='pedidos',
-            source_id='pedido-1',
-            relationship_name='cliente',
-            target_type='clientes',
-            target_id='cliente-1',
-            created_by=user_id
+            source_type="pedidos",
+            source_id="pedido-1",
+            relationship_name="cliente",
+            target_type="clientes",
+            target_id="cliente-1",
+            created_by=user_id,
         )
 
         rel_id2 = repository.create_relationship(
-            source_type='pedidos',
-            source_id='pedido-1',
-            relationship_name='produto',
-            target_type='produtos',
-            target_id='produto-1',
-            created_by=user_id
+            source_type="pedidos",
+            source_id="pedido-1",
+            relationship_name="produto",
+            target_type="produtos",
+            target_id="produto-1",
+            created_by=user_id,
         )
 
         # Retrieve
-        rels = repository.get_relationships('pedidos', 'pedido-1')
+        rels = repository.get_relationships("pedidos", "pedido-1")
 
         assert len(rels) == 2
         rel_ids = {r.rel_id for r in rels}
@@ -491,12 +518,12 @@ class TestRelationshipCRUD:
         """Test soft-delete of relationship."""
         # Create
         rel_id = repository.create_relationship(
-            source_type='pedidos',
-            source_id='pedido-1',
-            relationship_name='cliente',
-            target_type='clientes',
-            target_id='cliente-1',
-            created_by=user_id
+            source_type="pedidos",
+            source_id="pedido-1",
+            relationship_name="cliente",
+            target_type="clientes",
+            target_id="cliente-1",
+            created_by=user_id,
         )
 
         # Remove (soft-delete)
@@ -515,12 +542,12 @@ class TestRelationshipCRUD:
         """Test restoring a soft-deleted relationship."""
         # Create
         rel_id = repository.create_relationship(
-            source_type='pedidos',
-            source_id='pedido-1',
-            relationship_name='cliente',
-            target_type='clientes',
-            target_id='cliente-1',
-            created_by=user_id
+            source_type="pedidos",
+            source_id="pedido-1",
+            relationship_name="cliente",
+            target_type="clientes",
+            target_id="cliente-1",
+            created_by=user_id,
         )
 
         # Remove (soft-delete)
@@ -545,6 +572,7 @@ class TestRelationshipCRUD:
 # TEST: Batch Operations
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class TestBatchOperations:
     """Tests for batch operations."""
 
@@ -552,24 +580,23 @@ class TestBatchOperations:
         """Test creating multiple relationships in batch."""
         relationships = [
             {
-                'source_type': 'pedidos',
-                'source_id': 'pedido-1',
-                'relationship_name': 'cliente',
-                'target_type': 'clientes',
-                'target_id': 'cliente-1'
+                "source_type": "pedidos",
+                "source_id": "pedido-1",
+                "relationship_name": "cliente",
+                "target_type": "clientes",
+                "target_id": "cliente-1",
             },
             {
-                'source_type': 'pedidos',
-                'source_id': 'pedido-1',
-                'relationship_name': 'produto',
-                'target_type': 'produtos',
-                'target_id': 'produto-1'
-            }
+                "source_type": "pedidos",
+                "source_id": "pedido-1",
+                "relationship_name": "produto",
+                "target_type": "produtos",
+                "target_id": "produto-1",
+            },
         ]
 
         results = repository.create_relationships_batch(
-            relationships,
-            created_by=user_id
+            relationships, created_by=user_id
         )
 
         # Returns list of rel_ids (strings) for successful creations
@@ -581,6 +608,7 @@ class TestBatchOperations:
 # TEST: Relationship Sync and Statistics
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class TestSyncAndStatistics:
     """Tests for sync operations and statistics."""
 
@@ -588,12 +616,12 @@ class TestSyncAndStatistics:
         """Test syncing display values."""
         # Create relationship
         repository.create_relationship(
-            source_type='pedidos',
-            source_id='pedido-1',
-            relationship_name='cliente',
-            target_type='clientes',
-            target_id='cliente-1',
-            created_by=user_id
+            source_type="pedidos",
+            source_id="pedido-1",
+            relationship_name="cliente",
+            target_type="clientes",
+            target_id="cliente-1",
+            created_by=user_id,
         )
 
         # Manually clear display value
@@ -601,13 +629,13 @@ class TestSyncAndStatistics:
         cursor = conn.cursor()
         cursor.execute(
             "UPDATE pedidos SET _cliente_display = NULL WHERE record_id = ?",
-            ('pedido-1',)
+            ("pedido-1",),
         )
         conn.commit()
         conn.close()
 
         # Sync display values
-        updated = repository.sync_display_values('pedidos', 'pedido-1')
+        updated = repository.sync_display_values("pedidos", "pedido-1")
 
         assert updated > 0
 
@@ -616,20 +644,20 @@ class TestSyncAndStatistics:
         # Create multiple relationships
         for i in range(3):
             repository.create_relationship(
-                source_type='pedidos',
-                source_id='pedido-1',
-                relationship_name='cliente' if i == 0 else f'item_{i}',
-                target_type='clientes' if i == 0 else 'produtos',
-                target_id='cliente-1' if i == 0 else 'produto-1',
-                created_by=user_id
+                source_type="pedidos",
+                source_id="pedido-1",
+                relationship_name="cliente" if i == 0 else f"item_{i}",
+                target_type="clientes" if i == 0 else "produtos",
+                target_id="cliente-1" if i == 0 else "produto-1",
+                created_by=user_id,
             )
 
         # Get stats for pedidos
-        stats = repository.get_relationship_stats('pedidos')
+        stats = repository.get_relationship_stats("pedidos")
 
-        assert stats['total'] >= 3
-        assert stats['active'] >= 3
-        assert 'by_name' in stats
+        assert stats["total"] >= 3
+        assert stats["active"] >= 3
+        assert "by_name" in stats
 
 
 if __name__ == "__main__":

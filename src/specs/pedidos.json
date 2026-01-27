@@ -1,0 +1,41 @@
+{
+  "title": "Pedidos",
+  "icon": "fa-shopping-cart",
+  "fields": [
+    {
+      "name": "cliente",
+      "label": "Cliente",
+      "type": "relationship",
+      "target": "contatos",
+      "cardinality": "one",
+      "display_field": "nome",
+      "required": true
+    },
+    {
+      "name": "produtos",
+      "label": "Produtos",
+      "type": "relationship",
+      "target": "produtos",
+      "cardinality": "many",
+      "display_field": "nome",
+      "required": true
+    },
+    {
+      "name": "data_pedido",
+      "label": "Data do Pedido",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "observacoes",
+      "label": "Observações",
+      "type": "textarea",
+      "required": false
+    }
+  ],
+  "validation_messages": {
+    "all_empty": "Por favor, preencha os dados do pedido",
+    "cliente": "Selecione o cliente",
+    "produtos": "Selecione pelo menos um produto"
+  }
+}
