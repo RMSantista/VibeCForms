@@ -2,6 +2,18 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Development Workflow
+
+For structured development with specialized agents, refer to the **[Orchestrator](.claude/Orchestrator.md)** - workflow based on the Orchestrator pattern for managing work at scale.
+
+The Orchestrator defines:
+- Development phases (Understanding → Planning → Implementation → Review → Validation → Finalization)
+- Specialized agents (rex, gus, tir)
+- Human interaction levels (Low, Medium, High)
+- Success criteria per stage
+
+---
+
 ## Framework Overview
 
 VibeCForms is an **AI-first framework for building process tracking systems** with seamless collaboration between humans, AI agents, and code. Unlike traditional CRUD frameworks, VibeCForms is designed for systems that track multi-step processes (sales pipelines, laboratory workflows, legal cases) where objects move through states and multiple actors (human, AI, or code) can observe and act on those transitions.
